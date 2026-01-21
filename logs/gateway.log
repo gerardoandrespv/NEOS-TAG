@@ -1,0 +1,166 @@
+[2026-01-20 06:18:18] 🚀 Iniciando Gateway RFID en puerto 60000
+[2026-01-20 06:18:18] 📡 URL: http://localhost:60000/
+[2026-01-20 06:18:18] ☁️  Cloud Function: https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway
+[2026-01-20 06:18:18] ✅ Regla firewall agregada
+[2026-01-20 06:18:18] ✅ Gateway LISTO. Esperando lecturas RFID...
+[2026-01-20 06:18:21] 📥 Solicitud recibida: /readerid
+[2026-01-20 06:26:30] 🚀 Iniciando Gateway RFID en puerto 60000
+[2026-01-20 06:26:30] 📡 URL: http://localhost:60000/
+[2026-01-20 06:26:30] ☁️  Cloud Function: https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway
+[2026-01-20 06:26:30] ✅ Permisos URL configurados
+[2026-01-20 06:26:30] ✅ Regla firewall agregada
+[2026-01-20 06:26:30] ❌ ERROR CRÍTICO: No se pudo iniciar listener: Exception calling "Start" with "0" argument(s): "Failed to listen on prefix 'http://+:60000/' because it conflicts with an existing registration on the machine."
+[2026-01-20 06:26:33] 📥 Solicitud recibida: /health
+[2026-01-20 06:26:33] 💚 Health Check respondido
+[2026-01-20 06:26:33] 📥 Solicitud recibida: /process
+[2026-01-20 06:26:33] 🏷️  Tag RFID recibido: {
+  "epc": "TEST_PS_938908",
+  "gateway_version": "condominio_powershell_1.0",
+  "reader_sn": "READER_PS_01",
+  "timestamp": "2026-01-20T06:26:33.231"
+}
+[2026-01-20 06:26:33] 📤 Respuesta enviada: {"access_granted":true,"client_id":"condominio-neos","debug":"firestore_logging_enabled","message":"Acceso permitido","reader_id":"READER_PS_01","status":"processed","tag_id":"TEST_PS_938908","timestamp":"2026-01-20T09:26:33.86109","version":"2.0-multi-tenant"}
+[2026-01-20 06:26:33] 📥 Solicitud recibida: /badroute
+[2026-01-20 06:27:25] 🚀 Iniciando Gateway RFID en puerto 60000
+[2026-01-20 06:27:25] 📡 URL: http://localhost:60000/
+[2026-01-20 06:27:25] ☁️  Cloud Function: https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway
+[2026-01-20 06:27:25] ✅ Permisos URL configurados
+[2026-01-20 06:27:25] ✅ Regla firewall agregada
+[2026-01-20 06:27:25] ❌ ERROR CRÍTICO: No se pudo iniciar listener: Exception calling "Start" with "0" argument(s): "Failed to listen on prefix 'http://+:60000/' because it conflicts with an existing registration on the machine."
+[2026-01-20 06:27:30] 📥 Solicitud recibida: /health
+[2026-01-20 06:27:30] 💚 Health Check respondido
+[2026-01-20 06:27:30] 📥 Solicitud recibida: /process
+[2026-01-20 06:27:30] 🏷️  Tag RFID recibido: {
+  "timestamp": "2026-01-20T06:27:30.195",
+  "location": "Puerta Principal",
+  "client_id": "condominio-neos",
+  "id": "TAG_TEST_062730",
+  "gateway_version": "condominio_powershell",
+  "reader_sn": "READER_TEST"
+}
+[2026-01-20 06:27:30] 📤 Respuesta enviada: {"access_granted":true,"client_id":"condominio-neos","debug":"firestore_logging_enabled","message":"Acceso permitido","reader_id":"READER_TEST","status":"processed","tag_id":"TAG_TEST_062730","timestamp":"2026-01-20T09:27:30.60083","version":"2.0-multi-tenant"}
+[2026-01-20 06:41:00] 🚀 Iniciando Gateway RFID en puerto 60000
+[2026-01-20 06:41:00] 📡 URL: http://localhost:60000/
+[2026-01-20 06:41:00] ☁️  Cloud Function: https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway
+[2026-01-20 06:41:00] ✅ Permisos URL configurados
+[2026-01-20 06:41:00] ✅ Regla firewall agregada
+[2026-01-20 06:41:00] ✅ Gateway LISTO. Esperando lecturas RFID...
+[2026-01-20 06:41:18] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 06:41:18] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 06:41:18] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 06:41:18] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 06:41:18] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 06:41:18] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 06:41:18] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 06:41:18] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 06:41:18] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 06:41:18] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 06:41:19] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 06:41:19] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 06:42:29] 🚀 Iniciando Gateway RFID en puerto 60000
+[2026-01-20 06:42:29] 📡 URL: http://localhost:60000/
+[2026-01-20 06:42:29] ☁️  Cloud Function: https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway
+[2026-01-20 06:42:29] ✅ Permisos URL configurados
+[2026-01-20 06:42:29] ✅ Regla firewall agregada
+[2026-01-20 06:42:29] ❌ ERROR CRÍTICO: No se pudo iniciar listener: Exception calling "Start" with "0" argument(s): "Failed to listen on prefix 'http://+:60000/' because it conflicts with an existing registration on the machine."
+[2026-01-20 06:42:44] 📥 Solicitud recibida: /health - Método: GET
+[2026-01-20 06:42:44] 💚 Health Check respondido
+[2026-01-20 06:51:04] 📥 Solicitud recibida: /health - Método: GET
+[2026-01-20 06:51:04] 💚 Health Check respondido
+[2026-01-20 06:51:04] 📥 Solicitud recibida: /process - Método: POST
+[2026-01-20 06:51:04] 🏷️  Tag RFID recibido: {
+  "timestamp": "2026-01-20T06:51:04.681",
+  "id": "FINAL_TEST_065104",
+  "reader_sn": "FINAL_TEST"
+}
+[2026-01-20 06:51:04] 📤 Enviando a Cloud Function...
+[2026-01-20 06:51:05] ✅ Cloud Function respondió
+[2026-01-20 06:51:05] 📤 Respuesta enviada
+[2026-01-20 06:51:40] 📥 Solicitud recibida: /health - Método: GET
+[2026-01-20 06:51:40] 💚 Health Check respondido
+[2026-01-20 07:06:03] 📥 Solicitud recibida: /health - Método: GET
+[2026-01-20 07:06:03] 💚 Health Check respondido
+[2026-01-20 07:13:50] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:13:50] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:14:25] 📥 Solicitud recibida: /health - Método: GET
+[2026-01-20 07:14:25] 💚 Health Check respondido
+[2026-01-20 07:14:51] 📥 Solicitud recibida: /process - Método: POST
+[2026-01-20 07:14:51] 🏷️  Tag RFID recibido: {
+  "client_id": "condominio-neos",
+  "location": "Entrada Principal",
+  "reader_id": "MAIN_ENTRANCE",
+  "tag_id": "FIRST_PROD_TAG_20260120_071451",
+  "access_type": "resident"
+}
+[2026-01-20 07:14:51] 📤 Enviando a Cloud Function...
+[2026-01-20 07:14:51] ✅ Cloud Function respondió
+[2026-01-20 07:14:51] 📤 Respuesta enviada
+[2026-01-20 07:20:50] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:20:50] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:21:35] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:21:35] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:22:01] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:22:01] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:22:39] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:22:39] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:24:52] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:24:52] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:24:53] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:24:53] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:25:45] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:25:45] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:25:45] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:25:45] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:25:48] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:25:48] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:25:55] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:25:55] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:26:16] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:26:16] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:26:26] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:26:26] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:26:29] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:26:29] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:27:17] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:27:17] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:31:08] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:31:08] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:32:07] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:32:07] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:35:06] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:35:06] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:35:07] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:35:07] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:35:07] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:35:07] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:35:07] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:35:07] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:35:07] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:35:07] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:35:07] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:35:07] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:35:07] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:35:07] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:36:49] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:36:49] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:36:49] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:36:49] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:36:49] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:36:49] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:36:49] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:36:49] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:36:49] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:36:49] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:36:52] 📥 Solicitud recibida: /readerid - Método: GET
+[2026-01-20 07:36:52] ⚠️  Ruta no encontrada: /readerid
+[2026-01-20 07:38:42] 📥 Solicitud recibida: /process - Método: POST
+[2026-01-20 07:38:42] 🏷️  Tag RFID recibido: {
+  "status": "active",
+  "reader_sn": "TEST_UPDATER",
+  "timestamp": "2026-01-20T07:38:41.979Z",
+  "location": "Entrada Principal",
+  "epc": "TEST_UPDATE_20260120_073841"
+}
+[2026-01-20 07:38:42] 📤 Enviando a Cloud Function...
+[2026-01-20 07:38:45] ✅ Cloud Function respondió
+[2026-01-20 07:38:45] 📤 Respuesta enviada

@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: neos
+      POSTGRES_PASSWORD: neos_dev
+      POSTGRES_DB: neos_access
+    ports:
+      - "5432:5432"
+    volumes:
+      - neos_pg:/var/lib/postgresql/data
+
+volumes:
+  neos_pg:

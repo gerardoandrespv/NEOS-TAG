@@ -1,0 +1,16 @@
+{
+  "logging": {
+    "file": "C:\\NeosTech-RFID-System-Pro\\logs\\gateway\\gateway.log",
+    "level": "info"
+  },
+  "cloud": {
+    "timeout_seconds": 10,
+    "function_url": "https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway"
+  },
+  "version": "condominio_2.0",
+  "server": {
+    "port": 60000,
+    "api_endpoint": "/api/tag",
+    "health_endpoint": "/health"
+  }
+}

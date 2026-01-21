@@ -1,0 +1,5 @@
+C:\NEOS-TECH\DEVELOPMENT\GATEWAY-CSHARP\obj\Debug\net8.0\win-x64\RFID_Gateway.csproj.AssemblyReference.cache
+C:\NEOS-TECH\DEVELOPMENT\GATEWAY-CSHARP\obj\Debug\net8.0\win-x64\RFID_Gateway.GeneratedMSBuildEditorConfig.editorconfig
+C:\NEOS-TECH\DEVELOPMENT\GATEWAY-CSHARP\obj\Debug\net8.0\win-x64\RFID_Gateway.AssemblyInfoInputs.cache
+C:\NEOS-TECH\DEVELOPMENT\GATEWAY-CSHARP\obj\Debug\net8.0\win-x64\RFID_Gateway.AssemblyInfo.cs
+C:\NEOS-TECH\DEVELOPMENT\GATEWAY-CSHARP\obj\Debug\net8.0\win-x64\RFID_Gateway.csproj.CoreCompileInputs.cache

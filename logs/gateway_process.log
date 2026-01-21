@@ -1,0 +1,5 @@
+﻿2026-01-20 05:57:28 - === INICIANDO GATEWAY RFID ===
+2026-01-20 05:57:28 - Puerto: 60000
+2026-01-20 05:57:28 - Cloud Function: https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway
+2026-01-20 05:57:28 - ERROR CRÃTICO: No se puede agregar el tipo. Se produjeron errores de compilación.
+2026-01-20 05:57:28 -    en System.Management.Automation.MshCommandRuntime.ThrowTerminatingError(ErrorRecord errorRecord)

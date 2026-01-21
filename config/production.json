@@ -1,0 +1,14 @@
+{
+  "production_since": "2026-01-20",
+  "firebase_project": "neos-tech",
+  "environment": "production",
+  "cloud_function": "https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway",
+  "gateway_port": 60000,
+  "logs_retention_days": 30,
+  "auto_start": true,
+  "allowed_readers": [
+    "READER_01",
+    "READER_02",
+    "READER_03"
+  ]
+}

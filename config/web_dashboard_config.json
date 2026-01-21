@@ -1,0 +1,19 @@
+{
+  "firebase_config": {
+    "authDomain": "neos-tech.firebaseapp.com",
+    "storageBucket": "neos-tech.firebasestorage.app",
+    "messagingSenderId": "738411977369",
+    "appId": "1:738411977369:web:7facc71cea4c271d217608",
+    "measurementId": "G-DL4X5MX5JL",
+    "projectId": "neos-tech",
+    "apiKey": "AIzaSyBZ-XRSRgC2gz9E6zdYpes7yv5nLZtKmSw"
+  },
+  "last_updated": "2026-01-20 07:13:21",
+  "gateway_config": {
+    "cloud_function": "https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway",
+    "port": 60000,
+    "auto_start": true
+  },
+  "dashboard_type": "web_hosted",
+  "dashboard_url": "https://neos-tech.web.app/"
+}

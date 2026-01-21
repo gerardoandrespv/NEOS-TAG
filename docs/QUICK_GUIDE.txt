@@ -1,0 +1,28 @@
+╔══════════════════════════════════════════════════════╗
+║            SISTEMA RFID - CONDOMINIO NEOS TECH      ║
+╠══════════════════════════════════════════════════════╣
+║                                                      ║
+║  🌐 DASHBOARD WEB:                                   ║
+║     https://neos-tech.web.app/                       ║
+║                                                      ║
+║  🔧 HERRAMIENTAS ADMIN:                              ║
+║     • Firebase Console:                              ║
+║       https://console.firebase.google.com/project/   ║
+║       neos-tech/firestore                            ║
+║                                                      ║
+║     • Cloud Function Logs:                           ║
+║       https://console.cloud.google.com/functions/    ║
+║       list?project=neos-tech                         ║
+║                                                      ║
+║  📡 GATEWAY LOCAL:                                   ║
+║     • Puerto: 60000                                  ║
+║     • Health Check: http://localhost:60000/health    ║
+║     • Servicio: RFIDGateway                          ║
+║                                                      ║
+║  🚨 COMANDOS ÚTILES (PowerShell como Admin):         ║
+║     • Ver estado: Get-Service RFIDGateway            ║
+║     • Reiniciar: Restart-Service RFIDGateway         ║
+║     • Ver logs: Get-EventLog -LogName Application    ║
+║       -Source RFIDGateway -Newest 20                 ║
+║                                                      ║
+╚══════════════════════════════════════════════════════╝
