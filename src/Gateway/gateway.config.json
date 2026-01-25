@@ -7,7 +7,7 @@
   },
   "cloud": {
     "timeout_seconds": 10,
-    "function_url": "https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway"
+    "function_url": "https://us-central1-neos-tech.cloudfunctions.net/check-tag-access"
   },
   "server": {
     "port": 60000,
@@ -20,20 +20,22 @@
       "name": "Portón Triwe",
       "type": "gate",
       "reader_ip": "192.168.1.200",
-      "reader_port": 8080,
+      "reader_port": 60000,
       "relay_channel": 1,
-      "open_duration_ms": 5000,
-      "test_mode": true
+      "open_duration_ms": 1000,
+      "test_mode": false,
+      "protocol": "THY_SDK"
     },
     {
       "id": "porton_principal",
       "name": "Portón Principal",
       "type": "gate",
       "reader_ip": "192.168.1.101",
-      "reader_port": 8080,
+      "reader_port": 60000,
       "relay_channel": 1,
       "open_duration_ms": 5000,
-      "test_mode": true
+      "test_mode": false,
+      "protocol": "THY_SDK"
     }
   ]
 }

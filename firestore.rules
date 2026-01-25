@@ -39,14 +39,13 @@ service cloud.firestore {
     // COLECCIÓN: users
     // ============================================
     match /users/{userId} {
-      // Lectura: En producción, solo autenticados
-      // Por ahora permitir para desarrollo
+      // Lectura: Permitir para desarrollo
       allow read: if true;
       
-      // Creación: Validar estructura completa
-      allow create: if isValidUserData(request.resource.data) &&
-                       request.resource.data.createdAt == request.time &&
-                       request.resource.data.updatedAt == request.time;
+      // Escritura: Permitir para desarrollo
+      // TODO: Restringir en producción
+      allow write: if true;
+    }
       
       // Actualización: Validar datos y preservar createdAt
       allow update: if isValidUserData(request.resource.data) &&

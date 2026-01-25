@@ -1,6 +1,12 @@
-node_modules/
-dist/
-build/
+﻿dist/
+bin/
+obj/
 .env
+*.local
+.vs/
 .vscode/
-.DS_Store
+.archive/
+.firebase/
+firebase-debug.log
+*.log
+node_modules

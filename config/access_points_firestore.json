@@ -1,0 +1,48 @@
+﻿{
+    "access_points":  [
+                          {
+                              "id":  "porton_principal",
+                              "type":  "gate",
+                              "open_duration_ms":  3000,
+                              "created_at":  "2026-01-21T23:04:10Z",
+                              "reader_port":  8080,
+                              "name":  "PortÃ³n Principal",
+                              "relay_channel":  1,
+                              "reader_ip":  "192.168.1.100",
+                              "enabled":  true
+                          },
+                          {
+                              "id":  "estacionamiento",
+                              "type":  "gate",
+                              "open_duration_ms":  5000,
+                              "created_at":  "2026-01-21T23:04:10Z",
+                              "reader_port":  8080,
+                              "name":  "PortÃ³n Estacionamiento",
+                              "relay_channel":  1,
+                              "reader_ip":  "192.168.1.101",
+                              "enabled":  true
+                          },
+                          {
+                              "id":  "puerta_peatonal",
+                              "type":  "door",
+                              "open_duration_ms":  2000,
+                              "created_at":  "2026-01-21T23:04:10Z",
+                              "reader_port":  8080,
+                              "name":  "Puerta Peatonal",
+                              "relay_channel":  1,
+                              "reader_ip":  "192.168.1.102",
+                              "enabled":  true
+                          },
+                          {
+                              "id":  "acceso_gimnasio",
+                              "type":  "door",
+                              "open_duration_ms":  2000,
+                              "created_at":  "2026-01-21T23:04:10Z",
+                              "reader_port":  8080,
+                              "name":  "Acceso Gimnasio",
+                              "relay_channel":  1,
+                              "reader_ip":  "192.168.1.103",
+                              "enabled":  true
+                          }
+                      ]
+}
