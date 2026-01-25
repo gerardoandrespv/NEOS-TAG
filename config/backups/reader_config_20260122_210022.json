@@ -1,0 +1,41 @@
+{
+  "client_id": "condominio-neos",
+  "version": "6.0",
+  "logging": {
+    "file": "C:\\NeosTech-RFID-System-Pro\\logs\\gateway\\gateway.log",
+    "level": "info"
+  },
+  "cloud": {
+    "timeout_seconds": 10,
+    "function_url": "https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway"
+  },
+  "server": {
+    "port": 60000,
+    "api_endpoint": "/api/tag",
+    "health_endpoint": "/health"
+  },
+  "access_points": [
+    {
+      "id": "porton_triwe",
+      "name": "Portón Triwe",
+      "type": "gate",
+      "reader_ip": "192.168.1.200",
+      "reader_port": 60000,
+      "relay_channel": 1,
+      "open_duration_ms": 1000,
+      "test_mode": false,
+      "protocol": "THY_SDK"
+    },
+    {
+      "id": "porton_principal",
+      "name": "Portón Principal",
+      "type": "gate",
+      "reader_ip": "192.168.1.101",
+      "reader_port": 60000,
+      "relay_channel": 1,
+      "open_duration_ms": 5000,
+      "test_mode": false,
+      "protocol": "THY_SDK"
+    }
+  ]
+}

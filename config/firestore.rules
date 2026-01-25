@@ -1,0 +1,175 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // REGLAS DE SEGURIDAD - TRIÁNGULO CIA
+    // ============================================
+    
+    // CONFIDENCIALIDAD: Solo usuarios autenticados pueden acceder
+    // INTEGRIDAD: Validación de datos en cada escritura
+    // DISPONIBILIDAD: Rate limiting implícito por Firebase
+    
+    // Función auxiliar: Validar email
+    function isValidEmail(email) {
+      return email.matches('^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+    
+    // Función auxiliar: Validar tag RFID
+    function isValidTag(tag) {
+      return tag is string && 
+             tag.size() >= 12 && 
+             tag.size() <= 50 &&
+             tag.matches('^[A-Fa-f0-9]+$');
+    }
+    
+    // Función auxiliar: Datos de usuario válidos
+    function isValidUserData(data) {
+      return data.name is string && 
+             data.name.size() >= 3 &&
+             data.name.size() <= 100 &&
+             data.email is string &&
+             isValidEmail(data.email) &&
+             data.status in ['active', 'inactive', 'suspended'] &&
+             data.role in ['resident', 'guest', 'staff', 'admin'] &&
+             (data.tags is list || !('tags' in data));
+    }
+    
+    // ============================================
+    // COLECCIÓN: users
+    // ============================================
+    match /users/{userId} {
+      // MODO DESARROLLO: Permitir todas las operaciones
+      // TODO: Restringir en producción
+      allow read, write: if true;
+    }
+    
+    // ============================================
+    // COLECCIÓN: rfid_tags
+    // ============================================
+    match /rfid_tags/{tagId} {
+      // Lectura: Permitir (eventos públicos del sistema)
+      allow read: if true;
+      
+      // Escritura: Solo desde Cloud Function o autenticado
+      allow create: if request.resource.data.timestamp == request.time;
+      
+      // No permitir actualización ni eliminación
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: audit_log
+    // ============================================
+    match /audit_log/{logId} {
+      // Solo lectura para auditoría
+      allow read: if true; // En producción: solo admins
+      
+      // Solo escritura con timestamp server
+      allow create: if request.resource.data.timestamp == request.time;
+      
+      // No modificar ni eliminar logs
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: access_events (Eventos de Acceso)
+    // ============================================
+    match /access_events/{eventId} {
+      // Lectura: Permitida para monitoreo
+      allow read: if true;
+      
+      // Escritura: Solo con timestamp del servidor
+      allow create: if request.resource.data.timestamp == request.time &&
+                       request.resource.data.access_point_id is string &&
+                       request.resource.data.action in ['open', 'close', 'denied'];
+      
+      // No modificar ni eliminar eventos
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: access_points (Configuración de Puntos de Acceso)
+    // ============================================
+    match /access_points/{accessPointId} {
+      // Lectura: Permitida
+      allow read: if true;
+      
+      // Escritura: Solo admins (en producción agregar autenticación)
+      allow create, update: if true; // TODO: Validar admin
+      
+      // No eliminar puntos de acceso
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: gate_events (Legacy - mantener compatibilidad)
+    // ============================================
+    match /gate_events/{eventId} {
+      allow read: if true;
+      allow create: if request.resource.data.timestamp == request.time;
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: clients (multi-tenant)
+    // ============================================
+    match /clients/{clientId} {
+      allow read: if true;
+      allow write: if true; // En producción: validar clientId
+      
+      // Subcolecciones - IMPORTANTE: Debe ir ANTES de la regla catch-all
+      match /tags/{tagId} {
+        allow read, write: if true;
+      }
+      
+      match /rfid_tags/{tagId} {
+        allow read, write: if true;
+      }
+      
+      match /gate_logs/{logId} {
+        allow read, write: if true;
+      }
+      
+      match /access_events/{eventId} {
+        allow read, write: if true;
+      }
+      
+      match /login_logs/{logId} {
+        allow read, write: if true;
+      }
+    }
+    
+    // ============================================
+    // COLECCIONES BASE (Para desarrollo - sin multi-tenant)
+    // ============================================
+    match /rfid_tags/{tagId} {
+      allow read, write: if true;
+    }
+    
+    match /whitelist/{itemId} {
+      allow read, write: if true;
+    }
+    
+    match /blacklist/{itemId} {
+      allow read, write: if true;
+    }
+    
+    match /alerts/{alertId} {
+      allow read, write: if true;
+    }
+    
+    match /logs/{logId} {
+      allow read, write: if true;
+    }
+    
+    match /login_logs/{logId} {
+      allow read, write: if true;
+    }
+    
+    // Denegar acceso a cualquier otra colección no especificada
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

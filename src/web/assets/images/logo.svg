@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <!-- Fondo degradado moderno -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0066cc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00a8ff;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00a8ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0066cc;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Icono RFID estilizado -->
+  <g>
+    <!-- Ondas RFID -->
+    <path d="M 25 30 Q 15 20, 15 30 Q 15 40, 25 30" fill="none" stroke="url(#grad1)" stroke-width="2" opacity="0.6"/>
+    <path d="M 30 30 Q 20 15, 10 30 Q 20 45, 30 30" fill="none" stroke="url(#grad1)" stroke-width="2" opacity="0.7"/>
+    <path d="M 35 30 Q 25 10, 5 30 Q 25 50, 35 30" fill="none" stroke="url(#grad1)" stroke-width="2" opacity="0.8"/>
+    
+    <!-- Chip RFID central -->
+    <rect x="32" y="22" width="16" height="16" rx="2" fill="url(#grad2)"/>
+    <rect x="34" y="24" width="12" height="12" rx="1" fill="#fff" opacity="0.2"/>
+    <line x1="36" y1="30" x2="44" y2="30" stroke="#fff" stroke-width="1"/>
+    <line x1="40" y1="26" x2="40" y2="34" stroke="#fff" stroke-width="1"/>
+  </g>
+  
+  <!-- Texto NeosTech -->
+  <text x="55" y="25" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#2c3e50">
+    Neos
+  </text>
+  <text x="93" y="25" font-family="Arial, sans-serif" font-size="18" font-weight="300" fill="#0066cc">
+    Tech
+  </text>
+  
+  <!-- Subtítulo -->
+  <text x="55" y="40" font-family="Arial, sans-serif" font-size="9" fill="#7f8c8d" letter-spacing="1">
+    CONTROL DE ACCESO
+  </text>
+  
+  <!-- Línea decorativa -->
+  <line x1="55" y1="45" x2="150" y2="45" stroke="url(#grad2)" stroke-width="2" opacity="0.3"/>
+</svg>
