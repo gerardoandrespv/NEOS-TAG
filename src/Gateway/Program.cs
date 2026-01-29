@@ -35,6 +35,11 @@ namespace RFID_Gateway
         private static bool isReading = false;
         private static System.Threading.CancellationTokenSource readingCancellation;
         
+        // Cache local de whitelist (para funcionamiento offline)
+        private static HashSet<string> whitelistCache = new HashSet<string>();
+        private static DateTime whitelistLastSync = DateTime.MinValue;
+        private static int whitelistSyncIntervalMinutes = 5; // Sincronizar cada 5 minutos
+        
         static async Task Main(string[] args)
         {
             try
@@ -50,6 +55,10 @@ namespace RFID_Gateway
                 Console.WriteLine($"[{DateTime.Now}] Client ID: {clientId}");
                 Console.WriteLine($"[{DateTime.Now}] Cloud Function: {cloudFunctionUrl}");
                 Console.WriteLine($"[{DateTime.Now}] Puntos de acceso cargados: {accessPoints.Count}");
+                
+                // Sincronizar whitelist al inicio
+                Console.WriteLine($"[{DateTime.Now}] 🔄 Sincronizando whitelist inicial...");
+                await SyncWhitelistFromFirestore();
                 
                 // Iniciar lectura automática de tags
                 StartAutoTagReading();
@@ -477,9 +486,12 @@ namespace RFID_Gateway
         
         private static async Task<(bool isAllowed, string status, string message)> CheckTagAccess(string tagId)
         {
+            // PASO 1: Verificar cache local primero (modo offline-first)
+            bool inLocalCache = CheckWhitelistCache(tagId);
+            
             try
             {
-                // Consultar cloud function para verificar acceso
+                // PASO 2: Intentar verificar con cloud (para actualizar estado en tiempo real)
                 string checkUrl = cloudFunctionUrl.Replace("/rfid-gateway", "/check-tag-access");
                 
                 var payload = new
@@ -492,7 +504,7 @@ namespace RFID_Gateway
                 
                 using (var client = new HttpClient())
                 {
-                    client.Timeout = TimeSpan.FromSeconds(5);
+                    client.Timeout = TimeSpan.FromSeconds(3); // Timeout reducido para respuesta rápida
                     client.DefaultRequestHeaders.Add("X-Client-ID", clientId);
                     
                     var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -512,6 +524,12 @@ namespace RFID_Gateway
                     else
                     {
                         Console.WriteLine($"[{DateTime.Now}] ⚠️ Error verificando tag: {responseContent}");
+                        // Fallback a cache local si cloud falla
+                        if (inLocalCache)
+                        {
+                            Console.WriteLine($"[{DateTime.Now}] ℹ️ Usando cache local (tag en whitelist)");
+                            return (true, "whitelist_cached", "Tag autorizado (cache local)");
+                        }
                         return (false, "error", "Error consultando acceso");
                     }
                 }
@@ -519,8 +537,16 @@ namespace RFID_Gateway
             catch (Exception ex)
             {
                 Console.WriteLine($"[{DateTime.Now}] ⚠️ Excepción verificando tag: {ex.Message}");
-                // En caso de error de red, denegar acceso por seguridad
-                return (false, "error", $"Error de conexión: {ex.Message}");
+                
+                // MODO OFFLINE: Si no hay conexión, usar cache local
+                if (inLocalCache)
+                {
+                    Console.WriteLine($"[{DateTime.Now}] 🔌 MODO OFFLINE: Tag en whitelist local");
+                    return (true, "whitelist_offline", "Tag autorizado (modo offline)");
+                }
+                
+                Console.WriteLine($"[{DateTime.Now}] 🔌 MODO OFFLINE: Tag NO en whitelist local");
+                return (false, "not_in_cache", "Tag no autorizado (modo offline)");
             }
         }
         
@@ -837,6 +863,86 @@ namespace RFID_Gateway
                     Console.WriteLine($"[{DateTime.Now}] ⚠️ Excepción registrando evento: {ex.Message}");
                 }
             });
+        }
+        
+        /// <summary>
+        /// Sincroniza la whitelist local con Firestore
+        /// </summary>
+        private static async Task SyncWhitelistFromFirestore()
+        {
+            try
+            {
+                Console.WriteLine($"[{DateTime.Now}] 🔄 Sincronizando whitelist desde Firestore...");
+                
+                using (var client = new HttpClient())
+                {
+                    // Obtener todos los tags activos del cliente
+                    var url = $"https://firestore.googleapis.com/v1/projects/neos-tech/databases/(default)/documents/clients/{clientId}/tags";
+                    var response = await client.GetAsync(url);
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var json = await response.Content.ReadAsStringAsync();
+                        dynamic data = JsonConvert.DeserializeObject(json);
+                        
+                        var newWhitelist = new HashSet<string>();
+                        
+                        if (data != null && data.documents != null)
+                        {
+                            foreach (var doc in data.documents)
+                            {
+                                try
+                                {
+                                    // Verificar que el tag esté activo (status != "blocked")
+                                    string status = doc.fields?.status?.stringValue ?? "active";
+                                    string tagId = doc.fields?.tag_id?.stringValue;
+                                    
+                                    if (!string.IsNullOrWhiteSpace(tagId) && status != "blocked")
+                                    {
+                                        newWhitelist.Add(tagId);
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        
+                        whitelistCache = newWhitelist;
+                        whitelistLastSync = DateTime.Now;
+                        
+                        Console.WriteLine($"[{DateTime.Now}] ✅ Whitelist sincronizada: {whitelistCache.Count} tags");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[{DateTime.Now}] ⚠️ Error sincronizando whitelist: {response.StatusCode}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now}] ⚠️ Excepción sincronizando whitelist: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Verifica si un tag está en la whitelist local (cache)
+        /// </summary>
+        private static bool CheckWhitelistCache(string tagId)
+        {
+            // Si han pasado más de N minutos desde la última sincronización, disparar sync en background
+            if ((DateTime.Now - whitelistLastSync).TotalMinutes > whitelistSyncIntervalMinutes)
+            {
+                _ = Task.Run(async () => await SyncWhitelistFromFirestore());
+            }
+            
+            return whitelistCache.Contains(tagId);
+        }
+        
+        /// <summary>
+        /// Obtiene la whitelist completa (para API)
+        /// </summary>
+        private static List<string> GetWhitelistCache()
+        {
+            return whitelistCache.ToList();
         }
     }
 }
