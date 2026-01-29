@@ -325,13 +325,26 @@ namespace RFID_Gateway
                 ushort iNum = 0;
                 
                 // Ejecutar inventario G2 (AnswerMode)
-                if (!SWNet_InventoryG2(devAddr, arrBuffer, out iTotalLen, out iNum))
+                bool result = SWNet_InventoryG2(devAddr, arrBuffer, out iTotalLen, out iNum);
+                
+                // Debug cada 5 segundos
+                if (DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 100)
                 {
+                    Console.WriteLine($"[THY-DEBUG] InventoryG2 result={result}, num={iNum}, len={iTotalLen}");
+                }
+                
+                if (!result)
+                {
+                    // No es error, simplemente no hay respuesta
                     return new string[0];
                 }
                 
                 int iTagNumber = iNum;
-                if (iTagNumber == 0) return new string[0];
+                if (iTagNumber == 0)
+                {
+                    // No hay tags, normal
+                    return new string[0];
+                }
                 
                 Console.WriteLine($"[THY] InventoryG2: {iTagNumber} tag(s), totalLen={iTotalLen}");
                 
@@ -382,6 +395,90 @@ namespace RFID_Gateway
                 return new string[0];
             }
         }
+        
+        /// <summary>
+        /// Lee los tags del buffer (modo pasivo - tags que llegaron automáticamente)
+        /// </summary>
+        public static string[] ReadTagBuffer()
+        {
+            try
+            {
+                byte[] buffer = new byte[64000];
+                int length = 0;
+                int tagNumber = 0;
+                
+                // Leer buffer de tags
+                byte result = SWNet_GetTagBuf(buffer, out length, out tagNumber);
+                
+                // Debug: mostrar resultado cada 5 segundos
+                if (DateTime.Now.Second % 5 == 0 && DateTime.Now.Millisecond < 100)
+                {
+                    Console.WriteLine($"[THY-DEBUG] GetTagBuf result={result}, tags={tagNumber}, len={length}");
+                }
+                
+                if (result == 0 || tagNumber == 0)
+                {
+                    return new string[0];
+                }
+                
+                Console.WriteLine($"[THY] Buffer: {tagNumber} tag(s), length={length}");
+                
+                // Parse tags del buffer
+                List<string> tags = new List<string>();
+                int offset = 0;
+                
+                for (int i = 0; i < tagNumber; i++)
+                {
+                    if (offset >= length) break;
+                    
+                    byte packLength = buffer[offset];
+                    
+                    if (packLength == 0 || offset + packLength > length)
+                    {
+                        Console.WriteLine($"[THY] Buffer: Dato inválido en offset {offset}");
+                        break;
+                    }
+                    
+                    // Determinar longitud del EPC
+                    int epcLen;
+                    if ((buffer[offset + 1] & 0x80) == 0x80)
+                    {
+                        // Con timestamp
+                        epcLen = packLength - 7;
+                    }
+                    else
+                    {
+                        epcLen = packLength - 1;
+                    }
+                    
+                    // Extraer EPC (saltar Type y Ant)
+                    StringBuilder epc = new StringBuilder();
+                    for (int j = 2; j < epcLen && (offset + 1 + j) < length; j++)
+                    {
+                        epc.Append(buffer[offset + 1 + j].ToString("X2"));
+                    }
+                    
+                    string tagId = epc.ToString();
+                    
+                    if (!string.IsNullOrWhiteSpace(tagId))
+                    {
+                        byte ant = buffer[offset + 2];
+                        Console.WriteLine($"[THY] Buffer Tag #{i + 1}: {tagId} (Ant:{ant})");
+                        tags.Add(tagId);
+                    }
+                    
+                    offset += packLength + 1;
+                }
+                
+                return tags.ToArray();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[THY] Error leyendo buffer: {ex.Message}");
+                return new string[0];
+            }
+        }
+
         
 
         

@@ -209,6 +209,9 @@ namespace RFID_Gateway
             
             try
             {
+                // DEBUG: Log de TODAS las peticiones HTTP
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📨 HTTP {context.Request.HttpMethod} {context.Request.Url.PathAndQuery}");
+                
                 // Endpoint para recibir tags de la lectora THY (HTTP Protocol)
                 if (context.Request.Url.PathAndQuery.StartsWith("/readerid"))
                 {
@@ -220,6 +223,8 @@ namespace RFID_Gateway
                     string heart = context.Request.QueryString["heart"];
                     string readsn = context.Request.QueryString["readsn"];
                     
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Parámetros recibidos: id={tagId}, heart={heart}, readsn={readsn}");
+                    
                     // Ignorar heartbeats (solo procesar tags reales)
                     if (!string.IsNullOrEmpty(tagId) && heart != "1")
                     {
@@ -230,10 +235,18 @@ namespace RFID_Gateway
                         {
                             await ProcessTag(tagId, reader);
                         }
+                        else
+                        {
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ No hay puntos de acceso configurados");
+                        }
                     }
                     else if (heart == "1")
                     {
                         Console.WriteLine($"[{DateTime.Now:dd-MM-yyyy HH:mm:ss}] 💓 Heartbeat de lectora {readsn}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Tag vacío o heartbeat ignorado");
                     }
                     
                     response.StatusCode = 200;
@@ -601,6 +614,11 @@ namespace RFID_Gateway
                         if (isConnected)
                         {
                             Console.WriteLine($"[{DateTime.Now}] ✅ Conectado al lector {reader.name}");
+                            
+                            // Intentar iniciar lectura continua
+                            bool startReadResult = THYReaderAPI.SWNet_StartRead(0xFF);
+                            Console.WriteLine($"[{DateTime.Now}] 📡 StartRead: {(startReadResult ? "OK" : "FAIL")}");
+                            
                             Console.WriteLine($"[{DateTime.Now}] 📡 Modo polling del buffer (cada 500ms)");
                             Console.WriteLine($"[{DateTime.Now}] 💡 Acerca un tag RFID al lector...");
                             
@@ -620,28 +638,48 @@ namespace RFID_Gateway
                         }
                     }
                     
-                    // Forzar inventario activo (trigger de lectura)
-                    var tags = THYReaderAPI.DoInventory(0xFF);
-                    
-                    if (tags != null && tags.Length > 0)
+                    // DEBUG: Mostrar que estamos en el loop
+                    if (DateTime.Now.Second % 10 == 0 && DateTime.Now.Millisecond < 500)
                     {
-                        Console.WriteLine($"[{DateTime.Now}] 📡 {tags.Length} tag(s) detectado(s)");
+                        Console.WriteLine($"[{DateTime.Now}] 🔍 Polling... (cada 500ms)");
+                    }
+                    
+                    // MÉTODO 1: Leer buffer de tags (tags que llegaron automáticamente)
+                    var bufferTags = THYReaderAPI.ReadTagBuffer();
+                    
+                    if (bufferTags != null && bufferTags.Length > 0)
+                    {
+                        Console.WriteLine($"[{DateTime.Now}] 📡 Buffer: {bufferTags.Length} tag(s) detectado(s)");
                         
-                        foreach (var tag in tags)
+                        foreach (var tag in bufferTags)
                         {
                             if (!string.IsNullOrWhiteSpace(tag))
                             {
-                                Console.WriteLine($"[{DateTime.Now}] 🏷️ TAG: {tag}");
+                                Console.WriteLine($"[{DateTime.Now}] 🏷️ TAG BUFFER: {tag}");
                                 await ProcessTag(tag, reader);
                             }
                         }
+                    }
+                    
+                    // MÉTODO 2: Forzar inventario (comando-respuesta)
+                    var inventoryTags = THYReaderAPI.DoInventory(0xFF);
+                    
+                    if (inventoryTags != null && inventoryTags.Length > 0)
+                    {
+                        Console.WriteLine($"[{DateTime.Now}] 📡 Inventory: {inventoryTags.Length} tag(s) detectado(s)");
                         
-                        // Limpiar buffer después de procesar tags
-                        THYReaderAPI.SWNet_ClearTagBuf();
+                        foreach (var tag in inventoryTags)
+                        {
+                            if (!string.IsNullOrWhiteSpace(tag))
+                            {
+                                Console.WriteLine($"[{DateTime.Now}] 🏷️ TAG INVENTORY: {tag}");
+                                await ProcessTag(tag, reader);
+                            }
+                        }
                     }
                     
                     // Esperar antes de la siguiente lectura (polling interval)
-                    await Task.Delay(800); // Cada 800ms para dar tiempo a la lectora
+                    await Task.Delay(500); // Cada 500ms para respuesta rápida
                 }
                 catch (Exception ex)
                 {
