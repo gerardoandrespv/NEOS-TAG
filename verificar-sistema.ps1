@@ -61,15 +61,15 @@ Write-Host ""
 Write-Host "3. Gateway Local (C# .NET)" -ForegroundColor Yellow
 Write-Host "   URL: $gatewayLocalUrl" -ForegroundColor Gray
 try {
-    $testUrl = "$($gatewayLocalUrl)?id=TEST12345&heart=0&readsn=VERIFY"
+    $testUrl = $gatewayLocalUrl + "?id=TEST12345" + [char]38 + "heart=0" + [char]38 + "readsn=VERIFY"
     $response = Invoke-WebRequest -Uri $testUrl -UseBasicParsing -TimeoutSec 5
     if ($response.StatusCode -eq 200) {
-        Write-Host "   ✅ Gateway local accesible (200 OK)" -ForegroundColor Green
-        Write-Host "   📋 Respuesta: $($response.Content)" -ForegroundColor Gray
+        Write-Host "   [OK] Gateway local accesible" -ForegroundColor Green
+        Write-Host "   Respuesta: $($response.Content)" -ForegroundColor Gray
     }
 } catch {
-    Write-Host "   ❌ Gateway local no responde" -ForegroundColor Red
-    Write-Host "   💡 Ejecuta: .\RUN-ADMIN.ps1" -ForegroundColor Yellow
+    Write-Host "   [ERROR] Gateway local no responde" -ForegroundColor Red
+    Write-Host "   Ejecuta: RUN-ADMIN.ps1" -ForegroundColor Yellow
     $allOk = $false
 }
 Write-Host ""
@@ -110,22 +110,22 @@ Write-Host ""
 # Resumen final
 Write-Host "============================================" -ForegroundColor Cyan
 if ($allOk) {
-    Write-Host "  ✅ SISTEMA 100% OPERATIVO" -ForegroundColor Green
+    Write-Host "  [OK] SISTEMA OPERATIVO" -ForegroundColor Green
     Write-Host "============================================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "📋 Accesos rápidos:" -ForegroundColor Cyan
+    Write-Host "[ACCESOS] URLs del sistema:" -ForegroundColor Cyan
     Write-Host "   Dashboard:      $dashboardUrl" -ForegroundColor White
     Write-Host "   Cloud Function: $cloudFunctionUrl" -ForegroundColor White
     Write-Host "   Gateway Local:  $gatewayLocalUrl" -ForegroundColor White
     Write-Host ""
-    Write-Host "🔧 Próximo paso:" -ForegroundColor Yellow
+    Write-Host "[SIGUIENTE PASO]" -ForegroundColor Yellow
     Write-Host "   Configura la lectora para enviar HTTP a: $gatewayLocalUrl" -ForegroundColor White
     Write-Host "   Ver: CONFIGURAR-LECTORA-HTTP.md" -ForegroundColor Gray
 } else {
-    Write-Host "  ⚠️  ALGUNOS COMPONENTES NECESITAN ATENCIÓN" -ForegroundColor Yellow
+    Write-Host "  [ATENCION] ALGUNOS COMPONENTES NECESITAN REVISION" -ForegroundColor Yellow
     Write-Host "============================================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "📖 Revisa la documentación:" -ForegroundColor Yellow
+    Write-Host "[DOCS] Revisa la documentacion:" -ForegroundColor Yellow
     Write-Host "   - DEPLOYMENT-GCP.md (deployment)" -ForegroundColor Gray
     Write-Host "   - RESUMEN-DEPLOYMENT.md (overview)" -ForegroundColor Gray
     Write-Host "   - CONFIGURAR-LECTORA-HTTP.md (setup lectora)" -ForegroundColor Gray
