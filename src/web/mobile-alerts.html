@@ -356,6 +356,11 @@
 
         // Check notification permission on load
         window.addEventListener('load', () => {
+            console.log('[Mobile] 🚀 ========== APP CARGADA ==========');
+            console.log('[Mobile] audioPermissionGranted:', localStorage.getItem('audioPermissionGranted'));
+            console.log('[Mobile] fcmToken:', localStorage.getItem('fcmToken') ? 'Presente' : 'No presente');
+            console.log('[Mobile] Notification.permission:', Notification.permission);
+            
             checkNotificationPermission();
             loadActiveAlerts();
             
@@ -862,7 +867,9 @@
         db.collection('emergency_alerts')
             .where('status', '==', 'ACTIVE')
             .onSnapshot(snapshot => {
-                console.log('[Mobile] 🔄 Actualización en tiempo real');
+                console.log('[Mobile] 🔄 ========== ACTUALIZACIÓN EN TIEMPO REAL ==========');
+                console.log('[Mobile] Snapshot size:', snapshot.size);
+                console.log('[Mobile] previousAlertIds antes:', Array.from(previousAlertIds));
                 
                 // Detectar nuevas alertas
                 const currentAlertIds = new Set();
@@ -872,32 +879,45 @@
                     const alertId = doc.id;
                     currentAlertIds.add(alertId);
                     
+                    console.log('[Mobile] Procesando alerta:', alertId, 'estaba antes?', previousAlertIds.has(alertId));
+                    
                     // Si es una alerta nueva (no estaba antes)
                     if (!previousAlertIds.has(alertId)) {
                         newAlert = { id: alertId, ...doc.data() };
-                        console.log('[Mobile] 🆕 Nueva alerta detectada:', newAlert);
+                        console.log('[Mobile] 🆕 NUEVA ALERTA DETECTADA:', newAlert);
                     }
                 });
                 
+                console.log('[Mobile] currentAlertIds:', Array.from(currentAlertIds));
+                console.log('[Mobile] newAlert encontrado?', !!newAlert);
+                console.log('[Mobile] previousAlertIds.size:', previousAlertIds.size);
+                
                 // Si hay una nueva alerta, reproducir sonido
-                if (newAlert && previousAlertIds.size > 0) { // Solo si no es la carga inicial
-                    console.log('[Mobile] 🔊 NUEVA ALERTA DETECTADA - Reproduciendo sonido');
-                    console.log('[Mobile] newAlert:', newAlert);
-                    console.log('[Mobile] previousAlertIds.size:', previousAlertIds.size);
-                    playAlertSound(newAlert.type || 'GENERAL', newAlert.id);
+                // CAMBIO: Reproducir siempre que haya nueva alerta, incluso en carga inicial SI ya activaron sonidos
+                if (newAlert) {
+                    const hasAudioPermission = localStorage.getItem('audioPermissionGranted');
+                    console.log('[Mobile] 🎵 Hay nueva alerta, audioPermission:', hasAudioPermission);
                     
-                    // Vibrar
-                    if ('vibrate' in navigator) {
-                        navigator.vibrate([300, 100, 300, 100, 300]);
+                    if (hasAudioPermission) {
+                        console.log('[Mobile] 🔊 REPRODUCIENDO SONIDO PARA NUEVA ALERTA');
+                        console.log('[Mobile] Tipo:', newAlert.type, 'ID:', newAlert.id);
+                        playAlertSound(newAlert.type || 'GENERAL', newAlert.id);
+                        
+                        // Vibrar
+                        if ('vibrate' in navigator) {
+                            navigator.vibrate([300, 100, 300, 100, 300]);
+                        }
+                    } else {
+                        console.log('[Mobile] ⚠️ Nueva alerta pero sin permiso de audio - mostrando banner');
+                        const banner = document.getElementById('soundPermissionBanner');
+                        if (banner) {
+                            banner.classList.remove('hidden');
+                        }
+                        // Guardar para reproducir después
+                        window.pendingAlert = { alertType: newAlert.type || 'GENERAL', alertId: newAlert.id };
                     }
                 } else {
-                    if (!newAlert) {
-                        console.log('[Mobile] ℹ️ No hay nueva alerta (actualización o carga inicial)');
-                    }
-                    if (previousAlertIds.size === 0) {
-                        console.log('[Mobile] ℹ️ Carga inicial, no reproducir sonido todavía');
-                        console.log('[Mobile] Setting previousAlertIds para próxima detección');
-                    }
+                    console.log('[Mobile] ℹ️ No hay nueva alerta (actualización de alerta existente)');
                 }
                 
                 // Actualizar conjunto de IDs
