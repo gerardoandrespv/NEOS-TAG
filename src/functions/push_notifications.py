@@ -68,19 +68,35 @@ def send_alert_to_all_devices(alert_type: str, title: str, body: str, severity: 
     """
     
     try:
-        # Obtener todos los tokens FCM de usuarios en Firestore
+        # Obtener todos los tokens FCM de Firestore (users + alert_subscribers)
         db = firestore.Client()
+        tokens = []
+        
+        # 1. Buscar en colección 'users' (dashboard de escritorio)
         users_ref = db.collection('users')
         users_query = users_ref.where(filter=firestore.FieldFilter('notifications_enabled', '==', True)).stream()
         
-        tokens = []
+        desktop_tokens = 0
         for user in users_query:
             user_data = user.to_dict()
             token = user_data.get('fcm_token')
             if token:
                 tokens.append(token)
+                desktop_tokens += 1
         
-        logger.info(f"📱 Encontrados {len(tokens)} dispositivos con notificaciones habilitadas")
+        # 2. Buscar en colección 'alert_subscribers' (apps móviles)
+        subscribers_ref = db.collection('alert_subscribers')
+        subscribers_query = subscribers_ref.where(filter=firestore.FieldFilter('notifications_enabled', '==', True)).stream()
+        
+        mobile_tokens = 0
+        for subscriber in subscribers_query:
+            subscriber_data = subscriber.to_dict()
+            token = subscriber_data.get('fcm_token')
+            if token and token not in tokens:  # Evitar duplicados
+                tokens.append(token)
+                mobile_tokens += 1
+        
+        logger.info(f"📱 Tokens encontrados - Desktop: {desktop_tokens}, Mobile: {mobile_tokens}, Total: {len(tokens)}")
         
         # Enviar al topic "all-users" (más confiable que tokens individuales web)
         try:
