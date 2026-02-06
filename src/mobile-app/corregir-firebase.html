@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Corregir Firebase Cloud Messaging</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 { color: #FF6B00; margin-bottom: 10px; }
+        .step {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 5px solid #FF6B00;
+        }
+        .step h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        .step ol {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+        .step li {
+            margin: 12px 0;
+        }
+        .code-box {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            position: relative;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #FF6B00;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        .copy-btn:hover {
+            background: #FF8C00;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            margin: 15px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+            margin: 15px 0;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #dc3545;
+            margin: 15px 0;
+        }
+        .btn-primary {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #FF6B00;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 10px 10px 10px 0;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .btn-primary:hover {
+            background: #FF8C00;
+        }
+        .screenshot {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin: 15px 0;
+            padding: 10px;
+            background: #fafafa;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        .label {
+            font-weight: 600;
+            color: #333;
+            margin-top: 15px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Corregir Cloud Messaging - Paso a Paso</h1>
+        <p style="color: #666; margin-bottom: 30px;">Vamos a obtener las credenciales correctas de Firebase</p>
+        
+        <!-- Problema Actual -->
+        <div class="error">
+            <h3>❌ Problema Detectado</h3>
+            <p>Tu <strong>Server Key</strong> y <strong>VAPID Key</strong> tienen el mismo valor. Deben ser diferentes:</p>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li><strong>Server Key:</strong> Para el backend (Cloud Function) - Empieza con "AAAA..."</li>
+                <li><strong>VAPID Key:</strong> Para la app web móvil - Empieza con "B..."</li>
+            </ul>
+        </div>
+        
+        <!-- Paso 1 -->
+        <div class="step">
+            <h2>Paso 1: Abrir Firebase Console</h2>
+            <ol>
+                <li>Abre: <a href="https://console.firebase.google.com/" target="_blank" class="btn-primary">Firebase Console</a></li>
+                <li>Inicia sesión con tu cuenta Google</li>
+                <li>Selecciona tu proyecto (debería ser el que tiene ID: <code>738411977369</code>)</li>
+            </ol>
+        </div>
+        
+        <!-- Paso 2 -->
+        <div class="step">
+            <h2>Paso 2: Ir a Project Settings</h2>
+            <ol>
+                <li>Click en el ícono de <strong>⚙️ engranaje</strong> arriba a la izquierda</li>
+                <li>Click en <strong>"Project Settings"</strong> o <strong>"Configuración del proyecto"</strong></li>
+                <li>Ve a la pestaña <strong>"Cloud Messaging"</strong></li>
+            </ol>
+            <div class="screenshot">
+                <p><strong>📸 Deberías ver algo como esto:</strong></p>
+                <pre style="background: #fff; padding: 10px; border-radius: 5px;">
+Firebase Cloud Messaging API (V1)
+├─ Estado: [Habilitado] ✅
+└─ Manage API
+
+Cloud Messaging API (Legacy)
+├─ Server key: AAAA... (este es el que necesitas)
+└─ Sender ID: 738411977369
+                </pre>
+            </div>
+        </div>
+        
+        <!-- Paso 3 -->
+        <div class="step">
+            <h2>Paso 3: Copiar Server Key (Backend)</h2>
+            <ol>
+                <li>En la sección <strong>"Cloud Messaging API (Legacy)"</strong></li>
+                <li>Busca <strong>"Server key"</strong></li>
+                <li>Debería empezar con <code>AAAA...</code></li>
+                <li>Click en el ícono de copiar o selecciona todo el texto</li>
+                <li>Pégalo aquí abajo:</li>
+            </ol>
+            <label class="label">SERVER KEY (debe empezar con AAAA...):</label>
+            <input type="text" id="serverKey" placeholder="AAAAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+            <div class="warning" id="serverKeyWarning" style="display: none;">
+                ⚠️ Esta clave debe empezar con "AAAA". Verifica que sea la correcta.
+            </div>
+        </div>
+        
+        <!-- Paso 4 -->
+        <div class="step">
+            <h2>Paso 4: Copiar VAPID Key (Web Push)</h2>
+            <ol>
+                <li>En la MISMA página, scroll hacia abajo</li>
+                <li>Busca la sección <strong>"Web Push certificates"</strong></li>
+                <li>Si NO existe un "Key pair", click en <strong>"Generate key pair"</strong></li>
+                <li>Copia el "Key pair" generado (empieza con <code>B...</code>)</li>
+                <li>Pégalo aquí abajo:</li>
+            </ol>
+            <label class="label">VAPID KEY (debe empezar con B...):</label>
+            <input type="text" id="vapidKey" placeholder="Bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" value="BBNPz5TTMqfFZSSRBAaYq43gW5uIW8wMhtYpK9loHna1m_ntxXNjjbDVUR0Y5q8jCao_5AcdfDPf1wvvEZ1MYTU">
+            <div class="success">
+                ✅ Esta clave ya está correcta (empieza con "B")
+            </div>
+        </div>
+        
+        <!-- Paso 5 -->
+        <div class="step">
+            <h2>Paso 5: Generar Archivos Corregidos</h2>
+            <button onclick="generateConfig()" class="btn-primary" style="width: 100%; font-size: 1.1em; padding: 15px;">
+                🚀 Generar Configuración Corregida
+            </button>
+            
+            <div id="output" style="display: none; margin-top: 20px;">
+                <div class="success">
+                    <h3>✅ Configuración Generada</h3>
+                    <p>Copia estos valores y pégalos cuando ejecutes el script</p>
+                </div>
+                
+                <label class="label">1. FIREBASE_SERVER_KEY:</label>
+                <div class="code-box">
+                    <button class="copy-btn" onclick="copyToClipboard('serverKeyOutput')">Copiar</button>
+                    <code id="serverKeyOutput"></code>
+                </div>
+                
+                <label class="label">2. FIREBASE_VAPID_KEY:</label>
+                <div class="code-box">
+                    <button class="copy-btn" onclick="copyToClipboard('vapidKeyOutput')">Copiar</button>
+                    <code id="vapidKeyOutput"></code>
+                </div>
+                
+                <div class="warning" style="margin-top: 20px;">
+                    <h4>📋 Próximos pasos:</h4>
+                    <ol style="margin-left: 20px; margin-top: 10px;">
+                        <li>Copia estas dos claves</li>
+                        <li>Actualiza el archivo <code>.env</code> manualmente con estos valores</li>
+                        <li>Recarga la app móvil en tu celular</li>
+                        <li>Activa las notificaciones</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Verificación Final -->
+        <div class="step" style="background: #e7f3ff; border-left-color: #2196F3;">
+            <h2>🔍 Verificación Final</h2>
+            <p style="margin-bottom: 15px;">Después de corregir, verifica esto en tu celular:</p>
+            <ol>
+                <li>Recarga la app móvil</li>
+                <li>Presiona "Activar Notificaciones"</li>
+                <li>En los logs deberías ver:
+                    <div class="code-box" style="margin-top: 10px;">
+                        <code>
+[HH:MM:SS] ✅ Notificaciones ACTIVADAS<br>
+[HH:MM:SS] ✅ Token FCM obtenido<br>
+[HH:MM:SS] ✅ Suscrito a alertas del edificio
+                        </code>
+                    </div>
+                </li>
+                <li>Si ves estos 3 mensajes → <span style="color: #28a745; font-weight: bold;">✅ TODO ESTÁ BIEN</span></li>
+            </ol>
+        </div>
+    </div>
+    
+    <script>
+        // Validación en tiempo real
+        document.getElementById('serverKey').addEventListener('input', function() {
+            const value = this.value.trim();
+            const warning = document.getElementById('serverKeyWarning');
+            
+            if (value && !value.startsWith('AAAA')) {
+                warning.style.display = 'block';
+                this.style.borderColor = '#dc3545';
+            } else {
+                warning.style.display = 'none';
+                this.style.borderColor = '#28a745';
+            }
+        });
+        
+        function generateConfig() {
+            const serverKey = document.getElementById('serverKey').value.trim();
+            const vapidKey = document.getElementById('vapidKey').value.trim();
+            
+            if (!serverKey) {
+                alert('⚠️ Por favor ingresa la Server Key de Firebase Console');
+                return;
+            }
+            
+            if (!serverKey.startsWith('AAAA')) {
+                alert('❌ La Server Key debe empezar con "AAAA". Verifica que sea la correcta.');
+                return;
+            }
+            
+            if (!vapidKey.startsWith('B')) {
+                alert('❌ La VAPID Key debe empezar con "B". Verifica que sea la correcta.');
+                return;
+            }
+            
+            // Mostrar output
+            document.getElementById('serverKeyOutput').textContent = serverKey;
+            document.getElementById('vapidKeyOutput').textContent = vapidKey;
+            document.getElementById('output').style.display = 'block';
+            
+            // Scroll al resultado
+            document.getElementById('output').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('✅ Copiado al portapapeles');
+            });
+        }
+    </script>
+</body>
+</html>

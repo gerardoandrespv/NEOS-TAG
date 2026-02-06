@@ -1,0 +1,39 @@
+﻿<!DOCTYPE html>
+<html>
+<head><title>Test</title></head>
+<body>
+<div id="connection-status">Conectando...</div>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyDnDnxTpvHg28YCLKd3s-KBi8AXpT-R4sg",
+    authDomain: "neos-tech.firebaseapp.com",
+    projectId: "neos-tech",
+    storageBucket: "neos-tech.firebasestorage.app",
+    messagingSenderId: "447461661754",
+    appId: "1:447461661754:web:c396c9b3d24e9d0fafb0f8"
+};
+if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+const db = firebase.firestore();
+
+function initCharts() { console.log('initCharts OK'); }
+function simulateUnknownTag() { console.log('simulateUnknownTag OK'); }
+function showLoginModal() { console.log('showLoginModal OK'); }
+
+window.initCharts = initCharts;
+window.simulateUnknownTag = simulateUnknownTag;
+window.showLoginModal = showLoginModal;
+
+console.log('Testing exports...');
+console.log('initCharts:', typeof window.initCharts);
+console.log('simulateUnknownTag:', typeof window.simulateUnknownTag);
+console.log('showLoginModal:', typeof window.showLoginModal);
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Ready - calling initCharts()');
+    initCharts();
+});
+</script>
+</body>
+</html>

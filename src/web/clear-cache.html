@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpiar Caché - NeosTech</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #f5576c;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .alert {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .step {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .step strong {
+            color: #007bff;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 0;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.02);
+        }
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            display: none;
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .code {
+            background: #2d3748;
+            color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpieza de Caché</h1>
+        
+        <div class="alert">
+            <strong>⚠️ IMPORTANTE:</strong> Tu navegador está mostrando una versión antigua del dashboard. 
+            Sigue estos pasos para forzar la actualización.
+        </div>
+        
+        <div class="status" id="status">
+            Esperando acción...
+        </div>
+        
+        <button onclick="clearAllCache()">🚀 PASO 1: Limpiar Todo el Caché</button>
+        
+        <div class="step">
+            <strong>📱 Si estás en CELULAR:</strong><br>
+            1. Menú (⋮) → Configuración → Privacidad<br>
+            2. Borrar datos de navegación<br>
+            3. Selecciona SOLO "Caché" (no borres contraseñas)<br>
+            4. Confirma y luego presiona el botón de abajo
+        </div>
+        
+        <div class="step">
+            <strong>💻 Si estás en PC:</strong><br>
+            1. Presiona <code>Ctrl+Shift+Delete</code> (Windows) o <code>Cmd+Shift+Delete</code> (Mac)<br>
+            2. Selecciona SOLO "Caché"<br>
+            3. Borra y luego presiona el botón de abajo
+        </div>
+        
+        <button onclick="reloadWithoutCache()">🔄 PASO 2: Recargar Sin Caché</button>
+        
+        <div class="step">
+            <strong>🔍 Método alternativo (GARANTIZADO):</strong><br>
+            1. Copia esta URL en una pestaña de INCÓGNITO/PRIVADO:<br>
+            <div class="code">https://neos-tech.web.app/?v=2.1.0&t=<span id="timestamp"></span></div>
+            2. En modo incógnito NO hay caché del archivo antiguo
+        </div>
+        
+        <button onclick="openIncognito()">🕵️ PASO 3: Abrir en Modo Incógnito</button>
+        
+        <div class="success" id="success">
+            ✅ Si después de estos pasos TODAVÍA ves errores en la consola (F12),<br>
+            CIERRA completamente el navegador y ábrelo de nuevo.
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/" style="color: #007bff; text-decoration: none; font-weight: 600;">
+                ← Volver al Dashboard
+            </a>
+        </div>
+    </div>
+    
+    <script>
+        // Actualizar timestamp
+        document.getElementById('timestamp').textContent = Date.now();
+        
+        function clearAllCache() {
+            const status = document.getElementById('status');
+            status.textContent = '🔄 Intentando limpiar caché...';
+            status.style.color = '#007bff';
+            
+            // Limpiar localStorage
+            localStorage.clear();
+            
+            // Limpiar sessionStorage
+            sessionStorage.clear();
+            
+            // Si el navegador soporta Cache API
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    names.forEach(name => {
+                        caches.delete(name);
+                    });
+                });
+            }
+            
+            // Intentar desregistrar service workers
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    registrations.forEach(registration => {
+                        registration.unregister();
+                    });
+                });
+            }
+            
+            setTimeout(() => {
+                status.textContent = '✅ Caché local limpiado. Ahora presiona PASO 2';
+                status.style.color = '#28a745';
+                document.getElementById('success').style.display = 'block';
+            }, 1000);
+        }
+        
+        function reloadWithoutCache() {
+            const status = document.getElementById('status');
+            status.textContent = '🔄 Recargando sin caché...';
+            
+            // Recargar forzando bypass de caché
+            setTimeout(() => {
+                window.location.href = '/?v=2.1.0&nocache=' + Date.now();
+            }, 500);
+        }
+        
+        function openIncognito() {
+            const url = 'https://neos-tech.web.app/?v=2.1.0&t=' + Date.now();
+            alert('COPIA esta URL y ábrela en una ventana INCÓGNITO/PRIVADO:\n\n' + url + '\n\nEsto garantiza que verás la versión nueva sin caché.');
+            
+            // Intentar abrir en nueva ventana (puede ser bloqueado)
+            window.open(url, '_blank');
+        }
+        
+        console.log('=== HERRAMIENTA DE LIMPIEZA DE CACHÉ ===');
+        console.log('Versión objetivo: 2.1.0');
+        console.log('Timestamp: ' + Date.now());
+    </script>
+</body>
+</html>

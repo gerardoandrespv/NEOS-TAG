@@ -1,15 +1,36 @@
 ﻿{
   "hosting": {
     "public": "src/web",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          },
+          {
+            "key": "Pragma",
+            "value": "no-cache"
+          },
+          {
+            "key": "Expires",
+            "value": "0"
+          }
+        ]
+      }
+    ]
   },
   "firestore": {
-    "rules": "config/firestore.rules"
+    "rules": "config/firestore.rules",
+    "indexes": "config/firestore.indexes.json"
   },
   "functions": [
     {
       "source": "src/functions",
       "codebase": "default",
+      "runtime": "python312",
       "ignore": [
         "node_modules",
         ".git",

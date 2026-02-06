@@ -10,3 +10,18 @@ obj/
 firebase-debug.log
 *.log
 node_modules
+
+# Archivos de sonido (MP3) - Se suben a Firebase Storage
+assets/sounds/*.mp3
+assets/sounds/*.wav
+assets/sounds/*.caf
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Configuraciones locales sensibles
+config/firebase-admin-sdk.json

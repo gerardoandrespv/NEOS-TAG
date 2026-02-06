@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#FF6B00">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="./icon-192.png">
+    
+    <!-- Firebase SDK -->
+    <script src="./libs/firebase-app-compat.js"></script>
+    <script src="./libs/firebase-messaging-compat.js"></script>
+    
+    <title>Alertas de Emergencia</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .app-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #FF6B00, #FF8C00);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .status-bar {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .install-prompt {
+            background: linear-gradient(135deg, #4CAF50, #66BB6A);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .install-prompt button {
+            background: white;
+            color: #4CAF50;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .section h2 {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .test-btn {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .test-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #d32f2f, #f44336);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: alertPulse 1.5s infinite;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        @keyframes alertPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.9; }
+        }
+        
+        .alert-overlay h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        
+        .alert-overlay p {
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            white-space: pre-line;
+        }
+        
+        .safe-btn {
+            background: white;
+            color: #d32f2f;
+            padding: 20px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.3em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .logs {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 3px 0;
+        }
+        
+        .log-success { color: #4CAF50; }
+        .log-error { color: #ff0000; }
+        .log-warning { color: #ffaa00; }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .notification-warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+            border-left: 4px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🟠 Alertas de Emergencia</h1>
+            <div class="subtitle">NeosTech Building Alert System</div>
+        </div>
+        
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div>
+                <span class="status-dot"></span>
+                <span><strong>Sistema Activo</strong></span>
+            </div>
+            <div id="notificationStatus" style="font-size: 0.9em; color: #999;">
+                🔕 Sin notificaciones
+            </div>
+        </div>
+        
+        <!-- Install Prompt -->
+        <div id="installPrompt" class="install-prompt hidden">
+            <div>
+                <strong>📲 Instalar App</strong>
+                <p style="margin: 5px 0 0 0; font-size: 0.9em;">Agregar a pantalla de inicio</p>
+            </div>
+            <button onclick="installApp()">Instalar</button>
+        </div>
+        
+        <!-- Configuración -->
+        <div class="section">
+            <h2>⚙️ Paso 1: Activar Notificaciones</h2>
+            <button onclick="requestNotificationPermission()" class="test-btn" style="background: linear-gradient(135deg, #4CAF50, #66BB6A);">
+                🔔 Activar Notificaciones
+            </button>
+            <div class="notification-warning">
+                <strong>⚠️ IMPORTANTE:</strong><br>
+                Debes activar las notificaciones para recibir alertas de emergencia
+            </div>
+        </div>
+        
+        <!-- Pruebas -->
+        <div class="section">
+            <h2>🧪 Paso 2: Probar Sistema</h2>
+            <button onclick="testNotification()" class="test-btn" style="background: linear-gradient(135deg, #2196F3, #42A5F5);">
+                🔔 Prueba Notificación
+            </button>
+            <button onclick="testSound()" class="test-btn" style="background: linear-gradient(135deg, #9C27B0, #BA68C8);">
+                🔊 Prueba Sonido
+            </button>
+            <button onclick="simulateAlert()" class="test-btn" style="background: linear-gradient(135deg, #f44336, #ef5350);">
+                🚨 Simular Alerta Completa
+            </button>
+        </div>
+        
+        <!-- Logs -->
+        <div class="section">
+            <h2>📋 Registro de Eventos</h2>
+            <div id="logs" class="logs"></div>
+        </div>
+        
+        <!-- Alert Overlay -->
+        <div id="activeAlert" class="alert-overlay hidden">
+            <h1 id="alertTitle">🔥 ALERTA DE INCENDIO</h1>
+            <p id="alertMessage">Evacuación inmediata por escaleras<br>NO usar ascensores<br>Dirigirse al punto de encuentro</p>
+            <button class="safe-btn" onclick="confirmSafe()">✓ ESTOY A SALVO</button>
+        </div>
+    </div>
+    
+    <script>
+        let deferredPrompt;
+        let messagingInstance = null;
+        let firebaseReady = false;
+        
+        // Configuración Firebase
+        const firebaseConfig = {
+          apiKey: "AIzaSyBZ-XRSRgC2gz9E6zdYpes7yv5nLZtKmSw",
+          authDomain: "neos-tech.firebaseapp.com",
+          projectId: "neos-tech",
+          storageBucket: "neos-tech.appspot.com",
+          messagingSenderId: "738411977369",
+          appId: "1:738411977369:web:7facc71cea4c271d217608"
+        };
+        
+        const vapidKey = "BBNPz5TTMqfFZSSRBAaYq43gW5uIW8wMhtYpK9loHna1m_ntxXNjjbDVUR0Y5q8jCao_5AcdfDPf1wvvEZ1MYTU";
+        
+        // Inicializar Firebase DESPUÉS de registrar Service Worker
+        function initializeFirebase() {
+            try {
+                console.log('🔧 Inicializando Firebase...');
+                firebase.initializeApp(firebaseConfig);
+                console.log('🔧 Firebase App inicializado');
+                
+                messagingInstance = firebase.messaging();
+                console.log('🔧 Firebase Messaging obtenido');
+                
+                firebaseReady = true;
+                console.log('✅ Firebase inicializado completamente');
+                log('✅ Firebase listo', 'success');
+                
+                // Configurar listener de mensajes
+                messagingInstance.onMessage((payload) => {
+                    log('📨 ALERTA RECIBIDA vía push', 'success');
+                    console.log('Payload completo:', payload);
+                    
+                    const title = payload.notification?.title || 'Alerta de Emergencia';
+                    const body = payload.notification?.body || payload.data?.message || '';
+                    
+                    // Mostrar alerta en pantalla
+                    document.getElementById('alertTitle').textContent = title;
+                    document.getElementById('alertMessage').textContent = body;
+                    document.getElementById('activeAlert').classList.remove('hidden');
+                    
+                    // Reproducir sonido
+                    playAlertSound();
+                    
+                    // Vibrar
+                    if ('vibrate' in navigator) {
+                        navigator.vibrate([500, 200, 500, 200, 500, 200, 500]);
+                    }
+                    
+                    // Mostrar notificación del navegador
+                    if (Notification.permission === 'granted') {
+                        new Notification(title, {
+                            body: body,
+                            icon: './icon-192.png',
+                            vibrate: [500, 200, 500, 200, 500],
+                            requireInteraction: true
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error('❌ Error Firebase:', error);
+                log('❌ Error Firebase: ' + error.message, 'error');
+            }
+        }
+        
+        // Cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => {
+            // Primero registrar Service Worker, LUEGO Firebase
+            setupServiceWorker();
+            setupInstallPrompt();
+            log('🟠 Sistema de Alertas NeosTech');
+            log('⚠️ Activa las notificaciones para continuar', 'warning');
+        });
+        
+        // Service Worker
+        async function setupServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.register('sw.js');
+                    log('✅ Service Worker registrado', 'success');
+                    
+                    // Esperar a que esté activo
+                    await navigator.serviceWorker.ready;
+                    log('✅ Service Worker activo', 'success');
+                    
+                    // AHORA inicializar Firebase Messaging
+                    initializeFirebase();
+                    
+                    // Auto-solicitar notificaciones
+                    setTimeout(() => {
+                        if (Notification.permission === 'default') {
+                            log('💡 Activa las notificaciones ahora', 'warning');
+                        }
+                    }, 2000);
+                } catch (error) {
+                    log('❌ Error SW: ' + error.message, 'error');
+                    console.error('Error detallado SW:', error);
+                }
+            } else {
+                log('❌ Service Workers no soportados', 'error');
+            }
+        }
+        
+        // Install Prompt
+        function setupInstallPrompt() {
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                document.getElementById('installPrompt').classList.remove('hidden');
+                log('📲 App lista para instalar');
+            });
+        }
+        
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((result) => {
+                    if (result.outcome === 'accepted') {
+                        log('✅ App instalada', 'success');
+                    }
+                    deferredPrompt = null;
+                    document.getElementById('installPrompt').classList.add('hidden');
+                });
+            }
+        }
+        
+        // Notificaciones
+        function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                alert('❌ Este navegador no soporta notificaciones');
+                return;
+            }
+            
+            if (!messagingInstance) {
+                alert('❌ Firebase no está listo. Recarga la página e intenta de nuevo.');
+                return;
+            }
+            
+            log('🔔 Solicitando permisos...', 'info');
+            
+            Notification.requestPermission().then(permission => {
+                log(`Permiso: ${permission}`, 'info');
+                
+                if (permission === 'granted') {
+                    log('🔔 Notificaciones ACTIVADAS', 'success');
+                    document.getElementById('notificationStatus').innerHTML = '<span style="color: #4CAF50;">🔔 Activas</span>';
+                    
+                    // Obtener token FCM y suscribirse
+                    log('Obteniendo token FCM...', 'info');
+                    messagingInstance.getToken({ vapidKey: vapidKey })
+                        .then((currentToken) => {
+                            if (currentToken) {
+                                log('✅ Token FCM obtenido: ' + currentToken.substring(0, 20) + '...', 'success');
+                                localStorage.setItem('fcm_token', currentToken);
+                                
+                                // En la app móvil no necesitamos suscripción manual a topics
+                                // Firebase lo maneja automáticamente
+                                log('✅ Listo para recibir alertas', 'success');
+                                
+                                // Notificación de confirmación
+                                new Notification('✅ Sistema Configurado', {
+                                    body: 'Recibirás alertas de emergencia en este dispositivo',
+                                    icon: './icon-192.png',
+                                    vibrate: [200, 100, 200]
+                                });
+                            } else {
+                                log('⚠️ No se pudo obtener token FCM', 'warning');
+                                alert('⚠️ Error obteniendo token. Intenta de nuevo.');
+                            }
+                        })
+                        .catch((err) => {
+                            log('❌ Error FCM: ' + err.message, 'error');
+                            console.error('Error detallado:', err);
+                            alert('❌ Error: ' + err.message);
+                        });
+                } else {
+                    log('❌ Notificaciones BLOQUEADAS - Usuario rechazó', 'error');
+                    document.getElementById('notificationStatus').innerHTML = '<span style="color: #f44336;">🔕 Bloqueadas</span>';
+                    alert('⚠️ IMPORTANTE: Debes activar las notificaciones para recibir alertas.\n\nVe a Configuración del navegador → Permisos del sitio → Notificaciones → Permitir');
+                }
+            }).catch(err => {
+                log('❌ Error solicitando permisos: ' + err.message, 'error');
+                console.error('Error detallado:', err);
+                alert('❌ Error: ' + err.message);
+            });
+        }
+        
+        // Pruebas
+        function testNotification() {
+            if (Notification.permission !== 'granted') {
+                alert('⚠️ Primero debes activar las notificaciones');
+                return;
+            }
+            
+            new Notification('🧪 Prueba de Notificación', {
+                body: 'Si ves esto, el sistema funciona correctamente ✓',
+                icon: './icon-192.png',
+                badge: './icon-192.png',
+                vibrate: [200, 100, 200, 100, 200],
+                tag: 'test'
+            });
+            
+            log('🧪 Notificación de prueba enviada', 'success');
+        }
+        
+        function testSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 900;
+            oscillator.type = 'square';
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.5);
+            
+            log('🔊 Sonido de prueba', 'success');
+        }
+        
+        function simulateAlert() {
+            log('🚨 INICIANDO SIMULACRO', 'warning');
+            
+            // Mostrar overlay
+            document.getElementById('activeAlert').classList.remove('hidden');
+            
+            // Notificación
+            if (Notification.permission === 'granted') {
+                new Notification('🔥 ALERTA DE INCENDIO', {
+                    body: 'EVACUACIÓN INMEDIATA - Usar escaleras',
+                    icon: './icon-192.png',
+                    vibrate: [500, 200, 500, 200, 500, 200, 500],
+                    requireInteraction: true,
+                    tag: 'emergency'
+                });
+            }
+            
+            // Sonido
+            playAlertSound();
+        }
+        
+        function playAlertSound() {
+            const audio = new Audio('./sounds/emergency_alarm_fire.wav');
+            audio.play().catch(() => {
+                log('⚠️ Usando sonido sintético', 'warning');
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                for (let i = 0; i < 10; i++) {
+                    setTimeout(() => {
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        oscillator.frequency.value = 900;
+                        oscillator.type = 'square';
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                        oscillator.start();
+                        oscillator.stop(audioContext.currentTime + 0.2);
+                    }, i * 300);
+                }
+            });
+            log('🔊 Sonido de alerta activado');
+        }
+        
+        function confirmSafe() {
+            log('✅ Confirmación: Usuario a salvo', 'success');
+            document.getElementById('activeAlert').classList.add('hidden');
+            
+            if (Notification.permission === 'granted') {
+                new Notification('✅ Confirmación Recibida', {
+                    body: 'Tu confirmación ha sido registrada',
+                    icon: './icon-192.png'
+                });
+            }
+        }
+        
+        // Logs
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry log-' + type;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+    </script>
+</body>
+</html>

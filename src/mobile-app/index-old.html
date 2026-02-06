@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#FF6B00">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Alertas Edificio">
+    
+    <title>Alertas de Emergencia - NeosTech</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .app-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #FF6B00, #FF8C42);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(255, 107, 0, 0.3);
+        }
+        
+        .header h1 {
+            font-size: 22px;
+            margin-bottom: 5px;
+        }
+        
+        .header .subtitle {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        
+        .status-bar {
+            padding: 12px 20px;
+            background: #f8f9fa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-dot.connected {
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .section {
+            margin-bottom: 25px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: #FF6B00;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+        
+        .info-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            border-left: 4px solid #FF6B00;
+        }
+        
+        .info-card h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .info-card p {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #FF6B00, #FF8C42);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 107, 0, 0.3);
+        }
+        
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #333;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .alert-active {
+            background: linear-gradient(135deg, #ff1744, #ff5252);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(255, 23, 68, 0.4);
+            animation: alertPulse 1.5s infinite;
+        }
+        
+        @keyframes alertPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 8px 25px rgba(255, 23, 68, 0.4); }
+            50% { transform: scale(1.02); box-shadow: 0 8px 35px rgba(255, 23, 68, 0.6); }
+        }
+        
+        .alert-active h2 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .alert-active p {
+            font-size: 15px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+            opacity: 0.95;
+        }
+        
+        .alert-active .btn {
+            background: white;
+            color: #ff1744;
+            font-weight: 700;
+        }
+        
+        .logs {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            color: #00ff00;
+            margin-bottom: 5px;
+        }
+        
+        .log-time {
+            color: #888;
+        }
+        
+        .log-error {
+            color: #ff0000;
+        }
+        
+        .log-warning {
+            color: #ffaa00;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-content h2 {
+            color: #FF6B00;
+            margin-bottom: 15px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+        
+        .install-prompt {
+            background: linear-gradient(135deg, #4CAF50, #66BB6A);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .install-prompt button {
+            background: white;
+            color: #4CAF50;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🟠 Alertas de Emergencia</h1>
+            <div class="subtitle">NeosTech Building Alert System</div>
+        </div>
+        
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div>
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Conectando...</span>
+            </div>
+            <div style="font-size: 12px; color: #666;" id="deviceId">---</div>
+        </div>
+        
+        <!-- Install Prompt -->
+        <div class="install-prompt hidden" id="installPrompt">
+            <div>
+                <strong>📲 Instalar App</strong><br>
+                <small>Agregar a pantalla de inicio</small>
+            </div>
+            <button onclick="installApp()">Instalar</button>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            <!-- Active Alert -->
+            <div class="alert-active hidden" id="activeAlert">
+                <h2 id="alertTitle">🔥 INCENDIO DETECTADO</h2>
+                <p id="alertMessage">Evacuación inmediata...</p>
+                <button class="btn" onclick="confirmSafe()">
+                    ✅ ESTOY A SALVO
+                </button>
+            </div>
+            
+            <!-- Registration Section -->
+            <div class="section" id="registrationSection">
+                <div class="section-title">📝 Registro</div>
+                <div class="info-card">
+                    <h3>Estado</h3>
+                    <p id="registrationStatus">No registrado</p>
+                </div>
+                <button class="btn btn-primary" onclick="showRegistration()">
+                    Registrarme Ahora
+                </button>
+            </div>
+            
+            <!-- User Info Section -->
+            <div class="section hidden" id="userInfoSection">
+                <div class="section-title">👤 Mi Información</div>
+                <div class="info-card">
+                    <h3>Nombre</h3>
+                    <p id="userName">---</p>
+                </div>
+                <div class="info-card">
+                    <h3>Ubicación</h3>
+                    <p id="userLocation">---</p>
+                </div>
+                <div class="info-card">
+                    <h3>Notificaciones</h3>
+                    <p id="notificationStatus">---</p>
+                </div>
+            </div>
+            
+            <!-- Test Section -->
+            <div class="section">
+                <div class="section-title">🧪 Pruebas</div>
+                <button class="btn btn-secondary" onclick="testNotification()" style="margin-bottom: 10px;">
+                    🔔 Probar Notificación
+                </button>
+                <button class="btn btn-secondary" onclick="testSound()" style="margin-bottom: 10px;">
+                    🔊 Probar Sonido
+                </button>
+                <button class="btn btn-secondary" onclick="simulateAlert()">
+                    🚨 Simular Alerta
+                </button>
+            </div>
+            
+            <!-- Settings -->
+            <div class="section">
+                <div class="section-title">⚙️ Configuración</div>
+                <button class="btn btn-secondary" onclick="requestNotificationPermission()">
+                    📢 Activar Notificaciones
+                </button>
+            </div>
+            
+            <!-- Logs -->
+            <div class="section">
+                <div class="section-title">📋 Registro de Eventos</div>
+                <div class="logs" id="logs">
+                    <div class="log-entry">
+                        <span class="log-time">[00:00:00]</span>
+                        <span>App inicializada</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Registration Modal -->
+    <div class="modal" id="registrationModal">
+        <div class="modal-content">
+            <h2>Registro de Usuario</h2>
+            
+            <div class="form-group">
+                <label>Nombre Completo *</label>
+                <input type="text" id="inputName" placeholder="Juan Pérez">
+            </div>
+            
+            <div class="form-group">
+                <label>Email *</label>
+                <input type="email" id="inputEmail" placeholder="juan@email.com">
+            </div>
+            
+            <div class="form-group">
+                <label>Teléfono *</label>
+                <input type="tel" id="inputPhone" placeholder="+56 9 XXXX XXXX">
+            </div>
+            
+            <div class="form-group">
+                <label>Torre/Edificio *</label>
+                <select id="inputTower">
+                    <option value="">Seleccionar...</option>
+                    <option value="A">Torre A</option>
+                    <option value="B">Torre B</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Piso *</label>
+                <input type="number" id="inputFloor" min="1" max="20" placeholder="12">
+            </div>
+            
+            <div class="form-group">
+                <label>Departamento *</label>
+                <input type="text" id="inputApt" placeholder="1205">
+            </div>
+            
+            <button class="btn btn-primary" onclick="saveRegistration()" style="margin-bottom: 10px;">
+                Guardar Registro
+            </button>
+            <button class="btn btn-secondary" onclick="closeRegistration()">
+                Cancelar
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        // Variables globales
+        let deferredPrompt;
+        let currentUser = null;
+        let alertAudio = null;
+        
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            log('App cargada correctamente');
+            checkRegistration();
+            checkNotificationPermission();
+            setupServiceWorker();
+            setupInstallPrompt();
+        });
+        
+        // Service Worker
+        async function setupServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.register('sw.js');
+                    log('Service Worker registrado');
+                    
+                    // Solicitar permiso de notificaciones
+                    if (Notification.permission === 'default') {
+                        setTimeout(() => {
+                            requestNotificationPermission();
+                        }, 3000);
+                    }
+                } catch (error) {
+                    log('Error registrando Service Worker: ' + error.message, 'error');
+                }
+            }
+        }
+        
+        // Install Prompt
+        function setupInstallPrompt() {
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                document.getElementById('installPrompt').classList.remove('hidden');
+                log('Instalación disponible');
+            });
+            
+            // Detectar si ya está instalada
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                log('App ya instalada', 'success');
+                updateStatus(true);
+            }
+        }
+        
+        async function installApp() {
+            if (!deferredPrompt) {
+                alert('La instalación no está disponible. Usa el menú del navegador: "Agregar a pantalla de inicio"');
+                return;
+            }
+            
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                log('App instalada correctamente', 'success');
+                document.getElementById('installPrompt').classList.add('hidden');
+            }
+            
+            deferredPrompt = null;
+        }
+        
+        // Notification Permission
+        async function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                alert('Tu navegador no soporta notificaciones');
+                return;
+            }
+            
+            try {
+                const permission = await Notification.requestPermission();
+                
+                if (permission === 'granted') {
+                    log('Notificaciones activadas', 'success');
+                    updateNotificationStatus('Activadas ✅');
+                    
+                    // Test notification
+                    new Notification('¡Listo!', {
+                        body: 'Ahora recibirás alertas de emergencia',
+                        icon: 'icon-192.png',
+                        badge: 'icon-192.png',
+                        vibrate: [200, 100, 200]
+                    });
+                } else {
+                    log('Notificaciones denegadas', 'warning');
+                    updateNotificationStatus('Denegadas ❌');
+                }
+            } catch (error) {
+                log('Error: ' + error.message, 'error');
+            }
+        }
+        
+        function checkNotificationPermission() {
+            if ('Notification' in window) {
+                const status = Notification.permission === 'granted' ? 'Activadas ✅' : 
+                              Notification.permission === 'denied' ? 'Denegadas ❌' : 
+                              'Pendientes ⏱️';
+                updateNotificationStatus(status);
+            }
+        }
+        
+        // Registration
+        function checkRegistration() {
+            const user = localStorage.getItem('user');
+            if (user) {
+                currentUser = JSON.parse(user);
+                showUserInfo();
+                log('Usuario registrado: ' + currentUser.name);
+                updateStatus(true);
+            }
+        }
+        
+        function showRegistration() {
+            document.getElementById('registrationModal').classList.add('show');
+        }
+        
+        function closeRegistration() {
+            document.getElementById('registrationModal').classList.remove('show');
+        }
+        
+        function saveRegistration() {
+            const name = document.getElementById('inputName').value.trim();
+            const email = document.getElementById('inputEmail').value.trim();
+            const phone = document.getElementById('inputPhone').value.trim();
+            const tower = document.getElementById('inputTower').value;
+            const floor = document.getElementById('inputFloor').value;
+            const apt = document.getElementById('inputApt').value.trim();
+            
+            if (!name || !email || !phone || !tower || !floor || !apt) {
+                alert('Por favor completa todos los campos');
+                return;
+            }
+            
+            currentUser = {
+                id: 'user_' + Date.now(),
+                name,
+                email,
+                phone,
+                tower,
+                floor,
+                apt,
+                registeredAt: new Date().toISOString()
+            };
+            
+            localStorage.setItem('user', JSON.stringify(currentUser));
+            
+            closeRegistration();
+            showUserInfo();
+            updateStatus(true);
+            
+            log('Registro completado: ' + name, 'success');
+            
+            // Solicitar notificaciones después de registro
+            setTimeout(() => {
+                requestNotificationPermission();
+            }, 1000);
+        }
+        
+        function showUserInfo() {
+            document.getElementById('registrationSection').classList.add('hidden');
+            document.getElementById('userInfoSection').classList.remove('hidden');
+            document.getElementById('userName').textContent = currentUser.name;
+            document.getElementById('userLocation').textContent = 
+                `Torre ${currentUser.tower}, Piso ${currentUser.floor}, Dpto ${currentUser.apt}`;
+            document.getElementById('registrationStatus').textContent = 'Registrado ✅';
+            document.getElementById('deviceId').textContent = currentUser.id;
+        }
+        
+        // Test Functions
+        function testNotification() {
+            if (Notification.permission !== 'granted') {
+                alert('Primero debes activar las notificaciones');
+                requestNotificationPermission();
+                return;
+            }
+            
+            const notification = new Notification('🧪 Prueba de Notificación', {
+                body: 'Esta es una notificación de prueba del sistema de alertas',
+                icon: 'icon-192.png',
+                badge: 'icon-192.png',
+                vibrate: [200, 100, 200, 100, 200],
+                tag: 'test-notification'
+            });
+            
+            log('Notificación de prueba enviada');
+        }
+        
+        function testSound() {
+            log('Reproduciendo sonido de prueba...');
+            
+            // Usar archivo de prueba o generar tono
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 900;
+            oscillator.type = 'square';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.5);
+            
+            log('Sonido reproducido (beep 900Hz)');
+        }
+        
+        function simulateAlert() {
+            log('Simulando alerta de emergencia...', 'warning');
+            
+            // Mostrar alerta en pantalla
+            document.getElementById('alertTitle').textContent = '🔥 SIMULACRO - INCENDIO';
+            document.getElementById('alertMessage').textContent = 
+                'ESTO ES UN SIMULACRO\n\n' +
+                'Evacuación por escaleras de emergencia.\n' +
+                'NO usar ascensores.\n' +
+                'Dirigirse al punto de encuentro.';
+            document.getElementById('activeAlert').classList.remove('hidden');
+            
+            // Notificación
+            if (Notification.permission === 'granted') {
+                new Notification('🔥 SIMULACRO - INCENDIO', {
+                    body: 'Evacuación inmediata - ESTO ES UN SIMULACRO',
+                    icon: 'icon-192.png',
+                    badge: 'icon-192.png',
+                    vibrate: [500, 200, 500, 200, 500, 200, 500],
+                    requireInteraction: true,
+                    tag: 'emergency-alert'
+                });
+            }
+            
+            // Sonido de alarma
+            playAlertSound();
+        }
+        
+        function playAlertSound() {
+            // Intentar cargar archivo WAV si existe
+            const audio = new Audio('./sounds/emergency_alarm_fire.wav');
+            
+            audio.play().catch(() => {
+                // Si falla, generar tono sintético
+                log('Archivo de audio no encontrado, generando tono...', 'warning');
+                
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Generar beeps rápidos (patrón de incendio)
+                for (let i = 0; i < 10; i++) {
+                    setTimeout(() => {
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.frequency.value = 900;
+                        oscillator.type = 'square';
+                        
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                        
+                        oscillator.start();
+                        oscillator.stop(audioContext.currentTime + 0.2);
+                    }, i * 300);
+                }
+            });
+            
+            log('Sonido de alerta reproducido');
+        }
+        
+        function confirmSafe() {
+            log('Usuario confirmó estar a salvo', 'success');
+            
+            document.getElementById('activeAlert').classList.add('hidden');
+            
+            alert('✅ Confirmación enviada\n\nGracias por confirmar tu seguridad.');
+            
+            // Aquí se enviaría al backend
+            if (currentUser) {
+                log(`Confirmación registrada para ${currentUser.name}`);
+            }
+        }
+        
+        // Utility Functions
+        function log(message, type = 'info') {
+            const logsContainer = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString();
+            const logClass = type === 'error' ? 'log-error' : type === 'warning' ? 'log-warning' : '';
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${logClass}">${message}</span>`;
+            
+            logsContainer.appendChild(entry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+            
+            console.log(`[${time}] ${message}`);
+        }
+        
+        function updateStatus(connected) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            
+            if (connected) {
+                dot.classList.add('connected');
+                text.textContent = 'Conectado';
+            } else {
+                dot.classList.remove('connected');
+                text.textContent = 'Desconectado';
+            }
+        }
+        
+        function updateNotificationStatus(status) {
+            document.getElementById('notificationStatus').textContent = status;
+        }
+        
+        // Handle visibility change
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                log('App en segundo plano');
+            } else {
+                log('App visible nuevamente');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+/**
+ * Component: Forms
+ * Form inputs, labels, and validation styles
+ */
+
+/* Form groups */
+.form-group {
+  margin-bottom: var(--spacing-4);
+}
+
+/* Labels */
+.form-label {
+  display: block;
+  margin-bottom: var(--spacing-2);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+}
+
+.form-label-required::after {
+  content: " *";
+  color: var(--color-danger-600);
+}
+
+/* Input base styles */
+.form-input,
+.form-select,
+.form-textarea {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-3) var(--spacing-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  border: var(--border-width-1) solid var(--border-default);
+  border-radius: var(--radius-md);
+  transition: var(--transition-fast);
+  appearance: none;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-input:disabled,
+.form-select:disabled,
+.form-textarea:disabled {
+  background-color: var(--color-neutral-100);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+/* Input states */
+.form-input.is-valid {
+  border-color: var(--color-success-600);
+}
+
+.form-input.is-invalid {
+  border-color: var(--color-danger-600);
+}
+
+/* Textarea */
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+/* Select */
+.form-select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right var(--spacing-3) center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: var(--spacing-10);
+}
+
+/* Checkbox and radio */
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-2);
+}
+
+.form-check-input {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.form-check-label {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Input groups */
+.input-group {
+  display: flex;
+  width: 100%;
+}
+
+.input-group .form-input {
+  flex: 1;
+  border-radius: 0;
+}
+
+.input-group .form-input:first-child {
+  border-top-left-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-md);
+}
+
+.input-group .form-input:last-child {
+  border-top-right-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+
+.input-group-prepend,
+.input-group-append {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-3) var(--spacing-4);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+  background-color: var(--color-neutral-50);
+  border: var(--border-width-1) solid var(--border-default);
+}
+
+.input-group-prepend {
+  border-right: none;
+  border-top-left-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-md);
+}
+
+.input-group-append {
+  border-left: none;
+  border-top-right-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+
+/* Help text */
+.form-help {
+  display: block;
+  margin-top: var(--spacing-1);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* Validation feedback */
+.invalid-feedback {
+  display: none;
+  margin-top: var(--spacing-1);
+  font-size: var(--text-sm);
+  color: var(--color-danger-600);
+}
+
+.is-invalid ~ .invalid-feedback {
+  display: block;
+}
+
+.valid-feedback {
+  display: none;
+  margin-top: var(--spacing-1);
+  font-size: var(--text-sm);
+  color: var(--color-success-600);
+}
+
+.is-valid ~ .valid-feedback {
+  display: block;
+}
+
+/* Search input */
+.form-search {
+  position: relative;
+}
+
+.form-search .form-input {
+  padding-left: var(--spacing-10);
+}
+
+.form-search-icon {
+  position: absolute;
+  left: var(--spacing-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  pointer-events: none;
+}

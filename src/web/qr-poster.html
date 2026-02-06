@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Póster QR - NeosTech Alertas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @page {
+            size: A4;
+            margin: 0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .poster {
+            width: 210mm;
+            height: 297mm;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            page-break-after: always;
+        }
+        
+        .logo {
+            width: 150px;
+            height: 150px;
+            background: white;
+            border-radius: 30px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        h1 {
+            font-size: 64px;
+            margin-bottom: 20px;
+            font-weight: 900;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 32px;
+            margin-bottom: 50px;
+            opacity: 0.95;
+            font-weight: 600;
+        }
+        
+        .qr-wrapper {
+            background: white;
+            padding: 50px;
+            border-radius: 40px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+            margin-bottom: 50px;
+            position: relative;
+        }
+        
+        .qr-wrapper::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+            border-radius: 45px;
+            z-index: -1;
+        }
+        
+        #qrcode {
+            display: inline-block;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+        
+        #qrcode img {
+            display: block;
+        }
+        
+        .instructions {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px 40px;
+            margin-top: 40px;
+        }
+        
+        .instruction-step {
+            font-size: 24px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: white;
+            color: #667eea;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 20px;
+        }
+        
+        .url {
+            font-size: 20px;
+            margin-top: 30px;
+            background: rgba(255,255,255,0.2);
+            padding: 15px 30px;
+            border-radius: 15px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            font-size: 18px;
+            opacity: 0.8;
+        }
+        
+        .print-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        @media print {
+            .print-button {
+                display: none;
+            }
+            
+            .poster {
+                width: 100%;
+                height: 100vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="print-button" onclick="window.print()">🖨️ Imprimir Póster</button>
+    
+    <div class="poster">
+        <div class="logo">
+            <img src="assets/images/neostechc.png" alt="NeosTech Logo">
+        </div>
+        
+        <h1>🚨 ALERTAS DE EMERGENCIA</h1>
+        <p class="subtitle">Instala la App de NeosTech</p>
+        
+        <div class="qr-wrapper">
+            <div id="qrcode"></div>
+            <div style="margin-top: 30px; padding: 20px; background: rgba(255,255,255,0.9); border-radius: 15px;">
+                <p style="margin: 0; font-size: 20px; color: #1F2937; font-weight: 700;">
+                    ✅ Se abre automáticamente en tu navegador
+                </p>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <div class="instruction-step">
+                <div class="step-number">1</div>
+                <span>Escanea el QR con tu celular</span>
+            </div>
+            <div class="instruction-step">
+                <div class="step-number">2</div>
+                <span>Instala la aplicación</span>
+            </div>
+            <div class="instruction-step">
+                <div class="step-number">3</div>
+                <span>Activa las notificaciones</span>
+            </div>
+        </div>
+        
+        <div class="url" id="appUrl"></div>
+        
+        <div class="footer">
+            📱 Recibe alertas de emergencia en tiempo real<br>
+            ⚡ Sistema de Control de Acceso NeosTech RFID
+        </div>
+    </div>
+
+    <script>
+        // URL ABSOLUTA COMPLETA - abre directo en navegador
+        const appUrl = 'https://neos-tech.web.app/install.html';
+        
+        // Generate QR Code simple (sin logo)
+        new QRCode(document.getElementById('qrcode'), {
+            text: appUrl,
+            width: 400,
+            height: 400,
+            colorDark: '#1F2937',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
+        
+        document.getElementById('appUrl').textContent = appUrl;
+    </script>
+</body>
+</html>

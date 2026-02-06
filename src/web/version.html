@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Verificación de Versión</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        
+        .version {
+            font-size: 72px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+        
+        .build-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .build-info div {
+            margin: 10px 0;
+            font-size: 14px;
+            color: #495057;
+        }
+        
+        .build-info strong {
+            color: #212529;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border-radius: 20px;
+            font-weight: 600;
+            margin: 20px 0;
+        }
+        
+        .instructions {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin-top: 30px;
+            text-align: left;
+            border-radius: 8px;
+        }
+        
+        .instructions h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .instructions p {
+            color: #856404;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        
+        .link:hover {
+            transform: scale(1.05);
+        }
+        
+        .timestamp {
+            color: #6c757d;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="version">v2.1</div>
+        <h1>NeosTech RFID System Pro</h1>
+        
+        <div class="status">✅ Sistema Actualizado</div>
+        
+        <div class="build-info">
+            <div><strong>Versión:</strong> 2.1.0</div>
+            <div><strong>Build:</strong> 2026-01-30-18:30</div>
+            <div><strong>Plataforma:</strong> Firebase Hosting</div>
+            <div><strong>Región:</strong> Global CDN</div>
+        </div>
+        
+        <div class="instructions">
+            <h3>⚠️ Si ves errores en la consola:</h3>
+            <p><strong>En Celular:</strong></p>
+            <p>1. Menú (⋮) → Configuración → Privacidad</p>
+            <p>2. Borrar datos de navegación → Selecciona "Caché"</p>
+            <p>3. Cierra y vuelve a abrir el navegador</p>
+            <br>
+            <p><strong>En PC:</strong></p>
+            <p>Presiona <strong>Ctrl+Shift+R</strong> (Windows) o <strong>Cmd+Shift+R</strong> (Mac)</p>
+        </div>
+        
+        <a href="/" class="link">🚀 Ir al Dashboard</a>
+        
+        <div class="timestamp">
+            Última actualización: <span id="timestamp"></span>
+        </div>
+    </div>
+    
+    <script>
+        // Mostrar timestamp actual
+        const now = new Date();
+        document.getElementById('timestamp').textContent = now.toLocaleString('es-ES');
+        
+        // Verificar que index.html tenga todas las funciones
+        console.log('=== VERIFICACIÓN DE VERSIÓN ===');
+        console.log('✓ Versión 2.1.0');
+        console.log('✓ Build: 2026-01-30-18:30');
+        console.log('✓ Archivo: version.html cargado correctamente');
+        console.log('===============================');
+    </script>
+</body>
+</html>

@@ -84,7 +84,7 @@ namespace RFID_Gateway
                     config["SerialNumber"] = sn;
                 }
                 
-                // Leer parámetros individuales
+                // Leer parámetros individuales conocidos
                 /*  01: Transport (0x01=COM, 0x02=RJ45, 0x03=USB, 0x04=WiFi)
                     02: WorkMode (0x00=AnswerMode, 0x01=ActiveMode)
                     03: DeviceAddr
@@ -153,11 +153,39 @@ namespace RFID_Gateway
                     config["UartBaudRate"] = baudRate;
                 }
                 
-                // Leer configuración completa del dispositivo (parámetros adicionales)
-                byte[] allParams = new byte[128];
-                if (SWNet_GetDeviceParam(0xFF, allParams))
+                // SCAN EXTENDIDO: Leer parámetros individuales adicionales (0x08-0x30)
+                // La función SWNet_GetDeviceParam NO existe en esta versión de la DLL
+                // Así que escaneamos parámetro por parámetro
+                Console.WriteLine($"[THY] 🔍 Escaneando parámetros extendidos (0x08-0x30)...");
+                var extendedParams = new Dictionary<string, string>();
+                
+                for (byte paramAddr = 0x08; paramAddr <= 0x30; paramAddr++)
                 {
-                    config["RawParams"] = BitConverter.ToString(allParams, 0, 20);
+                    try
+                    {
+                        byte[] paramValue = new byte[1];
+                        if (SWNet_ReadDeviceOneParam(0xFF, paramAddr, paramValue))
+                        {
+                            // Solo reportar valores significativos
+                            if (paramValue[0] != 0x00)
+                            {
+                                string description = GetParameterDescription(paramAddr, paramValue[0]);
+                                extendedParams[$"0x{paramAddr:X2}"] = $"0x{paramValue[0]:X2} ({paramValue[0]}) - {description}";
+                                Console.WriteLine($"[THY]   Param 0x{paramAddr:X2} = 0x{paramValue[0]:X2} ({paramValue[0]}) - {description}");
+                            }
+                        }
+                    }
+                    catch { }
+                }
+                
+                if (extendedParams.Count > 0)
+                {
+                    config["ExtendedParams"] = extendedParams;
+                    Console.WriteLine($"[THY] ✅ {extendedParams.Count} parámetros extendidos encontrados");
+                }
+                else
+                {
+                    Console.WriteLine($"[THY] ℹ️ No se encontraron parámetros extendidos activos");
                 }
             }
             catch (Exception ex)
@@ -208,6 +236,69 @@ namespace RFID_Gateway
             catch (Exception ex)
             {
                 Console.WriteLine($"[THY] Error conectando: {ex.Message}");
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// Desconecta del lector RFID THY
+        /// </summary>
+        public static void Disconnect()
+        {
+            try
+            {
+                SWNet_CloseDevice();
+                Console.WriteLine($"[THY] Desconectado");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[THY] Error desconectando: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Activa el relé de la lectora por un tiempo determinado
+        /// </summary>
+        /// <param name="relayNumber">Número de relé (1-4)</param>
+        /// <param name="durationMs">Duración en milisegundos (predeterminado 3000)</param>
+        /// <returns>true si se activó correctamente</returns>
+        public static bool ActivateRelay(int relayNumber = 1, int durationMs = 3000)
+        {
+            try
+            {
+                Console.WriteLine($"[THY] 🔓 Activando relé {relayNumber} por {durationMs}ms");
+                
+                // Activar relé (dirección 0xFF = broadcast a todas las lectoras)
+                bool activated = SWNet_RelayOn(0xFF);
+                
+                if (!activated)
+                {
+                    Console.WriteLine($"[THY] ❌ Error al activar relé");
+                    return false;
+                }
+                
+                Console.WriteLine($"[THY] ✅ Relé activado, esperando {durationMs}ms...");
+                
+                // Esperar el tiempo especificado
+                System.Threading.Thread.Sleep(durationMs);
+                
+                // Desactivar relé
+                bool deactivated = SWNet_RelayOff(0xFF);
+                
+                if (!deactivated)
+                {
+                    Console.WriteLine($"[THY] ⚠️ Advertencia: El relé se apagará automáticamente");
+                }
+                else
+                {
+                    Console.WriteLine($"[THY] ✅ Relé desactivado");
+                }
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[THY] ❌ Error activando relé: {ex.Message}");
                 return false;
             }
         }
@@ -596,6 +687,180 @@ namespace RFID_Gateway
                 4 => 115200,
                 _ => 115200
             };
+        }
+        
+        /// <summary>
+        /// Intenta identificar el significado de parámetros extendidos
+        /// </summary>
+        private static string GetParameterDescription(byte paramAddr, byte value)
+        {
+            return paramAddr switch
+            {
+                0x08 => "Wiegand Mode",
+                0x09 => "Wiegand Width",
+                0x0A => "Wiegand Interval",
+                0x0B => "Tag Filter Enable",
+                0x0C => "Filter Mode",
+                0x0D => "Valid Tag Count (Low)",
+                0x0E => "Valid Tag Count (High)",
+                0x0F => "Session",
+                0x10 => "Target",
+                0x11 => "Q Value",
+                0x12 => "Frequency Region",
+                0x13 => "Output Mode",
+                0x14 => "Relay Control",
+                0x15 => "Relay Time",
+                0x16 => "HTTP Enable",
+                0x17 => "HTTP Mode",
+                _ => "Unknown"
+            };
+        }
+        
+        /// <summary>
+        /// Habilita o deshabilita el filtro interno de tags de la lectora
+        /// </summary>
+        public static bool SetTagFilter(bool enable, byte filterMode = 0x00)
+        {
+            try
+            {
+                Console.WriteLine($"[THY] 🔧 Configurando filtro interno: {(enable ? "HABILITADO" : "DESHABILITADO")}");
+                
+                // Parámetro 0x0B = Tag Filter Enable (0=Off, 1=On)
+                byte filterValue = enable ? (byte)0x01 : (byte)0x00;
+                bool result = SWNet_SetDeviceOneParam(0xFF, 0x0B, filterValue);
+                
+                if (result)
+                {
+                    Console.WriteLine($"[THY] ✅ Filtro {(enable ? "habilitado" : "deshabilitado")}");
+                    
+                    // Si se habilita, configurar modo de filtro (0x0C)
+                    if (enable && filterMode != 0x00)
+                    {
+                        bool modeResult = SWNet_SetDeviceOneParam(0xFF, 0x0C, filterMode);
+                        Console.WriteLine($"[THY] Filter Mode 0x0C = 0x{filterMode:X2}: {(modeResult ? "OK" : "FAIL")}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[THY] ❌ Error configurando filtro");
+                }
+                
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[THY] ❌ Excepción configurando filtro: {ex.Message}");
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// Lee el estado actual del filtro
+        /// </summary>
+        public static (bool enabled, int validTagCount) GetFilterStatus()
+        {
+            try
+            {
+                byte[] filterEnabled = new byte[1];
+                byte[] tagCountLow = new byte[1];
+                byte[] tagCountHigh = new byte[1];
+                
+                bool hasFilter = SWNet_ReadDeviceOneParam(0xFF, 0x0B, filterEnabled);
+                bool hasCountLow = SWNet_ReadDeviceOneParam(0xFF, 0x0D, tagCountLow);
+                bool hasCountHigh = SWNet_ReadDeviceOneParam(0xFF, 0x0E, tagCountHigh);
+                
+                if (hasFilter && hasCountLow && hasCountHigh)
+                {
+                    int count = (tagCountHigh[0] << 8) | tagCountLow[0];
+                    bool enabled = filterEnabled[0] == 0x01;
+                    
+                    Console.WriteLine($"[THY] 📊 Filtro: {(enabled ? "ON" : "OFF")}, Tags en memoria: {count}");
+                    return (enabled, count);
+                }
+                
+                return (false, 0);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[THY] ❌ Error leyendo estado del filtro: {ex.Message}");
+                return (false, 0);
+            }
+        }
+        
+        /// <summary>
+        /// Lee todos los tags detectados en el rango de la lectora (inventario)
+        /// Útil para sincronizar whitelist local con tags presentes
+        /// </summary>
+        public static List<string> ReadInventory()
+        {
+            var tags = new List<string>();
+            
+            try
+            {
+                byte[] buffer = new byte[4096]; // Buffer grande para múltiples tags
+                ushort totalLen = 0;
+                ushort cardNum = 0;
+                
+                Console.WriteLine($"[THY] 📡 Realizando inventario de tags...");
+                
+                // Inventario G2 (EPC Gen2)
+                bool success = SWNet_InventoryG2(0xFF, buffer, out totalLen, out cardNum);
+                
+                if (success && cardNum > 0)
+                {
+                    Console.WriteLine($"[THY] ✅ Inventario: {cardNum} tag(s) detectado(s)");
+                    
+                    // Parsear buffer para extraer EPCs
+                    int offset = 0;
+                    for (int i = 0; i < cardNum && offset < totalLen; i++)
+                    {
+                        try
+                        {
+                            // Formato del buffer: [PC(2)] [EPC(N)] [RSSI(1)]
+                            // PC indica la longitud del EPC
+                            if (offset + 2 > totalLen) break;
+                            
+                            ushort pc = (ushort)((buffer[offset] << 8) | buffer[offset + 1]);
+                            int epcLen = ((pc >> 11) & 0x1F) * 2; // EPC length in bytes
+                            
+                            offset += 2; // Skip PC
+                            
+                            if (offset + epcLen > totalLen) break;
+                            
+                            // Extraer EPC
+                            StringBuilder epc = new StringBuilder();
+                            for (int j = 0; j < epcLen; j++)
+                            {
+                                epc.Append(buffer[offset + j].ToString("X2"));
+                            }
+                            
+                            string tagId = epc.ToString();
+                            if (!string.IsNullOrWhiteSpace(tagId))
+                            {
+                                tags.Add(tagId);
+                                Console.WriteLine($"[THY]   Tag {i + 1}: {tagId}");
+                            }
+                            
+                            offset += epcLen + 1; // Skip EPC + RSSI
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[THY] ⚠️ Error parseando tag {i + 1}: {ex.Message}");
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[THY] ℹ️ Inventario: 0 tags detectados");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[THY] ❌ Error en inventario: {ex.Message}");
+            }
+            
+            return tags;
         }
         
         private static byte GetBaudRateCode(int baudrate)

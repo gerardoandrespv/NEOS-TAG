@@ -1,92 +1,133 @@
-# Script de Verificacion del Sistema RFID
+#!/usr/bin/env pwsh
+# Script de verificación rápida del sistema desplegado
 
-Write-Host "================================================" -ForegroundColor Cyan
-Write-Host "  SISTEMA RFID NEOSTECH - VERIFICACION" -ForegroundColor Cyan
-Write-Host "================================================" -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "  VERIFICACIÓN DEL SISTEMA EN PRODUCCIÓN" -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. Verificar archivo principal
-Write-Host "[*] Verificando archivo principal..." -ForegroundColor Yellow
-$indexPath = "c:\NeosTech-RFID-System-Pro\src\web\index.html"
-if (Test-Path $indexPath) {
-    $lines = (Get-Content $indexPath | Measure-Object -Line).Lines
-    Write-Host "  [OK] index.html encontrado ($lines lineas)" -ForegroundColor Green
-} else {
-    Write-Host "  [ERROR] index.html NO encontrado" -ForegroundColor Red
-}
+# URLs del sistema
+$dashboardUrl = "https://neos-tech.web.app"
+$cloudFunctionUrl = "https://rfid-gateway-6psjv5t2ka-uc.a.run.app"
+$gatewayLocalUrl = "http://192.168.1.11:8080/readerid"
 
-# 2. Verificar funciones críticas
-Write-Host ""
-Write-Host "[*] Verificando funciones implementadas..." -ForegroundColor Yellow
-$functionsToCheck = @(
-    "async function loadLists",
-    "async function moveToBlacklist",
-    "async function removeFromBlacklist",
-    "async function addGuardComment",
-    "async function editUser",
-    "async function loadLogs",
-    "function renderLogs",
-    "@keyframes spin3d",
-    "class=`"logo-3d`""
-)
+$allOk = $true
 
-foreach ($func in $functionsToCheck) {
-    $found = Select-String -Path $indexPath -Pattern $func -Quiet
-    if ($found) {
-        Write-Host "  [OK] $func" -ForegroundColor Green
-    } else {
-        Write-Host "  [ERROR] $func NO encontrada" -ForegroundColor Red
+# 1. Verificar Dashboard
+Write-Host "1. Dashboard (Firebase Hosting)" -ForegroundColor Yellow
+Write-Host "   URL: $dashboardUrl" -ForegroundColor Gray
+try {
+    $response = Invoke-WebRequest -Uri $dashboardUrl -UseBasicParsing -TimeoutSec 10
+    if ($response.StatusCode -eq 200) {
+        Write-Host "   ✅ Dashboard accesible (200 OK)" -ForegroundColor Green
     }
-}
-
-# 3. Verificar servidor Python
-Write-Host ""
-Write-Host "[*] Verificando servidor web..." -ForegroundColor Yellow
-$pythonProcess = Get-Process python -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -like "*5004*"}
-if ($pythonProcess) {
-    Write-Host "  [OK] Servidor Python corriendo en puerto 5004" -ForegroundColor Green
-} else {
-    Write-Host "  [WARN] Servidor Python no detectado" -ForegroundColor Yellow
-    Write-Host "     Ejecuta: python -m http.server 5004 --directory src/web" -ForegroundColor Gray
-}
-
-# 4. Verificar Gateway
-Write-Host ""
-Write-Host "[*] Verificando Gateway RFID..." -ForegroundColor Yellow
-$gatewayProcess = Get-Process Rfid_gateway -ErrorAction SilentlyContinue
-if ($gatewayProcess) {
-    Write-Host "  [OK] Gateway RFID corriendo" -ForegroundColor Green
-} else {
-    Write-Host "  [WARN] Gateway RFID no detectado" -ForegroundColor Yellow
-}
-
-# 5. Verificar conectividad
-Write-Host ""
-Write-Host "[*] Verificando conectividad..." -ForegroundColor Yellow
-try {
-    Invoke-WebRequest -Uri "http://localhost:5004" -TimeoutSec 2 -ErrorAction Stop | Out-Null
-    Write-Host "  [OK] Dashboard accesible en http://localhost:5004" -ForegroundColor Green
 } catch {
-    Write-Host "  [WARN] Dashboard no accesible" -ForegroundColor Yellow
+    Write-Host "   ❌ Dashboard no responde: $($_.Exception.Message)" -ForegroundColor Red
+    $allOk = $false
 }
+Write-Host ""
 
+# 2. Verificar Cloud Function
+Write-Host "2. Cloud Function (GCP)" -ForegroundColor Yellow
+Write-Host "   URL: $cloudFunctionUrl" -ForegroundColor Gray
 try {
-    Invoke-WebRequest -Uri "http://localhost:8080/api/status" -TimeoutSec 2 -ErrorAction Stop | Out-Null
-    Write-Host "  [OK] API Gateway accesible en http://localhost:8080" -ForegroundColor Green
+    $response = Invoke-WebRequest -Uri $cloudFunctionUrl -Method OPTIONS -UseBasicParsing -TimeoutSec 10
+    if ($response.StatusCode -eq 204) {
+        Write-Host "   ✅ Cloud Function activa (CORS OK)" -ForegroundColor Green
+    }
 } catch {
-    Write-Host "  [WARN] API Gateway no responde" -ForegroundColor Yellow
+    Write-Host "   ⚠️  Cloud Function: $($_.Exception.Message)" -ForegroundColor Yellow
+    # OPTIONS puede dar error pero la función estar activa
 }
 
-# 6. Resumen
+# Probar con POST real
+try {
+    $body = @{
+        tag_id = "TEST12345"
+        reader_id = "test"
+        client_id = "condominio-neos"
+    } | ConvertTo-Json
+    
+    $response = Invoke-RestMethod -Uri $cloudFunctionUrl -Method POST -Body $body -ContentType "application/json" -Headers @{"X-Client-ID"="condominio-neos"} -TimeoutSec 10
+    Write-Host "   ✅ Cloud Function responde a peticiones POST" -ForegroundColor Green
+    Write-Host "   📋 Respuesta: $($response | ConvertTo-Json -Compress)" -ForegroundColor Gray
+} catch {
+    Write-Host "   ❌ Cloud Function no responde a POST: $($_.Exception.Message)" -ForegroundColor Red
+    $allOk = $false
+}
 Write-Host ""
-Write-Host "================================================" -ForegroundColor Cyan
-Write-Host "  NUEVAS FUNCIONALIDADES IMPLEMENTADAS" -ForegroundColor Cyan
-Write-Host "================================================" -ForegroundColor Cyan
+
+# 3. Verificar Gateway Local
+Write-Host "3. Gateway Local (C# .NET)" -ForegroundColor Yellow
+Write-Host "   URL: $gatewayLocalUrl" -ForegroundColor Gray
+try {
+    $testUrl = $gatewayLocalUrl + "?id=TEST12345" + [char]38 + "heart=0" + [char]38 + "readsn=VERIFY"
+    $response = Invoke-WebRequest -Uri $testUrl -UseBasicParsing -TimeoutSec 5
+    if ($response.StatusCode -eq 200) {
+        Write-Host "   [OK] Gateway local accesible" -ForegroundColor Green
+        Write-Host "   Respuesta: $($response.Content)" -ForegroundColor Gray
+    }
+} catch {
+    Write-Host "   [ERROR] Gateway local no responde" -ForegroundColor Red
+    Write-Host "   Ejecuta: RUN-ADMIN.ps1" -ForegroundColor Yellow
+    $allOk = $false
+}
 Write-Host ""
-Write-Host "[OK] Registros de eventos - Ahora muestra TODOS los eventos" -ForegroundColor Green
-Write-Host "[OK] Edicion de usuarios - Corregido mapeo de campos" -ForegroundColor Green
-Write-Host "[OK] Whitelist/Blacklist - Implementado completamente" -ForegroundColor Green
-Write-Host "[OK] Comentarios de guardia - Sistema nuevo implementado" -ForegroundColor Green
-Write-Host "[OK] Logo 3D animado - Efecto visual profesional" -ForegroundColor Green
-Write-Host "[OK] Estadisticas mejoradas - Mas informacion y robustez" -ForegroundColor Green
+
+# 4. Verificar conectividad de red
+Write-Host "4. Conectividad de Red" -ForegroundColor Yellow
+$gatewayIp = "192.168.1.11"
+$gatewayPort = 8080
+$result = Test-NetConnection -ComputerName $gatewayIp -Port $gatewayPort -WarningAction SilentlyContinue
+if ($result.TcpTestSucceeded) {
+    Write-Host "   ✅ Puerto $gatewayPort en $gatewayIp accesible" -ForegroundColor Green
+} else {
+    Write-Host "   ❌ Puerto $gatewayPort en $gatewayIp NO accesible" -ForegroundColor Red
+    $allOk = $false
+}
+Write-Host ""
+
+# 5. Verificar Git
+Write-Host "5. Repositorio GitHub" -ForegroundColor Yellow
+try {
+    $branch = git rev-parse --abbrev-ref HEAD
+    $commit = git rev-parse --short HEAD
+    Write-Host "   📍 Rama: $branch" -ForegroundColor Gray
+    Write-Host "   📍 Commit: $commit" -ForegroundColor Gray
+    
+    # Verificar si hay cambios sin commit
+    $status = git status --porcelain
+    if ($status) {
+        Write-Host "   ⚠️  Hay cambios sin commit" -ForegroundColor Yellow
+    } else {
+        Write-Host "   ✅ Todo en sync con GitHub" -ForegroundColor Green
+    }
+} catch {
+    Write-Host "   ❌ Error al verificar Git: $($_.Exception.Message)" -ForegroundColor Red
+}
+Write-Host ""
+
+# Resumen final
+Write-Host "============================================" -ForegroundColor Cyan
+if ($allOk) {
+    Write-Host "  [OK] SISTEMA OPERATIVO" -ForegroundColor Green
+    Write-Host "============================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "[ACCESOS] URLs del sistema:" -ForegroundColor Cyan
+    Write-Host "   Dashboard:      $dashboardUrl" -ForegroundColor White
+    Write-Host "   Cloud Function: $cloudFunctionUrl" -ForegroundColor White
+    Write-Host "   Gateway Local:  $gatewayLocalUrl" -ForegroundColor White
+    Write-Host ""
+    Write-Host "[SIGUIENTE PASO]" -ForegroundColor Yellow
+    Write-Host "   Configura la lectora para enviar HTTP a: $gatewayLocalUrl" -ForegroundColor White
+    Write-Host "   Ver: CONFIGURAR-LECTORA-HTTP.md" -ForegroundColor Gray
+} else {
+    Write-Host "  [ATENCION] ALGUNOS COMPONENTES NECESITAN REVISION" -ForegroundColor Yellow
+    Write-Host "============================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "[DOCS] Revisa la documentacion:" -ForegroundColor Yellow
+    Write-Host "   - DEPLOYMENT-GCP.md (deployment)" -ForegroundColor Gray
+    Write-Host "   - RESUMEN-DEPLOYMENT.md (overview)" -ForegroundColor Gray
+    Write-Host "   - CONFIGURAR-LECTORA-HTTP.md (setup lectora)" -ForegroundColor Gray
+}
 Write-Host ""

@@ -5,6 +5,11 @@
     "file": "C:\\NeosTech-RFID-System-Pro\\logs\\gateway\\gateway.log",
     "level": "info"
   },
+  "rfid": {
+    "tag_cooldown_seconds": 10,
+    "show_duplicate_stats": true,
+    "comment": "tag_cooldown_seconds: Tiempo mínimo entre lecturas del mismo tag (evita spam)"
+  },
   "cloud": {
     "timeout_seconds": 10,
     "function_url": "https://us-central1-neos-tech.cloudfunctions.net/check-tag-access"
@@ -24,7 +29,8 @@
       "relay_channel": 1,
       "open_duration_ms": 1000,
       "test_mode": false,
-      "protocol": "THY_SDK"
+      "protocol": "THY_SDK",
+      "tag_cooldown_seconds": 15
     },
     {
       "id": "porton_principal",
@@ -35,7 +41,8 @@
       "relay_channel": 1,
       "open_duration_ms": 5000,
       "test_mode": false,
-      "protocol": "THY_SDK"
+      "protocol": "THY_SDK",
+      "tag_cooldown_seconds": 30
     }
   ]
 }

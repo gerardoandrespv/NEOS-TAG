@@ -3,19 +3,42 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // ============================================
-    // REGLAS DE SEGURIDAD - TRIÁNGULO CIA
+    // FUNCIONES AUXILIARES
     // ============================================
     
-    // CONFIDENCIALIDAD: Solo usuarios autenticados pueden acceder
-    // INTEGRIDAD: Validación de datos en cada escritura
-    // DISPONIBILIDAD: Rate limiting implícito por Firebase
+    // Verificar si el usuario está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
     
-    // Función auxiliar: Validar email
+    // Obtener el UID del usuario autenticado
+    function currentUserId() {
+      return request.auth.uid;
+    }
+    
+    // Verificar si el usuario es administrador
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(currentUserId())).data.role == 'admin';
+    }
+    
+    // Verificar si el usuario es staff o admin
+    function isStaffOrAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(currentUserId())).data.role in ['staff', 'admin'];
+    }
+    
+    // Verificar si es el propio usuario
+    function isOwner(userId) {
+      return isAuthenticated() && currentUserId() == userId;
+    }
+    
+    // Validar formato de email
     function isValidEmail(email) {
       return email.matches('^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
     }
     
-    // Función auxiliar: Validar tag RFID
+    // Validar tag RFID (hexadecimal, 12-50 caracteres)
     function isValidTag(tag) {
       return tag is string && 
              tag.size() >= 12 && 
@@ -23,7 +46,7 @@ service cloud.firestore {
              tag.matches('^[A-Fa-f0-9]+$');
     }
     
-    // Función auxiliar: Datos de usuario válidos
+    // Validar datos de usuario
     function isValidUserData(data) {
       return data.name is string && 
              data.name.size() >= 3 &&
@@ -31,44 +54,217 @@ service cloud.firestore {
              data.email is string &&
              isValidEmail(data.email) &&
              data.status in ['active', 'inactive', 'suspended'] &&
-             data.role in ['resident', 'guest', 'staff', 'admin'] &&
-             (data.tags is list || !('tags' in data));
+             data.role in ['resident', 'guest', 'staff', 'admin'];
     }
+    
+    // Validar que los timestamps sean del servidor
+    function hasValidTimestamps(data) {
+      return (!('created_at' in data) || data.created_at == request.time) &&
+             (!('updated_at' in data) || data.updated_at == request.time);
+    }
+    
+    // Validar severidad de alerta
+    function isValidSeverity(severity) {
+      return severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+    }
+    
+    // Validar tipo de alerta
+    function isValidAlertType(type) {
+      return type in ['FIRE', 'EVACUATION', 'INTRUSION', 'MEDICAL', 'OTHER'];
+    }
+    
     
     // ============================================
     // COLECCIÓN: users
     // ============================================
     match /users/{userId} {
-      // Lectura: Permitir para desarrollo
-      allow read: if true;
+      // Lectura: Solo usuarios autenticados pueden ver su propia info o admins pueden ver todo
+      allow read: if isOwner(userId) || isAdmin();
       
-      // Escritura: Permitir para desarrollo
-      // TODO: Restringir en producción
-      allow write: if true;
-    }
+      // Creación: Solo admins pueden crear usuarios
+      allow create: if isAdmin() && 
+                       isValidUserData(request.resource.data) &&
+                       hasValidTimestamps(request.resource.data);
       
-      // Actualización: Validar datos y preservar createdAt
-      allow update: if isValidUserData(request.resource.data) &&
-                       request.resource.data.createdAt == resource.data.createdAt &&
-                       request.resource.data.updatedAt == request.time;
+      // Actualización: Usuario puede actualizar su propia info (excepto role)
+      //                Admins pueden actualizar todo
+      allow update: if (isOwner(userId) && 
+                        isValidUserData(request.resource.data) &&
+                        request.resource.data.role == resource.data.role &&  // No cambiar role
+                        hasValidTimestamps(request.resource.data)) ||
+                       (isAdmin() && 
+                        isValidUserData(request.resource.data) &&
+                        hasValidTimestamps(request.resource.data));
       
-      // Eliminación: En producción, solo admins
-      allow delete: if true; // Cambiar a: request.auth.token.admin == true
+      // Eliminación: Solo admins
+      allow delete: if isAdmin();
     }
     
+    
     // ============================================
-    // COLECCIÓN: rfid_tags
+    // COLECCIÓN: whitelist (Tags RFID autorizados)
     // ============================================
-    match /rfid_tags/{tagId} {
-      // Lectura: Permitir (eventos públicos del sistema)
-      allow read: if true;
+    match /whitelist/{tagId} {
+      // Lectura: Staff y admins
+      allow read: if isStaffOrAdmin();
       
-      // Escritura: Solo desde Cloud Function o autenticado
-      allow create: if request.resource.data.timestamp == request.time;
+      // Escritura: Solo admins
+      allow create: if isAdmin() && 
+                       isValidTag(request.resource.data.tag_id) &&
+                       request.resource.data.user_name is string &&
+                       request.resource.data.user_name.size() >= 3 &&
+                       hasValidTimestamps(request.resource.data);
       
-      // No permitir actualización ni eliminación
-      allow update, delete: if false;
+      allow update: if isAdmin() && 
+                       isValidTag(request.resource.data.tag_id) &&
+                       hasValidTimestamps(request.resource.data);
+      
+      allow delete: if isAdmin();
     }
+    
+    
+    // ============================================
+    // COLECCIÓN: blacklist (Tags bloqueados)
+    // ============================================
+    match /blacklist/{tagId} {
+      // Lectura: Staff y admins
+      allow read: if isStaffOrAdmin();
+      
+      // Escritura: Solo admins
+      allow create: if isAdmin() && 
+                       isValidTag(request.resource.data.tag_id) &&
+                       hasValidTimestamps(request.resource.data);
+      
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    
+    // ============================================
+    // COLECCIÓN: access_logs (Registro de accesos)
+    // ============================================
+    match /access_logs/{logId} {
+      // Lectura: Staff y admins pueden ver todos los logs
+      //          Usuarios pueden ver solo sus propios logs
+      allow read: if isStaffOrAdmin() || 
+                     (isAuthenticated() && resource.data.user_id == currentUserId());
+      
+      // Escritura: Solo el sistema (Cloud Functions con service account)
+      //            Los clientes NO pueden escribir logs
+      allow create: if false;  // Solo Cloud Functions
+      allow update: if false;
+      allow delete: if isAdmin();  // Solo admin puede eliminar logs antiguos
+    }
+    
+    
+    // ============================================
+    // COLECCIÓN: emergency_alerts
+    // ============================================
+    match /emergency_alerts/{alertId} {
+      // Lectura: Todos los usuarios autenticados
+      allow read: if isAuthenticated();
+      
+      // Creación: Solo admins y staff
+      allow create: if isStaffOrAdmin() && 
+                       isValidAlertType(request.resource.data.type) &&
+                       isValidSeverity(request.resource.data.severity) &&
+                       request.resource.data.status in ['ACTIVE', 'CANCELLED', 'RESOLVED'] &&
+                       request.resource.data.message is string &&
+                       request.resource.data.message.size() >= 10 &&
+                       request.resource.data.message.size() <= 500 &&
+                       hasValidTimestamps(request.resource.data);
+      
+      // Actualización: Solo admins y staff (para cancelar/resolver)
+      allow update: if isStaffOrAdmin() && 
+                       request.resource.data.status in ['ACTIVE', 'CANCELLED', 'RESOLVED'] &&
+                       hasValidTimestamps(request.resource.data);
+      
+      // Eliminación: Solo admins (para limpieza de alertas antiguas)
+      allow delete: if isAdmin();
+    }
+    
+    
+    // ============================================
+    // COLECCIÓN: alert_subscribers (Suscriptores de notificaciones push)
+    // ============================================
+    match /alert_subscribers/{subscriberId} {
+      // Lectura: Solo admins (contiene FCM tokens sensibles)
+      allow read: if isAdmin();
+      
+      // Creación: Usuarios autenticados pueden registrarse
+      allow create: if isAuthenticated() && 
+                       request.resource.data.user_id == currentUserId() &&
+                       request.resource.data.fcm_token is string &&
+                       request.resource.data.fcm_token.size() > 0 &&
+                       hasValidTimestamps(request.resource.data);
+      
+      // Actualización: Usuario puede actualizar su propia suscripción
+      allow update: if isAuthenticated() && 
+                       resource.data.user_id == currentUserId() &&
+                       hasValidTimestamps(request.resource.data);
+      
+      // Eliminación: Usuario puede eliminar su propia suscripción o admin
+      allow delete: if (isAuthenticated() && resource.data.user_id == currentUserId()) || 
+                       isAdmin();
+    }
+    
+    
+    // ============================================
+    // COLECCIÓN: access_points (Puertas/puntos de acceso)
+    // ============================================
+    match /access_points/{pointId} {
+      // Lectura: Usuarios autenticados
+      allow read: if isAuthenticated();
+      
+      // Escritura: Solo admins
+      allow create: if isAdmin() && 
+                       request.resource.data.name is string &&
+                       request.resource.data.name.size() >= 3 &&
+                       request.resource.data.status in ['online', 'offline', 'error'] &&
+                       hasValidTimestamps(request.resource.data);
+      
+      allow update: if isAdmin() && hasValidTimestamps(request.resource.data);
+      allow delete: if isAdmin();
+    }
+    
+    
+    // ============================================
+    // COLECCIÓN: system_config (Configuración del sistema)
+    // ============================================
+    match /system_config/{configId} {
+      // Lectura: Staff y admins
+      allow read: if isStaffOrAdmin();
+      
+      // Escritura: Solo admins
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    
+    // ============================================
+    // COLECCIÓN: rfid_events (Eventos RFID en tiempo real)
+    // ============================================
+    match /rfid_events/{eventId} {
+      // Lectura: Staff y admins
+      allow read: if isStaffOrAdmin();
+      
+      // Escritura: Solo Cloud Functions (service account)
+      allow create: if false;  // Solo sistema
+      allow update: if false;
+      allow delete: if isAdmin();  // Limpieza de eventos antiguos
+    }
+    
+    
+    // ============================================
+    // DENEGACIÓN POR DEFECTO
+    // ============================================
+    // Cualquier colección no especificada está completamente bloqueada
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
     
     // ============================================
     // COLECCIÓN: audit_log
@@ -99,6 +295,169 @@ service cloud.firestore {
       match /gate_logs/{logId} {
         allow read, write: if true;
       }
+    }
+    
+    // ============================================
+    // COLECCIÓN: blocks
+    // ============================================
+    match /blocks/{blockId} {
+      // Lectura: Permitir para mostrar en dashboard
+      allow read: if true;
+      
+      // Escritura: Permitir para desarrollo
+      // TODO: Restringir en producción a solo admins
+      allow write: if true;
+    }
+    
+    // ============================================
+    // COLECCIÓN: departments
+    // ============================================
+    match /departments/{deptId} {
+      // Lectura: Permitir para mostrar en dashboard
+      allow read: if true;
+      
+      // Escritura: Permitir para desarrollo
+      // TODO: Restringir en producción a solo admins
+      allow write: if true;
+    }
+    
+    // ============================================
+    // COLECCIÓN: whitelist
+    // ============================================
+    match /whitelist/{whitelistId} {
+      // Lectura: Permitir (necesario para validación de acceso)
+      allow read: if true;
+      
+      // Escritura: Permitir para desarrollo
+      allow write: if true;
+    }
+    
+    // ============================================
+    // COLECCIÓN: login_logs
+    // ============================================
+    match /login_logs/{logId} {
+      // Lectura: Permitir para auditoría
+      allow read: if true;
+      
+      // Escritura: Solo crear logs
+      allow create: if request.resource.data.timestamp == request.time;
+      
+      // No modificar ni eliminar logs
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: alerts
+    // ============================================
+    match /alerts/{alertId} {
+      // Lectura: Permitir para mostrar notificaciones
+      allow read: if true;
+      
+      // Escritura: Permitir para crear y actualizar alertas
+      allow write: if true;
+    }
+    
+    // ============================================
+    // COLECCIÓN: access_points
+    // ============================================
+    match /access_points/{pointId} {
+      // Lectura: Permitir para configuración
+      allow read: if true;
+      
+      // Escritura: Permitir para desarrollo
+      allow write: if true;
+    }
+    
+    // ============================================
+    // SISTEMA DE ALERTAS DE EMERGENCIA
+    // ============================================
+    
+    // Función auxiliar: Validar severidad de alerta
+    function isValidSeverity(severity) {
+      return severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+    }
+    
+    // Función auxiliar: Validar tipo de alerta
+    function isValidAlertType(type) {
+      return type in ['FIRE', 'EVACUATION', 'FLOOD', 'POWER_OUTAGE', 'SYSTEM_FAILURE', 'GENERAL'];
+    }
+    
+    // Función auxiliar: Validar estado de alerta
+    function isValidAlertStatus(status) {
+      return status in ['ACTIVE', 'CANCELLED', 'EXPIRED'];
+    }
+    
+    // Función auxiliar: Usuario es admin o guardia
+    function isAdminOrGuard() {
+      return request.auth != null && 
+             (request.auth.token.role == 'admin' || request.auth.token.role == 'guard');
+    }
+    
+    // COLECCIÓN: emergency_alerts
+    match /emergency_alerts/{alertId} {
+      // Lectura: Todos pueden leer alertas activas
+      allow read: if true;
+      
+      // Creación: Solo admins y guardias
+      allow create: if isAdminOrGuard() &&
+                       isValidAlertType(request.resource.data.type) &&
+                       isValidSeverity(request.resource.data.severity) &&
+                       isValidAlertStatus(request.resource.data.status) &&
+                       request.resource.data.issued_at == request.time &&
+                       request.resource.data.created_at == request.time &&
+                       request.resource.data.updated_at == request.time;
+      
+      // Actualización: Solo admin puede actualizar o cancelar
+      allow update: if isAdminOrGuard() &&
+                       request.resource.data.created_at == resource.data.created_at &&
+                       request.resource.data.updated_at == request.time;
+      
+      // Eliminación: No permitida (mantener histórico)
+      allow delete: if false;
+    }
+    
+    // COLECCIÓN: alert_recipients
+    match /alert_recipients/{recipientId} {
+      // Lectura: Admins pueden ver todos, usuarios solo sus propias confirmaciones
+      allow read: if isAdminOrGuard() || 
+                     (request.auth != null && resource.data.user_id == request.auth.uid);
+      
+      // Creación: Solo sistema (Cloud Function)
+      allow create: if request.resource.data.created_at == request.time;
+      
+      // Actualización: Usuario puede confirmar su estado
+      allow update: if (request.auth != null && resource.data.user_id == request.auth.uid) ||
+                       isAdminOrGuard();
+      
+      // Eliminación: No permitida
+      allow delete: if false;
+    }
+    
+    // COLECCIÓN: alert_templates
+    match /alert_templates/{templateId} {
+      // Lectura: Todos pueden leer plantillas
+      allow read: if true;
+      
+      // Escritura: Solo admins
+      allow write: if isAdminOrGuard();
+    }
+    
+    // COLECCIÓN: alert_logs
+    match /alert_logs/{logId} {
+      // Lectura: Solo admins (auditoría)
+      allow read: if isAdminOrGuard();
+      
+      // Creación: Sistema automático con timestamp server
+      allow create: if request.resource.data.timestamp == request.time;
+      
+      // No modificar ni eliminar logs de auditoría
+      allow update, delete: if false;
+    }
+    
+    // COLECCIÓN: alert_subscribers (Registro público - v2)
+    match /alert_subscribers/{subscriberId} {
+      // REGLAS COMPLETAMENTE ABIERTAS PARA REGISTRO PÚBLICO
+      allow read, write: if true;
     }
     
     // Denegar acceso a cualquier otra colección no especificada

@@ -1,0 +1,268 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-02-02",
+  "storage_bucket": "neos-tech.appspot.com",
+  "base_path": "alert_sounds/",
+  "sounds": {
+    "FIRE": {
+      "id": "fire",
+      "filename": "emergency_alarm_fire.mp3",
+      "display_name": "Alarma de Incendio",
+      "description": "Beeps rápidos y urgentes para alertas de incendio",
+      "pattern": "Beep-Beep-Beep continuo (3 beeps/segundo)",
+      "duration_seconds": 10,
+      "loop": true,
+      "volume": 1.0,
+      "priority": "critical",
+      "vibration_pattern_ms": [500, 200, 500, 200, 500, 200, 500],
+      "audio_specs": {
+        "format": "mp3",
+        "bitrate": "128kbps",
+        "sample_rate": "44100Hz",
+        "channels": "mono",
+        "frequency_range": "800-1200Hz"
+      },
+      "legal_compliance": {
+        "custom_sound": true,
+        "shoa_compliant": false,
+        "note": "Sonido personalizado para edificio, NO sonido oficial SHOA"
+      },
+      "firebase_storage_url": "gs://neos-tech.appspot.com/alert_sounds/emergency_alarm_fire.mp3",
+      "cdn_url": "https://storage.googleapis.com/neos-tech.appspot.com/alert_sounds/emergency_alarm_fire.mp3"
+    },
+    "EVACUATION": {
+      "id": "evacuation",
+      "filename": "emergency_alarm_evacuation.mp3",
+      "display_name": "Alarma de Evacuación",
+      "description": "Sirena oscilante lenta para evacuaciones",
+      "pattern": "Sirena ascendente-descendente (1 ciclo cada 2 segundos)",
+      "duration_seconds": 15,
+      "loop": true,
+      "volume": 1.0,
+      "priority": "critical",
+      "vibration_pattern_ms": [1000, 500, 1000, 500],
+      "audio_specs": {
+        "format": "mp3",
+        "bitrate": "128kbps",
+        "sample_rate": "44100Hz",
+        "channels": "mono",
+        "frequency_range": "400-1000Hz oscilante"
+      },
+      "legal_compliance": {
+        "custom_sound": true,
+        "shoa_compliant": false,
+        "note": "Sonido personalizado para edificio, NO sonido oficial SHOA"
+      },
+      "firebase_storage_url": "gs://neos-tech.appspot.com/alert_sounds/emergency_alarm_evacuation.mp3",
+      "cdn_url": "https://storage.googleapis.com/neos-tech.appspot.com/alert_sounds/emergency_alarm_evacuation.mp3"
+    },
+    "FLOOD": {
+      "id": "flood",
+      "filename": "emergency_alarm_flood.mp3",
+      "display_name": "Alarma de Inundación",
+      "description": "Patrón ondulante para fugas de agua o inundación",
+      "pattern": "Onda ascendente suave (patrón de 3 segundos)",
+      "duration_seconds": 8,
+      "loop": true,
+      "volume": 0.9,
+      "priority": "high",
+      "vibration_pattern_ms": [300, 100, 300, 100, 300, 100, 800],
+      "audio_specs": {
+        "format": "mp3",
+        "bitrate": "128kbps",
+        "sample_rate": "44100Hz",
+        "channels": "mono",
+        "frequency_range": "300-800Hz ondulante"
+      },
+      "legal_compliance": {
+        "custom_sound": true,
+        "shoa_compliant": false,
+        "note": "Sonido personalizado para edificio, NO sonido oficial SHOA"
+      },
+      "firebase_storage_url": "gs://neos-tech.appspot.com/alert_sounds/emergency_alarm_flood.mp3",
+      "cdn_url": "https://storage.googleapis.com/neos-tech.appspot.com/alert_sounds/emergency_alarm_flood.mp3"
+    },
+    "POWER_OUTAGE": {
+      "id": "power_outage",
+      "filename": "emergency_alarm_general.mp3",
+      "display_name": "Alarma General",
+      "description": "Triple beep para alertas generales (cortes de energía, fallas de sistema)",
+      "pattern": "3 beeps cortos seguidos, pausa 2 segundos, repetir",
+      "duration_seconds": 6,
+      "loop": true,
+      "volume": 0.8,
+      "priority": "medium",
+      "vibration_pattern_ms": [200, 100, 200, 100, 200, 1500],
+      "audio_specs": {
+        "format": "mp3",
+        "bitrate": "128kbps",
+        "sample_rate": "44100Hz",
+        "channels": "mono",
+        "frequency_range": "600-900Hz"
+      },
+      "legal_compliance": {
+        "custom_sound": true,
+        "shoa_compliant": false,
+        "note": "Sonido personalizado para edificio, NO sonido oficial SHOA"
+      },
+      "firebase_storage_url": "gs://neos-tech.appspot.com/alert_sounds/emergency_alarm_general.mp3",
+      "cdn_url": "https://storage.googleapis.com/neos-tech.appspot.com/alert_sounds/emergency_alarm_general.mp3"
+    },
+    "SYSTEM_FAILURE": {
+      "id": "system_failure",
+      "filename": "emergency_alarm_general.mp3",
+      "display_name": "Alarma General",
+      "description": "Mismo sonido que alertas generales",
+      "pattern": "3 beeps cortos seguidos, pausa 2 segundos, repetir",
+      "duration_seconds": 6,
+      "loop": true,
+      "volume": 0.8,
+      "priority": "medium",
+      "vibration_pattern_ms": [200, 100, 200, 100, 200, 1500],
+      "audio_specs": {
+        "format": "mp3",
+        "bitrate": "128kbps",
+        "sample_rate": "44100Hz",
+        "channels": "mono",
+        "frequency_range": "600-900Hz"
+      },
+      "legal_compliance": {
+        "custom_sound": true,
+        "shoa_compliant": false,
+        "note": "Sonido personalizado para edificio, NO sonido oficial SHOA"
+      },
+      "firebase_storage_url": "gs://neos-tech.appspot.com/alert_sounds/emergency_alarm_general.mp3",
+      "cdn_url": "https://storage.googleapis.com/neos-tech.appspot.com/alert_sounds/emergency_alarm_general.mp3"
+    },
+    "GENERAL": {
+      "id": "general",
+      "filename": "emergency_alarm_general.mp3",
+      "display_name": "Alarma General",
+      "description": "Triple beep para anuncios generales",
+      "pattern": "3 beeps cortos seguidos, pausa 2 segundos, repetir",
+      "duration_seconds": 6,
+      "loop": true,
+      "volume": 0.7,
+      "priority": "low",
+      "vibration_pattern_ms": [200, 100, 200, 100, 200, 1500],
+      "audio_specs": {
+        "format": "mp3",
+        "bitrate": "128kbps",
+        "sample_rate": "44100Hz",
+        "channels": "mono",
+        "frequency_range": "600-900Hz"
+      },
+      "legal_compliance": {
+        "custom_sound": true,
+        "shoa_compliant": false,
+        "note": "Sonido personalizado para edificio, NO sonido oficial SHOA"
+      },
+      "firebase_storage_url": "gs://neos-tech.appspot.com/alert_sounds/emergency_alarm_general.mp3",
+      "cdn_url": "https://storage.googleapis.com/neos-tech.appspot.com/alert_sounds/emergency_alarm_general.mp3"
+    },
+    "CANCELLED": {
+      "id": "cancelled",
+      "filename": "emergency_alarm_cancel.mp3",
+      "display_name": "Alarma Cancelada",
+      "description": "Melodía descendente suave para indicar cancelación de alerta",
+      "pattern": "Secuencia de 5 tonos descendentes (1 segundo total)",
+      "duration_seconds": 3,
+      "loop": false,
+      "volume": 0.8,
+      "priority": "low",
+      "vibration_pattern_ms": [100, 50, 100, 50, 100],
+      "audio_specs": {
+        "format": "mp3",
+        "bitrate": "128kbps",
+        "sample_rate": "44100Hz",
+        "channels": "mono",
+        "frequency_range": "800Hz descendente a 400Hz"
+      },
+      "legal_compliance": {
+        "custom_sound": true,
+        "shoa_compliant": false,
+        "note": "Sonido personalizado para edificio, NO sonido oficial SHOA"
+      },
+      "firebase_storage_url": "gs://neos-tech.appspot.com/alert_sounds/emergency_alarm_cancel.mp3",
+      "cdn_url": "https://storage.googleapis.com/neos-tech.appspot.com/alert_sounds/emergency_alarm_cancel.mp3"
+    }
+  },
+  "fallback": {
+    "enabled": true,
+    "use_system_default": true,
+    "notification_channel_id": "emergency_alerts",
+    "description": "Si falla la carga del archivo, usar sonido por defecto del sistema"
+  },
+  "testing": {
+    "test_mode_enabled": false,
+    "test_sound_volume": 0.5,
+    "test_vibration_enabled": true,
+    "note": "En modo prueba, reducir volumen al 50% para no alarmar a residentes"
+  },
+  "platform_specific": {
+    "android": {
+      "notification_channel": {
+        "id": "emergency_alerts",
+        "name": "Alertas de Emergencia",
+        "description": "Notificaciones críticas del edificio",
+        "importance": "max",
+        "sound_uri": "content://media/external/audio/media/{sound_id}",
+        "vibration_pattern": "variable por tipo",
+        "bypass_dnd": true,
+        "show_badge": true,
+        "lights_enabled": true,
+        "light_color": "#FF6B00"
+      }
+    },
+    "ios": {
+      "apns_sound": {
+        "critical": true,
+        "name": "emergency_alarm_{type}.caf",
+        "volume": 1.0
+      },
+      "interruption_level": "critical",
+      "relevance_score": 1.0
+    }
+  },
+  "generation_guidelines": {
+    "description": "Guía para generar/obtener archivos de audio",
+    "requirements": [
+      "NUNCA usar sonidos oficiales de SHOA (ilegal)",
+      "Crear sonidos personalizados o usar bibliotecas libres de derechos",
+      "Frecuencias entre 300-1200Hz (rango audible claro)",
+      "Duración 3-15 segundos máximo",
+      "Volumen normalizado (-3dB peak)",
+      "Formato MP3 128kbps mono",
+      "Comprimir para optimizar descarga móvil"
+    ],
+    "sources": [
+      "Freesound.org (licencia Creative Commons)",
+      "Zapsplat.com (free sounds)",
+      "Generadores de tono online (ToneGenerator.net)",
+      "Audacity (software gratuito para crear tonos)",
+      "GarageBand/FL Studio (DAWs profesionales)"
+    ],
+    "creation_steps": [
+      "1. Abrir Audacity o generador de tonos",
+      "2. Crear patrón según especificación (ej: 3 beeps 800Hz)",
+      "3. Normalizar audio a -3dB",
+      "4. Exportar como MP3 mono 128kbps",
+      "5. Probar en dispositivo móvil",
+      "6. Ajustar duración/volumen si es necesario",
+      "7. Subir a Firebase Storage con script"
+    ]
+  },
+  "legal_disclaimer": {
+    "warning": "IMPORTANTE - CUMPLIMIENTO LEGAL",
+    "points": [
+      "❌ NO usar sonidos oficiales de SHOA (Servicio Hidrográfico y Oceanográfico de la Armada)",
+      "❌ NO usar sonidos de Onemi (Oficina Nacional de Emergencia)",
+      "❌ NO usar tonos de bomberos o ambulancias oficiales",
+      "✅ Usar SOLO sonidos personalizados o con licencia libre",
+      "✅ Identificar claramente como 'ALERTA EDIFICIO' no 'ALERTA OFICIAL'",
+      "✅ Diferenciar de alertas gubernamentales para evitar confusión",
+      "⚖️ Cumplir con Ley 19.628 de Protección de Datos Personales",
+      "⚖️ No causar alarma pública innecesaria"
+    ]
+  }
+}

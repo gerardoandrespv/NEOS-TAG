@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Verificar Firebase - NeosTech Alertas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #FF6B00;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .step {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #FF6B00;
+        }
+        
+        .step h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        
+        .step ol {
+            margin-left: 20px;
+        }
+        
+        .step li {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        
+        .code {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #FF6B00;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 10px 10px 10px 0;
+        }
+        
+        .btn:hover {
+            background: #FF8C00;
+        }
+        
+        .checklist {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #4CAF50;
+        }
+        
+        .checklist input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.5);
+        }
+        
+        .checklist label {
+            margin-left: 10px;
+            font-size: 1.1em;
+        }
+        
+        .cost-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        .cost-table th,
+        .cost-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .cost-table th {
+            background: #FF6B00;
+            color: white;
+        }
+        
+        .free {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Verificar Configuración de Firebase</h1>
+        <p class="subtitle">Guía paso a paso para confirmar que todo está listo</p>
+        
+        <!-- Costos -->
+        <div class="step">
+            <h2>💰 Costos de Firebase (Tranquilo, es GRATIS)</h2>
+            <table class="cost-table">
+                <tr>
+                    <th>Servicio</th>
+                    <th>Plan Gratuito</th>
+                    <th>Tu Uso Estimado</th>
+                </tr>
+                <tr>
+                    <td><strong>Cloud Messaging</strong></td>
+                    <td class="free">ILIMITADO GRATIS</td>
+                    <td>~1,000 mensajes/mes</td>
+                </tr>
+                <tr>
+                    <td><strong>Firestore</strong></td>
+                    <td class="free">50,000 lecturas/día GRATIS</td>
+                    <td>~100 lecturas/día</td>
+                </tr>
+                <tr>
+                    <td><strong>Hosting</strong></td>
+                    <td class="free">10 GB transferencia GRATIS</td>
+                    <td>~100 MB/mes</td>
+                </tr>
+            </table>
+            <div class="success">
+                ✅ <strong>Para un edificio de 100 apartamentos:</strong> Todo será 100% GRATUITO, sin costos ocultos.
+            </div>
+        </div>
+        
+        <!-- Paso 1 -->
+        <div class="step">
+            <h2>Paso 1: Abrir Firebase Console</h2>
+            <ol>
+                <li>Ve a: <a href="https://console.firebase.google.com/" target="_blank" class="btn">Abrir Firebase Console</a></li>
+                <li>Inicia sesión con tu cuenta de Google</li>
+                <li>Selecciona tu proyecto existente (el que usaste para Firestore)</li>
+            </ol>
+        </div>
+        
+        <!-- Paso 2 -->
+        <div class="step">
+            <h2>Paso 2: Habilitar Cloud Messaging</h2>
+            <ol>
+                <li>En el panel izquierdo, busca <strong>"Build"</strong> o <strong>"Compilación"</strong></li>
+                <li>Click en <strong>"Cloud Messaging"</strong></li>
+                <li>Verifica que diga: <span class="free">✅ Firebase Cloud Messaging API (V1) - Habilitado</span></li>
+                <li>Si dice "Deshabilitado", click en el botón <strong>"Enable"</strong> / <strong>"Habilitar"</strong></li>
+            </ol>
+            <div class="warning">
+                ⚠️ Si no ves la opción Cloud Messaging, ve al Paso 3 primero
+            </div>
+        </div>
+        
+        <!-- Paso 3 -->
+        <div class="step">
+            <h2>Paso 3: Verificar Firestore</h2>
+            <ol>
+                <li>En el panel izquierdo, click <strong>"Firestore Database"</strong></li>
+                <li>Si ya existe, verás tus colecciones → <span class="free">✅ Listo</span></li>
+                <li>Si no existe, click <strong>"Crear base de datos"</strong>:
+                    <ul>
+                        <li>Modo: <strong>Producción</strong></li>
+                        <li>Ubicación: <strong>us-central</strong> (o la más cercana)</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+        
+        <!-- Paso 4 -->
+        <div class="step">
+            <h2>Paso 4: Registrar App Web</h2>
+            <ol>
+                <li>Click en el ícono de engranaje <strong>⚙️</strong> arriba a la izquierda</li>
+                <li>Click en <strong>"Project Settings"</strong> / <strong>"Configuración del proyecto"</strong></li>
+                <li>Ve a la pestaña <strong>"General"</strong></li>
+                <li>Scroll hasta <strong>"Your apps"</strong> / <strong>"Tus aplicaciones"</strong></li>
+                <li>Si NO hay un ícono web <code>&lt;/&gt;</code>, click en él para agregar:
+                    <ul>
+                        <li>Nombre de la app: <strong>Alertas Web</strong></li>
+                        <li>NO marcar "Set up Firebase Hosting"</li>
+                        <li>Click <strong>"Register app"</strong></li>
+                    </ul>
+                </li>
+                <li>Aparecerá tu configuración (ya la tienes en <code>firebase-config.js</code>)</li>
+            </ol>
+        </div>
+        
+        <!-- Checklist Final -->
+        <div class="step">
+            <h2>✅ Checklist de Verificación</h2>
+            <div class="checklist">
+                <p style="margin-bottom: 15px;"><strong>Marca lo que ya tienes:</strong></p>
+                <div style="margin: 10px 0;">
+                    <input type="checkbox" id="check1">
+                    <label for="check1">Cloud Messaging API habilitada</label>
+                </div>
+                <div style="margin: 10px 0;">
+                    <input type="checkbox" id="check2">
+                    <label for="check2">Firestore Database creada</label>
+                </div>
+                <div style="margin: 10px 0;">
+                    <input type="checkbox" id="check3">
+                    <label for="check3">App Web registrada</label>
+                </div>
+                <div style="margin: 10px 0;">
+                    <input type="checkbox" id="check4">
+                    <label for="check4">Archivo .env creado en tu proyecto</label>
+                </div>
+                <div style="margin: 10px 0;">
+                    <input type="checkbox" id="check5">
+                    <label for="check5">App móvil cargando sin errores</label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Resultado -->
+        <div id="result" class="success" style="display: none; margin-top: 20px;">
+            <h3>🎉 ¡CONFIGURACIÓN COMPLETA!</h3>
+            <p>Ya puedes recibir notificaciones push. Próximos pasos:</p>
+            <ol style="margin-left: 20px; margin-top: 10px;">
+                <li>Recarga la app móvil en tu celular</li>
+                <li>Activa las notificaciones</li>
+                <li>Prueba con "Simular Alerta Completa"</li>
+                <li>Despliega el backend: <code>firebase deploy --only functions</code></li>
+            </ol>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 20px; background: #f0f0f0; border-radius: 10px;">
+            <h3>🤔 ¿Necesitas Ayuda?</h3>
+            <p>Si algo no funciona:</p>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li>Verifica que hayas completado TODOS los pasos del checklist</li>
+                <li>Revisa la consola del navegador (F12) en tu celular para ver errores</li>
+                <li>Asegúrate de haber recargado la app después de configurar Firebase</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // Verificar checklist
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const allChecked = Array.from(document.querySelectorAll('input[type="checkbox"]'))
+                    .every(cb => cb.checked);
+                
+                if (allChecked) {
+                    document.getElementById('result').style.display = 'block';
+                    document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

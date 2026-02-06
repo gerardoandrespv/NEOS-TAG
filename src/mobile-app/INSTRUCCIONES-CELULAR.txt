@@ -1,0 +1,94 @@
+═══════════════════════════════════════════════════════════
+  📱 INSTRUCCIONES PARA INSTALAR EN TU CELULAR
+═══════════════════════════════════════════════════════════
+
+✅ SERVIDOR FUNCIONANDO EN:
+   http://192.168.31.95:8080
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 PASOS PARA ANDROID:
+
+1️⃣  Conecta tu celular a la WiFi de tu casa
+    (DEBE SER LA MISMA WIFI que esta computadora)
+
+2️⃣  Abre Chrome en tu celular
+
+3️⃣  Escribe en la barra de direcciones:
+    
+    👉 http://192.168.31.95:8080
+    
+4️⃣  Si no carga, prueba:
+    
+    A) Verifica que estés en la misma WiFi
+    B) Desactiva datos móviles (usa solo WiFi)
+    C) Intenta: http://192.168.31.95:8080/index.html
+
+5️⃣  Una vez que cargue:
+    - Completa el formulario de registro
+    - Presiona "Activar Notificaciones"
+    - Acepta cuando Chrome pida permisos
+
+6️⃣  Para instalar la app:
+    - Menú (⋮) arriba a la derecha
+    - "Agregar a pantalla de inicio"
+    - Confirmar
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 PASOS PARA iPhone:
+
+1️⃣  Conecta tu iPhone a la WiFi de tu casa
+
+2️⃣  Abre Safari (⚠️ DEBE SER SAFARI, no Chrome)
+
+3️⃣  Escribe en la barra:
+    
+    👉 http://192.168.31.95:8080
+
+4️⃣  Completa el registro y activa notificaciones
+
+5️⃣  Para instalar:
+    - Presiona el botón de Compartir 📤
+    - Desplázate y busca "Agregar a pantalla de inicio"
+    - Confirmar
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 SOLUCIÓN DE PROBLEMAS:
+
+❌ "No se puede acceder a este sitio"
+   ✅ Verifica que estés en la misma WiFi
+   ✅ Desactiva datos móviles temporalmente
+   ✅ Prueba con: http://192.168.31.95:8080/index.html
+
+❌ "Página en blanco"
+   ✅ Borra el caché del navegador
+   ✅ Recarga la página (desliza hacia abajo)
+
+❌ "No llegan notificaciones"
+   ✅ Ve a Configuración del sitio
+   ✅ Verifica que Notificaciones estén permitidas
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 PRUEBAS:
+
+Una vez instalada la app, presiona estos botones:
+
+1. "Prueba Notificación" - Debe llegar una notificación
+2. "Prueba Sonido" - Debe sonar un beep
+3. "Simular Alerta" - Pantalla roja + sonido + vibración
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 TIPS:
+
+- La IP puede cambiar si reinicias el router
+- El servidor debe estar corriendo en la PC
+- Si no funciona, cierra esta ventana y vuelve a ejecutar:
+  
+  cd C:\NeosTech-RFID-System-Pro\src\mobile-app
+  python -m http.server 8080
+
+═══════════════════════════════════════════════════════════

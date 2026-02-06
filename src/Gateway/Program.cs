@@ -19,6 +19,40 @@ namespace RFID_Gateway
         public int reader_port { get; set; }
         public int relay_channel { get; set; }
         public int open_duration_ms { get; set; }
+        public int? TagCooldownSeconds { get; set; } // Cooldown específico de este reader
+    }
+
+    class LectoraConfig
+    {
+        // Configuración HTTP Output (solo lectura - SDK no permite modificar)
+        public bool HttpEnabled { get; set; } = false;
+        public string HttpProtocol { get; set; } = "4,HTTP";
+        public string HttpParam { get; set; } = "/readerid?";
+        public string RemoteIP { get; set; } = "192.168.1.11";
+        public int RemotePort { get; set; } = 8080;
+        
+        // Configuración Output Control
+        public bool RelayEnabled { get; set; } = true;
+        public int RelayValidTime { get; set; } = 3; // Segundos
+        public bool CacheEnabled { get; set; } = false;
+        public bool TagWithTime { get; set; } = false;
+        public bool RSSIFilter { get; set; } = false;
+        public int RSSIValue { get; set; } = 76;
+        
+        // Configuración Reading Settings
+        public string Interface { get; set; } = "RJ45";
+        public string WorkMode { get; set; } = "ActiveMod";
+        public string InquiryArea { get; set; } = "EPC";
+        public string StartAddress { get; set; } = "00";
+        public string ByteLength { get; set; } = "00";
+        public int TriggerEffective { get; set; } = 1;
+        public bool BuzzerEnabled { get; set; } = true;
+        public int FilterTime { get; set; } = 0;
+        public int ReadTime { get; set; } = 0;
+        
+        // Metadata
+        public DateTime LastSync { get; set; } = DateTime.Now;
+        public string Source { get; set; } = "manual"; // "sdk" o "manual"
     }
 
     class Program
@@ -27,18 +61,31 @@ namespace RFID_Gateway
         private static string cloudFunctionUrl;
         private static Dictionary<string, AccessPointConfig> accessPoints = new Dictionary<string, AccessPointConfig>();
         
-        // Sistema anti-spam para tags
+        // Sistema anti-spam para tags (debouncing)
         private static Dictionary<string, DateTime> lastTagRead = new Dictionary<string, DateTime>();
-        private static int tagCooldownSeconds = 5; // No procesar el mismo tag por 5 segundos
+        private static int defaultCooldownSeconds = 10; // Cooldown por defecto
+        private static bool showDuplicateStats = true;
+        
+        // Estadísticas de duplicados
+        private static int totalTagReads = 0;
+        private static int duplicateTagsFiltered = 0;
+        private static DateTime statsStartTime = DateTime.Now;
         
         // Control de lectura automática
         private static bool isReading = false;
         private static System.Threading.CancellationTokenSource readingCancellation;
         
+        // Lock para evitar conflictos de conexión TCP
+        private static readonly object thyConnectionLock = new object();
+        
         // Cache local de whitelist (para funcionamiento offline)
         private static HashSet<string> whitelistCache = new HashSet<string>();
         private static DateTime whitelistLastSync = DateTime.MinValue;
         private static int whitelistSyncIntervalMinutes = 5; // Sincronizar cada 5 minutos
+        
+        // Configuración de lectora (snapshot + parámetros SDK)
+        private static LectoraConfig lectoraConfig = new LectoraConfig();
+        private static string lectoraConfigFile = "lectora.config.json";
         
         static async Task Main(string[] args)
         {
@@ -55,6 +102,10 @@ namespace RFID_Gateway
                 Console.WriteLine($"[{DateTime.Now}] Client ID: {clientId}");
                 Console.WriteLine($"[{DateTime.Now}] Cloud Function: {cloudFunctionUrl}");
                 Console.WriteLine($"[{DateTime.Now}] Puntos de acceso cargados: {accessPoints.Count}");
+                
+                // Cargar configuración de lectora
+                LoadLectoraConfig();
+                Console.WriteLine($"[{DateTime.Now}] 📋 Configuración de lectora cargada");
                 
                 // Sincronizar whitelist al inicio
                 Console.WriteLine($"[{DateTime.Now}] 🔄 Sincronizando whitelist inicial...");
@@ -93,6 +144,20 @@ namespace RFID_Gateway
                     
                     Console.WriteLine($"[{DateTime.Now}] Archivo de configuración encontrado y parseado");
                     
+                    // Cargar configuración RFID global
+                    if (config.rfid != null)
+                    {
+                        if (config.rfid.tag_cooldown_seconds != null)
+                        {
+                            defaultCooldownSeconds = (int)config.rfid.tag_cooldown_seconds;
+                            Console.WriteLine($"[{DateTime.Now}] 🔁 Cooldown global: {defaultCooldownSeconds}s");
+                        }
+                        if (config.rfid.show_duplicate_stats != null)
+                        {
+                            showDuplicateStats = (bool)config.rfid.show_duplicate_stats;
+                        }
+                    }
+                    
                     foreach (var ap in config.access_points)
                     {
                         var point = new AccessPointConfig
@@ -104,8 +169,19 @@ namespace RFID_Gateway
                             relay_channel = (int)ap.relay_channel,
                             open_duration_ms = (int)ap.open_duration_ms
                         };
+                        
+                        // Cargar cooldown específico si existe
+                        if (ap.tag_cooldown_seconds != null)
+                        {
+                            point.TagCooldownSeconds = (int)ap.tag_cooldown_seconds;
+                            Console.WriteLine($"[{DateTime.Now}] Cargado: {point.name} @ {point.reader_ip}:{point.reader_port} (cooldown: {point.TagCooldownSeconds}s)");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[{DateTime.Now}] Cargado: {point.name} @ {point.reader_ip}:{point.reader_port}");
+                        }
+                        
                         accessPoints[point.id] = point;
-                        Console.WriteLine($"[{DateTime.Now}] Cargado: {point.name} @ {point.reader_ip}:{point.reader_port}");
                     }
                 }
                 else
@@ -221,6 +297,529 @@ namespace RFID_Gateway
                 // DEBUG: Log de TODAS las peticiones HTTP
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📨 HTTP {context.Request.HttpMethod} {context.Request.Url.PathAndQuery}");
                 
+                // Endpoint para obtener configuración de lectora
+                if (context.Request.Url.PathAndQuery == "/api/lectora/config" && context.Request.HttpMethod == "GET")
+                {
+                    var configJson = JsonConvert.SerializeObject(lectoraConfig, Formatting.Indented);
+                    var buffer = Encoding.UTF8.GetBytes(configJson);
+                    response.ContentType = "application/json";
+                    response.ContentLength64 = buffer.Length;
+                    await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                    response.Close();
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Configuración de lectora enviada");
+                    return;
+                }
+                
+                // Endpoint para actualizar configuración de lectora
+                if (context.Request.Url.PathAndQuery == "/api/lectora/config" && context.Request.HttpMethod == "POST")
+                {
+                    using (var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding))
+                    {
+                        string json = await reader.ReadToEndAsync();
+                        var newConfig = JsonConvert.DeserializeObject<LectoraConfig>(json);
+                        
+                        // Actualizar configuración
+                        lectoraConfig = newConfig;
+                        lectoraConfig.LastSync = DateTime.Now;
+                        lectoraConfig.Source = "manual";
+                        
+                        // Guardar en archivo
+                        SaveLectoraConfig();
+                        
+                        // Responder con éxito
+                        var resultJson = JsonConvert.SerializeObject(new { status = "ok", message = "Configuración actualizada" });
+                        var buffer = Encoding.UTF8.GetBytes(resultJson);
+                        response.ContentType = "application/json";
+                        response.ContentLength64 = buffer.Length;
+                        await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                        response.Close();
+                        
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Configuración de lectora actualizada");
+                        return;
+                    }
+                }
+                
+                // Endpoint para refrescar configuración desde lectora (vía SDK si es posible)
+                if (context.Request.Url.PathAndQuery == "/api/lectora/config/refresh" && context.Request.HttpMethod == "POST")
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 Intentando leer configuración desde lectora física...");
+                    
+                    try
+                    {
+                        // Obtener el primer lector configurado
+                        var reader = accessPoints.Values.FirstOrDefault();
+                        if (reader == null)
+                        {
+                            var errorJson = JsonConvert.SerializeObject(new { 
+                                status = "error", 
+                                message = "No hay lectores configurados en access_points.json"
+                            });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+                        
+                        // Intentar conectar temporalmente a la lectora (si no está conectado ya)
+                        bool wasConnected = isReading;
+                        bool tempConnection = false;
+                        
+                        if (!wasConnected)
+                        {
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📡 Conectando temporalmente a {reader.reader_ip}:{reader.reader_port}...");
+                            tempConnection = THYReaderAPI.Connect(reader.reader_ip, reader.reader_port);
+                            
+                            if (!tempConnection)
+                            {
+                                var errorJson = JsonConvert.SerializeObject(new { 
+                                    status = "error", 
+                                    message = $"No se pudo conectar a la lectora en {reader.reader_ip}:{reader.reader_port}"
+                                });
+                                var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                                response.ContentType = "application/json";
+                                response.ContentLength64 = errorBuffer.Length;
+                                await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                                response.Close();
+                                return;
+                            }
+                            
+                            // Pequeña pausa para estabilizar conexión
+                            await Task.Delay(500);
+                        }
+                        
+                        // Leer configuración desde la lectora usando el SDK
+                        var readerConfig = THYReaderAPI.GetFullConfiguration();
+                        
+                        // Actualizar LectoraConfig con valores leídos del SDK
+                        if (readerConfig.ContainsKey("WorkMode"))
+                        {
+                            lectoraConfig.WorkMode = readerConfig["WorkMode"].ToString();
+                        }
+                        
+                        if (readerConfig.ContainsKey("Transport"))
+                        {
+                            lectoraConfig.Interface = readerConfig["Transport"].ToString();
+                        }
+                        
+                        if (readerConfig.ContainsKey("BeepEnable"))
+                        {
+                            lectoraConfig.BuzzerEnabled = readerConfig["BeepEnable"].ToString() == "On";
+                        }
+                        
+                        if (readerConfig.ContainsKey("FilterTime"))
+                        {
+                            // Convertir "50ms" a número
+                            string filterStr = readerConfig["FilterTime"].ToString().Replace("ms", "");
+                            if (int.TryParse(filterStr, out int filterMs))
+                            {
+                                lectoraConfig.FilterTime = filterMs / 10; // El SDK usa x10ms
+                            }
+                        }
+                        
+                        // Actualizar metadata
+                        lectoraConfig.LastSync = DateTime.Now;
+                        lectoraConfig.Source = "sdk";
+                        
+                        // Guardar configuración actualizada
+                        SaveLectoraConfig();
+                        
+                        // Cerrar conexión temporal si la abrimos nosotros
+                        if (tempConnection && !wasConnected)
+                        {
+                            THYReaderAPI.Disconnect();
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔌 Conexión temporal cerrada");
+                        }
+                        
+                        // Responder con configuración actualizada
+                        var resultJson = JsonConvert.SerializeObject(new { 
+                            status = "success", 
+                            message = "Configuración leída desde la lectora física exitosamente",
+                            reader_data = readerConfig,
+                            updated_config = lectoraConfig,
+                            timestamp = DateTime.Now
+                        });
+                        var buffer = Encoding.UTF8.GetBytes(resultJson);
+                        response.ContentType = "application/json";
+                        response.ContentLength64 = buffer.Length;
+                        await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                        response.Close();
+                        
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Configuración sincronizada desde lectora física");
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error leyendo configuración: {ex.Message}");
+                        
+                        var errorJson = JsonConvert.SerializeObject(new { 
+                            status = "error", 
+                            message = $"Error leyendo configuración: {ex.Message}",
+                            current_config = lectoraConfig
+                        });
+                        var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                        response.ContentType = "application/json";
+                        response.ContentLength64 = errorBuffer.Length;
+                        await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                        response.Close();
+                        return;
+                    }
+                }
+
+                // Endpoint para control del filtro interno de la lectora
+                if (context.Request.Url.PathAndQuery == "/api/lectora/filter" && context.Request.HttpMethod == "GET")
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 GET /api/lectora/filter - Consultando estado del filtro");
+                    try
+                    {
+                        var reader = accessPoints.Values.FirstOrDefault();
+                        if (reader == null)
+                        {
+                            var errorJson = JsonConvert.SerializeObject(new { error = "No hay lectoras configuradas" });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.StatusCode = 500;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+
+                        bool tempConnection = THYReaderAPI.Connect(reader.reader_ip, reader.reader_port);
+                        if (!tempConnection)
+                        {
+                            var errorJson = JsonConvert.SerializeObject(new { error = "No se pudo conectar a la lectora" });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.StatusCode = 500;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+
+                        var (filterEnabled, tagCount) = THYReaderAPI.GetFilterStatus();
+
+                        if (tempConnection)
+                            THYReaderAPI.Disconnect();
+
+                        var resultJson = JsonConvert.SerializeObject(new
+                        {
+                            filter_enabled = filterEnabled,
+                            valid_tag_count = tagCount,
+                            status = filterEnabled ? "ACTIVO" : "INACTIVO",
+                            warning = tagCount == 0 ? "No hay tags en memoria interna" : null
+                        });
+                        var buffer = Encoding.UTF8.GetBytes(resultJson);
+                        response.StatusCode = 200;
+                        response.ContentType = "application/json";
+                        response.ContentLength64 = buffer.Length;
+                        await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                        response.Close();
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error consultando filtro: {ex.Message}");
+                        var errorJson = JsonConvert.SerializeObject(new { error = ex.Message });
+                        var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                        response.StatusCode = 500;
+                        response.ContentType = "application/json";
+                        response.ContentLength64 = errorBuffer.Length;
+                        await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                        response.Close();
+                        return;
+                    }
+                }
+
+                // Endpoint para estadísticas de debouncing
+                if (context.Request.Url.PathAndQuery == "/api/rfid/stats" && context.Request.HttpMethod == "GET")
+                {
+                    var uptime = (DateTime.Now - statsStartTime).TotalMinutes;
+                    var filterRate = totalTagReads > 0 ? (duplicateTagsFiltered * 100.0) / totalTagReads : 0;
+                    
+                    var statsJson = JsonConvert.SerializeObject(new
+                    {
+                        total_reads = totalTagReads,
+                        duplicates_filtered = duplicateTagsFiltered,
+                        unique_reads = totalTagReads - duplicateTagsFiltered,
+                        filter_rate_percent = Math.Round(filterRate, 2),
+                        uptime_minutes = Math.Round(uptime, 2),
+                        default_cooldown_seconds = defaultCooldownSeconds,
+                        active_tags_cached = lastTagRead.Count,
+                        show_duplicate_stats = showDuplicateStats,
+                        readers = accessPoints.Values.Select(ap => new
+                        {
+                            id = ap.id,
+                            name = ap.name,
+                            cooldown_seconds = ap.TagCooldownSeconds ?? defaultCooldownSeconds
+                        }).ToList()
+                    });
+                    
+                    var buffer = Encoding.UTF8.GetBytes(statsJson);
+                    response.ContentType = "application/json";
+                    response.ContentLength64 = buffer.Length;
+                    await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                    response.Close();
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Estadísticas de debouncing enviadas");
+                    return;
+                }
+                
+                // Endpoint para actualizar cooldown en tiempo real
+                if (context.Request.Url.PathAndQuery == "/api/rfid/cooldown" && context.Request.HttpMethod == "POST")
+                {
+                    string requestBody;
+                    using (var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding))
+                    {
+                        requestBody = await reader.ReadToEndAsync();
+                    }
+                    
+                    var body = JsonConvert.DeserializeObject<Dictionary<string, object>>(requestBody);
+                    
+                    if (body.ContainsKey("default_cooldown"))
+                    {
+                        defaultCooldownSeconds = Convert.ToInt32(body["default_cooldown"]);
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔧 Cooldown global actualizado: {defaultCooldownSeconds}s");
+                    }
+                    
+                    if (body.ContainsKey("reader_id") && body.ContainsKey("cooldown"))
+                    {
+                        string readerId = body["reader_id"].ToString();
+                        int cooldown = Convert.ToInt32(body["cooldown"]);
+                        
+                        if (accessPoints.ContainsKey(readerId))
+                        {
+                            accessPoints[readerId].TagCooldownSeconds = cooldown;
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔧 Cooldown de {accessPoints[readerId].name} actualizado: {cooldown}s");
+                        }
+                    }
+                    
+                    var resultJson = JsonConvert.SerializeObject(new { status = "ok", message = "Cooldown actualizado" });
+                    var buffer2 = Encoding.UTF8.GetBytes(resultJson);
+                    response.ContentType = "application/json";
+                    response.ContentLength64 = buffer2.Length;
+                    await response.OutputStream.WriteAsync(buffer2, 0, buffer2.Length);
+                    response.Close();
+                    return;
+                }
+
+                if (context.Request.Url.PathAndQuery == "/api/lectora/filter" && context.Request.HttpMethod == "POST")
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔧 POST /api/lectora/filter - Control de filtro interno");
+                    try
+                    {
+                        string requestBody;
+                        using (var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding))
+                        {
+                            requestBody = await reader.ReadToEndAsync();
+                        }
+
+                        var body = JsonConvert.DeserializeObject<Dictionary<string, object>>(requestBody);
+                        if (body == null || !body.ContainsKey("enabled"))
+                        {
+                            var errorJson = JsonConvert.SerializeObject(new { error = "Parámetro 'enabled' requerido (true/false)" });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.StatusCode = 400;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+
+                        var accessPoint = accessPoints.Values.FirstOrDefault();
+                        if (accessPoint == null)
+                        {
+                            var errorJson = JsonConvert.SerializeObject(new { error = "No hay lectoras configuradas" });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.StatusCode = 500;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+
+                        bool enable = Convert.ToBoolean(body["enabled"]);
+                        byte filterMode = 0x00;
+                        if (body.ContainsKey("mode"))
+                            filterMode = Convert.ToByte(body["mode"]);
+
+                        bool tempConnection = THYReaderAPI.Connect(accessPoint.reader_ip, accessPoint.reader_port);
+                        if (!tempConnection)
+                        {
+                            var errorJson = JsonConvert.SerializeObject(new { error = "No se pudo conectar a la lectora" });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.StatusCode = 500;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+
+                        bool result = THYReaderAPI.SetTagFilter(enable, filterMode);
+                        var (filterEnabled, tagCount) = THYReaderAPI.GetFilterStatus();
+
+                        if (tempConnection)
+                            THYReaderAPI.Disconnect();
+
+                        if (result)
+                        {
+                            var resultJson = JsonConvert.SerializeObject(new
+                            {
+                                success = true,
+                                filter_enabled = filterEnabled,
+                                valid_tag_count = tagCount,
+                                message = $"Filtro {(filterEnabled ? "HABILITADO" : "DESHABILITADO")} - {tagCount} tag(s) en memoria"
+                            });
+                            var buffer = Encoding.UTF8.GetBytes(resultJson);
+                            response.StatusCode = 200;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = buffer.Length;
+                            await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                            response.Close();
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Filtro configurado: {(filterEnabled ? "ON" : "OFF")}");
+                            return;
+                        }
+                        else
+                        {
+                            var errorJson = JsonConvert.SerializeObject(new { error = "Error configurando filtro" });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.StatusCode = 500;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error configurando filtro: {ex.Message}");
+                        var errorJson = JsonConvert.SerializeObject(new { error = ex.Message });
+                        var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                        response.StatusCode = 500;
+                        response.ContentType = "application/json";
+                        response.ContentLength64 = errorBuffer.Length;
+                        await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                        response.Close();
+                        return;
+                    }
+                }
+
+                // Endpoint para activar relé (apertura manual desde dashboard)
+                if (context.Request.Url.PathAndQuery == "/api/lectora/relay" && context.Request.HttpMethod == "POST")
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔓 POST /api/lectora/relay - Comando de apertura manual");
+                    try
+                    {
+                        string requestBody;
+                        using (var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding))
+                        {
+                            requestBody = await reader.ReadToEndAsync();
+                        }
+
+                        var body = JsonConvert.DeserializeObject<Dictionary<string, object>>(requestBody);
+                        if (body == null)
+                        {
+                            var errorJson = JsonConvert.SerializeObject(new { error = "Invalid JSON body" });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.StatusCode = 400;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+
+                        string action = body.ContainsKey("action") ? body["action"].ToString() : "open";
+                        int duration = body.ContainsKey("duration") ? Convert.ToInt32(body["duration"]) : 3000;
+                        string doorId = body.ContainsKey("door_id") ? body["door_id"].ToString() : "manual";
+
+                        var accessPoint = accessPoints.Values.FirstOrDefault();
+                        if (accessPoint == null)
+                        {
+                            var errorJson = JsonConvert.SerializeObject(new { error = "No hay lectoras configuradas" });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.StatusCode = 500;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+
+                        // Conectar temporalmente a la lectora
+                        bool tempConnection = THYReaderAPI.Connect(accessPoint.reader_ip, accessPoint.reader_port);
+                        if (!tempConnection)
+                        {
+                            var errorJson = JsonConvert.SerializeObject(new { error = "No se pudo conectar a la lectora" });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.StatusCode = 500;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+
+                        // Activar relé físicamente
+                        int relayNumber = 1; // Relé 1 (puerta principal)
+                        bool relayResult = THYReaderAPI.ActivateRelay(relayNumber, duration);
+
+                        // Desconectar
+                        if (tempConnection)
+                            THYReaderAPI.Disconnect();
+
+                        if (relayResult)
+                        {
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Relé {relayNumber} activado por {duration}ms - Door: {doorId}");
+                            var resultJson = JsonConvert.SerializeObject(new
+                            {
+                                success = true,
+                                relay = relayNumber,
+                                duration_ms = duration,
+                                door_id = doorId,
+                                timestamp = DateTime.UtcNow.ToString("o"),
+                                message = $"Relé {relayNumber} activado exitosamente"
+                            });
+                            var buffer = Encoding.UTF8.GetBytes(resultJson);
+                            response.StatusCode = 200;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = buffer.Length;
+                            await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                            response.Close();
+                            return;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error activando relé {relayNumber}");
+                            var errorJson = JsonConvert.SerializeObject(new { error = "Error activando relé" });
+                            var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                            response.StatusCode = 500;
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = errorBuffer.Length;
+                            await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                            response.Close();
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error en endpoint de relé: {ex.Message}");
+                        var errorJson = JsonConvert.SerializeObject(new { error = ex.Message });
+                        var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                        response.StatusCode = 500;
+                        response.ContentType = "application/json";
+                        response.ContentLength64 = errorBuffer.Length;
+                        await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+                        response.Close();
+                        return;
+                    }
+                }
+                
                 // Endpoint para recibir tags de la lectora THY (HTTP Protocol)
                 if (context.Request.Url.PathAndQuery.StartsWith("/readerid"))
                 {
@@ -286,24 +885,49 @@ namespace RFID_Gateway
                         if (!string.IsNullOrEmpty(accessPointId) && accessPoints.ContainsKey(accessPointId))
                         {
                             var ap = accessPoints[accessPointId];
-                            Console.WriteLine($"[{DateTime.Now}] APERTURA MANUAL: {ap.name}");
+                            Console.WriteLine($"[{DateTime.Now}] 🔓 APERTURA MANUAL: {ap.name}");
                             
-                            bool success = await ActivateRelay(ap);
+                            // 1. Activar relay en background
+                            _ = Task.Run(async () => await ActivateRelay(ap));
                             
-                            if (success)
-                            {
-                                await SendJsonResponse(response, new { 
-                                    status = "success",
-                                    access_point = accessPointId,
-                                    name = ap.name,
-                                    message = "Relay activado correctamente"
-                                });
-                            }
-                            else
-                            {
-                                response.StatusCode = 500;
-                                await SendJsonResponse(response, new { error = "Error activando relay" });
-                            }
+                            // 2. Enviar evento a la nube (para registro en "Últimas Acciones de Control")
+                            _ = Task.Run(async () => {
+                                try
+                                {
+                                    var eventPayload = new
+                                    {
+                                        action = "manual_open",
+                                        access_point = accessPointId,
+                                        access_point_name = ap.name,
+                                        client_id = clientId,
+                                        timestamp = DateTime.UtcNow.ToString("o"),
+                                        source = "dashboard_button"
+                                    };
+                                    
+                                    string jsonPayload = JsonConvert.SerializeObject(eventPayload);
+                                    
+                                    using (var client = new HttpClient())
+                                    {
+                                        client.Timeout = TimeSpan.FromSeconds(5);
+                                        var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+                                        await client.PostAsync(cloudFunctionUrl, content);
+                                    }
+                                    
+                                    Console.WriteLine($"[{DateTime.Now}] ✅ Evento manual enviado a cloud");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"[{DateTime.Now}] ⚠️ Error enviando evento manual: {ex.Message}");
+                                }
+                            });
+                            
+                            // 3. Responder inmediatamente
+                            await SendJsonResponse(response, new { 
+                                status = "success",
+                                access_point = accessPointId,
+                                name = ap.name,
+                                message = "Portón abierto manualmente"
+                            });
                         }
                         else
                         {
@@ -458,27 +1082,46 @@ namespace RFID_Gateway
             {
                 try
                 {
-                    Console.WriteLine($"[{DateTime.Now}] Activando relay del lector {ap.name}...");
+                    Console.WriteLine($"[{DateTime.Now}] � APERTURA MANUAL: {ap.name}");
                     
-                    // NO reconectar - usar la conexión existente del autoread
-                    // El lector ya está conectado por StartAutoRead()
-                    
-                    // Activar relé (algunos lectores devuelven false pero funcionan)
-                    THYReaderAPI.ActivateRelay(0xFF);
-                    Console.WriteLine($"[{DateTime.Now}] ⚡ Relé activado para {ap.name}");
-                    
-                    // Mantener activo por la duración configurada
-                    System.Threading.Thread.Sleep(ap.open_duration_ms);
-                    
-                    // Desactivar relay
-                    THYReaderAPI.DeactivateRelay(0xFF);
-                    Console.WriteLine($"[{DateTime.Now}] ✅ Relé desactivado");
-                    
-                    return true;  // Asumir éxito ya que físicamente funciona
+                    // Usar lock para evitar conflicto con el polling TCP
+                    lock (thyConnectionLock)
+                    {
+                        Console.WriteLine($"[{DateTime.Now}] 🔌 Conectando a {ap.name} ({ap.reader_ip}:{ap.reader_port})...");
+                        
+                        // Conectar temporalmente para enviar comando de relé
+                        bool connected = THYReaderAPI.Connect(ap.reader_ip, ap.reader_port);
+                        
+                        if (!connected)
+                        {
+                            Console.WriteLine($"[{DateTime.Now}] ❌ No se pudo conectar a {ap.name}");
+                            return false;
+                        }
+                        
+                        Console.WriteLine($"[{DateTime.Now}] ✅ Conectado - Activando relé...");
+                        
+                        // Activar relé
+                        bool relayOn = THYReaderAPI.ActivateRelay(0xFF);
+                        Console.WriteLine($"[{DateTime.Now}] ⚡ Relé activado para {ap.name} (resultado: {relayOn})");
+                        
+                        // Mantener activo por la duración configurada
+                        System.Threading.Thread.Sleep(ap.open_duration_ms);
+                        
+                        // Desactivar relay
+                        bool relayOff = THYReaderAPI.DeactivateRelay(0xFF);
+                        Console.WriteLine($"[{DateTime.Now}] 🔒 Relé desactivado (resultado: {relayOff})");
+                        
+                        // Desconectar
+                        THYReaderAPI.Disconnect();
+                        Console.WriteLine($"[{DateTime.Now}] ✅ Desconectado de {ap.name}");
+                        
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[{DateTime.Now}] ERROR activando relay: {ex.Message}");
+                    Console.WriteLine($"[{DateTime.Now}] ❌ ERROR activando relay: {ex.Message}");
+                    Console.WriteLine($"[{DateTime.Now}] Stack: {ex.StackTrace}");
                     return false;
                 }
             });
@@ -486,12 +1129,20 @@ namespace RFID_Gateway
         
         private static async Task<(bool isAllowed, string status, string message)> CheckTagAccess(string tagId)
         {
-            // PASO 1: Verificar cache local primero (modo offline-first)
+            // PASO 1: Verificar whitelist local PRIMERO (fuente de verdad)
             bool inLocalCache = CheckWhitelistCache(tagId);
             
+            // PASO 2: Si NO está en cache local, RECHAZAR inmediatamente (modo offline-first)
+            if (!inLocalCache)
+            {
+                Console.WriteLine($"[{DateTime.Now}] ❌ Tag NO en whitelist local - ACCESO DENEGADO");
+                return (false, "not_in_whitelist", "Tag no autorizado (no en whitelist local)");
+            }
+            
+            // PASO 3: Si está en cache, intentar verificar con cloud para actualizar estado
+            // (pero el acceso ya está garantizado por cache local)
             try
             {
-                // PASO 2: Intentar verificar con cloud (para actualizar estado en tiempo real)
                 string checkUrl = cloudFunctionUrl.Replace("/rfid-gateway", "/check-tag-access");
                 
                 var payload = new
@@ -515,38 +1166,31 @@ namespace RFID_Gateway
                     if (response.IsSuccessStatusCode)
                     {
                         dynamic result = JsonConvert.DeserializeObject(responseContent);
-                        bool isAllowed = result?.access_granted ?? false;
                         string status = result?.status ?? "unknown";
                         string message = result?.message ?? "Sin información";
                         
-                        return (isAllowed, status, message);
+                        // Si cloud dice que está bloqueado, respetarlo
+                        if (status == "blacklist" || status == "blocked")
+                        {
+                            Console.WriteLine($"[{DateTime.Now}] ⚠️ Tag bloqueado en cloud (actualizando cache local)");
+                            // TODO: Remover de cache local
+                            return (false, "blacklist", message);
+                        }
+                        
+                        // Cloud confirma acceso
+                        return (true, "whitelist", message);
                     }
                     else
                     {
-                        Console.WriteLine($"[{DateTime.Now}] ⚠️ Error verificando tag: {responseContent}");
-                        // Fallback a cache local si cloud falla
-                        if (inLocalCache)
-                        {
-                            Console.WriteLine($"[{DateTime.Now}] ℹ️ Usando cache local (tag en whitelist)");
-                            return (true, "whitelist_cached", "Tag autorizado (cache local)");
-                        }
-                        return (false, "error", "Error consultando acceso");
+                        Console.WriteLine($"[{DateTime.Now}] ⚠️ Error cloud, usando cache local");
+                        return (true, "whitelist_cached", "Tag autorizado (cache local)");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[{DateTime.Now}] ⚠️ Excepción verificando tag: {ex.Message}");
-                
-                // MODO OFFLINE: Si no hay conexión, usar cache local
-                if (inLocalCache)
-                {
-                    Console.WriteLine($"[{DateTime.Now}] 🔌 MODO OFFLINE: Tag en whitelist local");
-                    return (true, "whitelist_offline", "Tag autorizado (modo offline)");
-                }
-                
-                Console.WriteLine($"[{DateTime.Now}] 🔌 MODO OFFLINE: Tag NO en whitelist local");
-                return (false, "not_in_cache", "Tag no autorizado (modo offline)");
+                Console.WriteLine($"[{DateTime.Now}] 🔌 MODO OFFLINE: Usando cache local");
+                return (true, "whitelist_offline", "Tag autorizado (modo offline)");
             }
         }
         
@@ -613,7 +1257,7 @@ namespace RFID_Gateway
             
             Console.WriteLine($"[{DateTime.Now}] 🔄 Iniciando lectura automática de tags...");
             Console.WriteLine($"[{DateTime.Now}] 📡 Lector: {mainReader.name} ({mainReader.reader_ip}:{mainReader.reader_port})");
-            Console.WriteLine($"[{DateTime.Now}] ⏱️ Anti-spam: {tagCooldownSeconds} segundos");
+            Console.WriteLine($"[{DateTime.Now}] ⏱️ Anti-spam: {mainReader.TagCooldownSeconds ?? defaultCooldownSeconds} segundos");
             
             readingCancellation = new System.Threading.CancellationTokenSource();
             isReading = true;
@@ -730,29 +1374,50 @@ namespace RFID_Gateway
         
         private static async Task ProcessTag(string tagId, AccessPointConfig reader)
         {
+            totalTagReads++;
+            
+            // Determinar cooldown: específico del reader o default
+            int cooldownSeconds = defaultCooldownSeconds;
+            if (reader != null && reader.TagCooldownSeconds.HasValue)
+            {
+                cooldownSeconds = reader.TagCooldownSeconds.Value;
+            }
+            
             // Sistema anti-spam: verificar si ya procesamos este tag recientemente
             DateTime now = DateTime.Now;
+            string cacheKey = $"{reader?.id ?? "unknown"}:{tagId}"; // Cooldown por reader+tag
             
-            if (lastTagRead.ContainsKey(tagId))
+            if (lastTagRead.ContainsKey(cacheKey))
             {
-                var timeSinceLastRead = (now - lastTagRead[tagId]).TotalSeconds;
+                var timeSinceLastRead = (now - lastTagRead[cacheKey]).TotalSeconds;
                 
-                if (timeSinceLastRead < tagCooldownSeconds)
+                if (timeSinceLastRead < cooldownSeconds)
                 {
-                    // Tag leído muy recientemente, ignorar
+                    // Tag leído muy recientemente, ignorar (debouncing)
+                    duplicateTagsFiltered++;
+                    
+                    // NO mostrar logs cada 10 duplicados (reduce spam en consola)
+                    // Solo mostrar cada 100 duplicados o cada minuto
+                    if (showDuplicateStats && (duplicateTagsFiltered % 100 == 0 || 
+                        (now - statsStartTime).TotalSeconds % 60 < 1))
+                    {
+                        var uptime = (now - statsStartTime).TotalMinutes;
+                        var filterRate = (duplicateTagsFiltered * 100.0) / totalTagReads;
+                        Console.WriteLine($"[{now:HH:mm:ss}] 🔁 Duplicados filtrados: {duplicateTagsFiltered}/{totalTagReads} ({filterRate:F1}%)");
+                    }
                     return;
                 }
             }
             
             // Actualizar timestamp de última lectura
-            lastTagRead[tagId] = now;
+            lastTagRead[cacheKey] = now;
             
-            // Limpiar tags antiguos del diccionario (mantener solo últimos 100)
-            if (lastTagRead.Count > 100)
+            // Limpiar tags antiguos del diccionario (mantener solo últimos 200)
+            if (lastTagRead.Count > 200)
             {
                 var oldestTags = lastTagRead
                     .OrderBy(x => x.Value)
-                    .Take(50)
+                    .Take(100)
                     .Select(x => x.Key)
                     .ToList();
                 
@@ -772,8 +1437,13 @@ namespace RFID_Gateway
             Console.WriteLine($"[{DateTime.Now}] 📋 Estado: {status}");
             Console.WriteLine($"[{DateTime.Now}] 💬 Mensaje: {message}");
             
-            // 2. Solo activar relé si está en WHITELIST
-            if (isAllowed && status == "whitelist")
+            // 2. Solo activar relé si está EXPLÍCITAMENTE en WHITELIST (no errores, no no-registrados)
+            bool shouldActivateRelay = isAllowed && 
+                                       (status == "whitelist" || 
+                                        status == "whitelist_cached" || 
+                                        status == "whitelist_offline");
+            
+            if (shouldActivateRelay)
             {
                 Console.WriteLine($"[{DateTime.Now}] ✅ ACCESO PERMITIDO - Activando relé...");
                 bool relayActivated = await ActivateRelay(reader);
@@ -800,67 +1470,45 @@ namespace RFID_Gateway
                 Console.WriteLine($"[{DateTime.Now}] ⚠️ ACCESO DENEGADO - {message}");
             }
             
-            // 3. Registrar evento de acceso en Firestore (rfid_tags)
+            // 3. Registrar evento de acceso enviando a Cloud Function
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    // Buscar nombre de usuario asociado al tag consultando Firestore
-                    string userName = "";
-                    try
+                    // Enviar a Cloud Function para registro en Firestore
+                    var payload = new
                     {
-                        using (var client = new HttpClient())
-                        {
-                            var url = $"https://firestore.googleapis.com/v1/projects/neos-tech/databases/(default)/documents/clients/condominio-neos/tags?where=tag_id=='{tagId}'&pageSize=1";
-                            var response = await client.GetAsync(url);
-                            if (response.IsSuccessStatusCode)
-                            {
-                                var json = await response.Content.ReadAsStringAsync();
-                                dynamic data = JsonConvert.DeserializeObject(json);
-                                if (data.documents != null && data.documents.Count > 0)
-                                {
-                                    var tagDoc = data.documents[0];
-                                    if (tagDoc.fields != null && tagDoc.fields.name != null && tagDoc.fields.name.stringValue != null)
-                                        userName = tagDoc.fields.name.stringValue;
-                                }
-                            }
-                        }
-                    }
-                    catch { }
-
-                    // Registrar evento
-                    var eventData = new
-                    {
-                        fields = new
-                        {
-                            timestamp = new { timestampValue = DateTime.UtcNow.ToString("o") },
-                            tag_id = new { stringValue = tagId },
-                            status = new { stringValue = status },
-                            lector = new { stringValue = reader.name },
-                            mensaje = new { stringValue = message },
-                            client_id = new { stringValue = clientId },
-                            usuario = new { stringValue = userName }
-                        }
+                        epc = tagId,
+                        reader_sn = reader.id,
+                        gateway_version = "condominio_2.0",
+                        access_granted = isAllowed && status == "whitelist",
+                        access_status = status,
+                        access_message = message,
+                        reader_name = reader.name,
+                        timestamp = DateTime.UtcNow.ToString("o")
                     };
-                    var jsonBody = JsonConvert.SerializeObject(eventData);
+                    
+                    string jsonPayload = JsonConvert.SerializeObject(payload);
+                    
                     using (var client = new HttpClient())
                     {
-                        var url = "https://firestore.googleapis.com/v1/projects/neos-tech/databases/(default)/documents/rfid_tags";
-                        var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-                        var response = await client.PostAsync(url, content);
+                        var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+                        var response = await client.PostAsync(cloudFunctionUrl, content);
+                        
                         if (response.IsSuccessStatusCode)
                         {
-                            Console.WriteLine($"[{DateTime.Now}] 📝 Evento registrado en Firestore");
+                            var responseContent = await response.Content.ReadAsStringAsync();
+                            Console.WriteLine($"[{DateTime.Now}] 📝 Evento enviado a Firebase: {responseContent}");
                         }
                         else
                         {
-                            Console.WriteLine($"[{DateTime.Now}] ⚠️ Error registrando evento en Firestore: {response.StatusCode}");
+                            Console.WriteLine($"[{DateTime.Now}] ⚠️ Error enviando evento: {response.StatusCode}");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[{DateTime.Now}] ⚠️ Excepción registrando evento: {ex.Message}");
+                    Console.WriteLine($"[{DateTime.Now}] ⚠️ Excepción enviando evento: {ex.Message}");
                 }
             });
         }
@@ -909,18 +1557,78 @@ namespace RFID_Gateway
                         whitelistCache = newWhitelist;
                         whitelistLastSync = DateTime.Now;
                         
-                        Console.WriteLine($"[{DateTime.Now}] ✅ Whitelist sincronizada: {whitelistCache.Count} tags");
+                        Console.WriteLine($"[{DateTime.Now}] ✅ Whitelist Firestore: {whitelistCache.Count} tags");
                     }
                     else
                     {
                         Console.WriteLine($"[{DateTime.Now}] ⚠️ Error sincronizando whitelist: {response.StatusCode}");
                     }
                 }
+                
+                // NUEVO: También sincronizar con lectora THY (verificar filtro interno)
+                await SyncWhitelistFromReader();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[{DateTime.Now}] ⚠️ Excepción sincronizando whitelist: {ex.Message}");
             }
+        }
+        
+        /// <summary>
+        /// Sincroniza whitelist leyendo el estado del filtro de la lectora THY
+        /// Esto permite funcionamiento offline usando la whitelist de la lectora
+        /// </summary>
+        private static async Task SyncWhitelistFromReader()
+        {
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var reader = accessPoints.Values.FirstOrDefault();
+                    if (reader == null)
+                    {
+                        Console.WriteLine($"[{DateTime.Now}] ⚠️ No hay lectoras configuradas para sincronizar");
+                        return;
+                    }
+                    
+                    Console.WriteLine($"[{DateTime.Now}] 🔍 Verificando filtro de lectora {reader.name}...");
+                    
+                    // Conectar temporalmente para verificar filtro
+                    bool wasConnected = THYReaderAPI.Connect(reader.reader_ip, reader.reader_port);
+                    if (!wasConnected)
+                    {
+                        Console.WriteLine($"[{DateTime.Now}] ⚠️ No se pudo conectar a lectora para verificar filtro");
+                        return;
+                    }
+                    
+                    try
+                    {
+                        var (filterEnabled, tagCount) = THYReaderAPI.GetFilterStatus();
+                        
+                        if (filterEnabled && tagCount > 0)
+                        {
+                            Console.WriteLine($"[{DateTime.Now}] ℹ️ Lectora tiene filtro activo con {tagCount} tag(s)");
+                            Console.WriteLine($"[{DateTime.Now}] ℹ️ Modo híbrido: Firestore ({whitelistCache.Count} tags) + Filtro lectora ({tagCount} tags)");
+                        }
+                        else if (!filterEnabled)
+                        {
+                            Console.WriteLine($"[{DateTime.Now}] ℹ️ Filtro de lectora deshabilitado - Usando solo Firestore");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[{DateTime.Now}] ⚠️ Filtro habilitado pero sin tags - Verificar configuración lectora");
+                        }
+                    }
+                    finally
+                    {
+                        THYReaderAPI.Disconnect();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[{DateTime.Now}] ⚠️ Error sincronizando con lectora: {ex.Message}");
+                }
+            });
         }
         
         /// <summary>
@@ -944,5 +1652,56 @@ namespace RFID_Gateway
         {
             return whitelistCache.ToList();
         }
+        
+        // =============== CONFIGURACIÓN LECTORA ===============
+        
+        /// <summary>
+        /// Carga configuración de lectora desde archivo JSON
+        /// </summary>
+        private static void LoadLectoraConfig()
+        {
+            try
+            {
+                if (File.Exists(lectoraConfigFile))
+                {
+                    string json = File.ReadAllText(lectoraConfigFile);
+                    lectoraConfig = JsonConvert.DeserializeObject<LectoraConfig>(json);
+                    Console.WriteLine($"[{DateTime.Now}] ✅ Configuración de lectora cargada desde {lectoraConfigFile}");
+                }
+                else
+                {
+                    // Crear configuración por defecto
+                    lectoraConfig = new LectoraConfig();
+                    SaveLectoraConfig();
+                    Console.WriteLine($"[{DateTime.Now}] 📝 Configuración de lectora creada con valores por defecto");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now}] ⚠️ Error cargando configuración de lectora: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now}] 💡 Usando configuración por defecto");
+                lectoraConfig = new LectoraConfig();
+            }
+        }
+        
+        /// <summary>
+        /// Guarda configuración de lectora en archivo JSON
+        /// </summary>
+        private static void SaveLectoraConfig()
+        {
+            try
+            {
+                string json = JsonConvert.SerializeObject(lectoraConfig, Formatting.Indented);
+                File.WriteAllText(lectoraConfigFile, json);
+                Console.WriteLine($"[{DateTime.Now}] 💾 Configuración de lectora guardada en {lectoraConfigFile}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now}] ❌ Error guardando configuración de lectora: {ex.Message}");
+            }
+        }
     }
 }
+
+
+

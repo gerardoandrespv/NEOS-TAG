@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2563EB">
+    <title>Instalar NeosTech Alertas - Sistema de Emergencias</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="assets/images/neostechc.png" type="image/png">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+    
+    <!-- QR Code Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+        }
+        
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        h1 {
+            font-size: 28px;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .step {
+            background: #f7f9fc;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 32px;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+        
+        .step-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        
+        .step-desc {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-left: 44px;
+        }
+        
+        .qr-container {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border: 4px solid transparent;
+            border-radius: 24px;
+            padding: 30px;
+            margin: 30px 0;
+            display: inline-block;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.2);
+            position: relative;
+            background-clip: padding-box;
+        }
+        
+        .qr-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 24px;
+            padding: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            z-index: -1;
+        }
+        
+        #qrcode {
+            display: inline-block;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        
+        #qrcode img {
+            display: block;
+            border-radius: 12px;
+        }
+        
+        .qr-url {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #667eea;
+            font-weight: 700;
+            word-break: break-all;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin: 15px 0;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .print-btn {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        
+        @media print {
+            body {
+                background: white;
+            }
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+            .btn, .print-btn {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 24px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+            .step {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="assets/images/neostechc.png" alt="NeosTech Logo">
+        </div>
+        
+        <h1>📱 NeosTech Alertas</h1>
+        <p class="subtitle">Sistema de Notificaciones de Emergencia</p>
+        
+        <!-- QR Code Section -->
+        <div id="qrSection">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px 24px; border-radius: 20px; font-weight: 700; font-size: 14px; margin-bottom: 15px;">
+                    📸 Escanea con tu celular
+                </div>
+            </div>
+            <div class="qr-container">
+                <div id="qrcode"></div>
+                <div class="qr-url" id="appUrl"></div>
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <p style="color: #666; font-size: 14px; margin-bottom: 10px;">
+                    <strong style="color: #1a1a1a;">Se abrirá automáticamente en tu navegador</strong><br>
+                    Luego podrás instalar la app en tu pantalla de inicio
+                </p>
+            </div>
+            <button class="print-btn" onclick="window.print()">🖨️ Imprimir QR</button>
+        </div>
+        
+        <!-- Installation Steps -->
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">1</span>
+                Escanea el QR
+            </div>
+            <div class="step-desc">
+                Abre la cámara de tu celular y escanea el código QR de arriba
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">2</span>
+                Instala la App
+            </div>
+            <div class="step-desc">
+                Toca "Agregar a pantalla de inicio" o "Instalar" cuando aparezca el mensaje
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">3</span>
+                Activa Notificaciones
+            </div>
+            <div class="step-desc">
+                Permite notificaciones para recibir alertas de emergencia en tiempo real
+            </div>
+        </div>
+        
+        <!-- Install Button (for when viewing on mobile) -->
+        <div id="installSection" class="hidden">
+            <div class="icon">📲</div>
+            <button id="installBtn" class="btn">
+                Instalar Ahora
+            </button>
+            <p class="status info">
+                👆 Toca el botón de arriba para instalar la aplicación
+            </p>
+        </div>
+        
+        <!-- Notification Permission Section -->
+        <div id="notificationSection" class="hidden">
+            <div class="icon">🔔</div>
+            <h2>Activar Notificaciones</h2>
+            <button id="enableNotificationsBtn" class="btn">
+                Permitir Notificaciones
+            </button>
+            <div id="notificationStatus"></div>
+        </div>
+        
+        <!-- Success Section -->
+        <div id="successSection" class="hidden">
+            <div class="icon">✅</div>
+            <h2>¡Todo Listo!</h2>
+            <p class="status success">
+                La aplicación está instalada y las notificaciones están activadas
+            </p>
+            <button class="btn" onclick="window.location.href='/'">
+                Ir al Dashboard
+            </button>
+        </div>
+        
+        <!-- Already Installed Section -->
+        <div id="alreadyInstalledSection" class="hidden">
+            <div class="icon">✨</div>
+            <h2>App Ya Instalada</h2>
+            <p class="status success">
+                La aplicación ya está instalada en tu dispositivo
+            </p>
+            <button class="btn" onclick="window.location.href='/'">
+                Abrir Dashboard
+            </button>
+        </div>
+        
+        <!-- Download Links -->
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0;">
+            <p style="color: #666; font-size: 14px; margin-bottom: 10px;">
+                ¿No puedes escanear el QR?
+            </p>
+            <button class="btn btn-secondary" onclick="copyUrl()">
+                📋 Copiar Enlace
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCu-jFdNAOuzQPcGx7EuZO_6IamafKCxjk",
+            authDomain: "neos-tech.firebaseapp.com",
+            projectId: "neos-tech",
+            storageBucket: "neos-tech.firebasestorage.app",
+            messagingSenderId: "896888243691",
+            appId: "1:896888243691:web:20ce831a12e06aa5cc2ac1",
+            measurementId: "G-EFCK4L1GY3"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        
+        // URL ABSOLUTA COMPLETA - abre directo en navegador
+        const appUrl = 'https://neos-tech.web.app/install.html';
+        
+        // Generate QR Code simple (sin logo)
+        new QRCode(document.getElementById('qrcode'), {
+            text: appUrl,
+            width: 200,
+            height: 200,
+            colorDark: '#1F2937',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
+        
+        document.getElementById('appUrl').textContent = appUrl;
+        
+        // PWA Install Prompt
+        let deferredPrompt;
+        let installPromptFired = false;
+        
+        // Detectar si es móvil
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Si es móvil, ocultar QR y pasos
+        if (isMobile) {
+            console.log('[Install] Dispositivo móvil detectado');
+            document.getElementById('qrSection').style.display = 'none';
+            
+            const steps = document.querySelectorAll('.step');
+            steps.forEach(step => step.style.display = 'none');
+            
+            // Esperar 2 segundos para ver si beforeinstallprompt se dispara
+            setTimeout(() => {
+                if (!installPromptFired) {
+                    // Si no se disparó el evento, verificar si está instalado
+                    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+                        console.log('[Install] App detectada como instalada (standalone mode)');
+                        document.getElementById('alreadyInstalledSection').classList.remove('hidden');
+                    } else {
+                        // Navegador no soporta PWA o ya está instalada sin evento
+                        console.log('[Install] beforeinstallprompt no se disparó');
+                        document.getElementById('installSection').classList.remove('hidden');
+                    }
+                }
+            }, 2000);
+        } else {
+            console.log('[Install] Desktop - mostrando QR');
+        }
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installPromptFired = true;
+            
+            console.log('[Install] beforeinstallprompt disparado - app NO instalada');
+            
+            // Ocultar "ya instalada" si estaba visible
+            document.getElementById('alreadyInstalledSection').classList.add('hidden');
+            
+            // Mostrar botón de instalación
+            if (isMobile) {
+                document.getElementById('installSection').classList.remove('hidden');
+            }
+        });
+        
+        document.getElementById('installBtn').addEventListener('click', async () => {
+            if (!deferredPrompt) {
+                alert('La aplicación ya está instalada o tu navegador no soporta instalación');
+                return;
+            }
+            
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                console.log('Usuario aceptó instalación');
+                document.getElementById('installSection').classList.add('hidden');
+                document.getElementById('notificationSection').classList.remove('hidden');
+            }
+            
+            deferredPrompt = null;
+        });
+        
+        // Notification Permission
+        document.getElementById('enableNotificationsBtn').addEventListener('click', async () => {
+            try {
+                const permission = await Notification.requestPermission();
+                
+                if (permission === 'granted') {
+                    // Register Service Worker
+                    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                    await navigator.serviceWorker.ready;
+                    
+                    // Get FCM token
+                    const messaging = firebase.messaging();
+                    const token = await messaging.getToken({
+                        vapidKey: 'BAbOEt9dMYOJz3Hw3LtBoqPSWeJF7s1qT70dC2yGNZUPfMV3g60r-bDRc7vdabuqsIIojP_TCAQ0XQSML-7wbWY',
+                        serviceWorkerRegistration: registration
+                    });
+                    
+                    console.log('FCM Token:', token);
+                    
+                    // Subscribe to topic
+                    await fetch('https://us-central1-neos-tech.cloudfunctions.net/sendEmergencyPush', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'subscribe',
+                            token: token,
+                            topic: 'all-users'
+                        })
+                    });
+                    
+                    // Show success
+                    document.getElementById('notificationSection').classList.add('hidden');
+                    document.getElementById('successSection').classList.remove('hidden');
+                    
+                } else {
+                    document.getElementById('notificationStatus').innerHTML = 
+                        '<p class="status error">❌ Debes permitir notificaciones para recibir alertas</p>';
+                }
+            } catch (error) {
+                console.error('Error activando notificaciones:', error);
+                document.getElementById('notificationStatus').innerHTML = 
+                    '<p class="status error">❌ Error: ' + error.message + '</p>';
+            }
+        });
+        
+        // Copy URL function
+        function copyUrl() {
+            navigator.clipboard.writeText(appUrl).then(() => {
+                alert('✅ Enlace copiado al portapapeles');
+            }).catch(err => {
+                console.error('Error copiando:', err);
+                const input = document.createElement('input');
+                input.value = appUrl;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                alert('✅ Enlace copiado al portapapeles');
+            });
+        }
+    </script>
+</body>
+</html>

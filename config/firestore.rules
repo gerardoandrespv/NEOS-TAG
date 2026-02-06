@@ -167,6 +167,64 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    // ============================================
+    // COLECCIÓN: blocks (Edificios/Torres)
+    // ============================================
+    match /blocks/{blockId} {
+      // Lectura: Permitir para mostrar en dashboard
+      allow read: if true;
+      
+      // Escritura: Permitir para desarrollo
+      // TODO: Restringir en producción a solo admins
+      allow write: if true;
+    }
+    
+    // ============================================
+    // COLECCIÓN: departments (Departamentos)
+    // ============================================
+    match /departments/{deptId} {
+      // Lectura: Permitir para mostrar en dashboard
+      allow read: if true;
+      
+      // Escritura: Permitir para desarrollo
+      // TODO: Restringir en producción a solo admins
+      allow write: if true;
+    }
+    
+    // ============================================
+    // COLECCIÓN: emergency_alerts (Alertas de Emergencia)
+    // ============================================
+    match /emergency_alerts/{alertId} {
+      // Lectura: Permitir para dashboard y monitoreo
+      allow read: if true;
+      
+      // Escritura: Permitir para emitir alertas desde dashboard
+      // TODO: Restringir en producción a solo usuarios autorizados
+      allow create, update: if true;
+      
+      // Eliminación: Solo para cancelar alertas
+      allow delete: if true;
+    }
+    
+    // ============================================
+    // COLECCIÓN: alert_confirmations (Confirmaciones de usuarios)
+    // ============================================
+    match /alert_confirmations/{confirmId} {
+      // Lectura: Permitir para dashboard
+      allow read: if true;
+      
+      // Escritura: Permitir para que usuarios confirmen
+      allow create, update: if true;
+    }
+    
+    // ============================================
+    // COLECCIÓN: alert_subscribers (Registro público móvil)
+    // ============================================
+    match /alert_subscribers/{subscriberId} {
+      // REGLAS COMPLETAMENTE ABIERTAS
+      allow read, write: if true;
+    }
+
     // Denegar acceso a cualquier otra colección no especificada
     match /{document=**} {
       allow read, write: if false;
