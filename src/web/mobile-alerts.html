@@ -720,9 +720,25 @@
                         console.log('[Mobile] 🎯 Tipo extraído:', alertType);
                         console.log('[Mobile] 🎯 ID extraído:', alertId);
                         
-                        // Play alert sound with ID for tracking
-                        console.log('[Mobile] 🔊 LLAMANDO A playAlertSound desde FCM...');
-                        playAlertSound(alertType, alertId);
+                        // Verificar permisos de audio ANTES de reproducir
+                        const hasAudioPermission = localStorage.getItem('audioPermissionGranted');
+                        console.log('[Mobile] 🔊 Permisos de audio:', hasAudioPermission);
+                        
+                        if (hasAudioPermission === 'true') {
+                            // Play alert sound with ID for tracking
+                            console.log('[Mobile] 🔊 LLAMANDO A playAlertSound desde FCM...');
+                            playAlertSound(alertType, alertId);
+                        } else {
+                            console.log('[Mobile] ⚠️ FCM recibido pero SIN permisos de audio - mostrando prompt');
+                            // Mostrar prompt de activación
+                            const prompt = document.getElementById('activationPrompt');
+                            if (prompt && prompt.classList.contains('hidden')) {
+                                prompt.classList.remove('hidden');
+                                prompt.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                            // Guardar alerta para reproducir después de activar
+                            window.pendingAlert = { alertType, alertId };
+                        }
                         
                         // NO mostrar notificación aquí - el Service Worker ya la muestra
                         // Esto evita notificaciones duplicadas
