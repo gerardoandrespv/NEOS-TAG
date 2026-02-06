@@ -352,6 +352,7 @@
         let previousAlertIds = new Set();
         let confirmedAlerts = JSON.parse(localStorage.getItem('confirmedAlerts') || '{}');
         let currentlyPlayingSounds = new Map();
+        let messagingListenerRegistered = false; // Flag para evitar listeners duplicados
 
         // Check notification permission on load
         window.addEventListener('load', () => {
@@ -466,29 +467,37 @@
                 // Save to localStorage
                 localStorage.setItem('fcmToken', token);
                 
-                // Listen for foreground messages
-                messaging.onMessage((payload) => {
-                    console.log('[Mobile] 📨 ========== MENSAJE RECIBIDO EN FOREGROUND ==========');
-                    console.log('[Mobile] Payload completo:', JSON.stringify(payload, null, 2));
-                    console.log('[Mobile] payload.data:', payload.data);
-                    console.log('[Mobile] payload.notification:', payload.notification);
+                // Listen for foreground messages - SOLO UNA VEZ
+                if (!messagingListenerRegistered) {
+                    console.log('[Mobile] 👂 Registrando listener de mensajes (PRIMERA VEZ)');
                     
-                    // Get alert type and ID from payload - intentar múltiples campos
-                    const alertType = (payload.data?.type || payload.data?.alert_type || 'GENERAL').toUpperCase();
-                    const alertId = payload.data?.alertId || payload.data?.alert_id || payload.data?.id || null;
-                    console.log('[Mobile] 🎯 Tipo extraído:', alertType);
-                    console.log('[Mobile] 🎯 ID extraído:', alertId);
+                    messaging.onMessage((payload) => {
+                        console.log('[Mobile] 📨 ========== MENSAJE RECIBIDO EN FOREGROUND ==========');
+                        console.log('[Mobile] Payload completo:', JSON.stringify(payload, null, 2));
+                        console.log('[Mobile] payload.data:', payload.data);
+                        console.log('[Mobile] payload.notification:', payload.notification);
+                        
+                        // Get alert type and ID from payload - intentar múltiples campos
+                        const alertType = (payload.data?.type || payload.data?.alert_type || 'GENERAL').toUpperCase();
+                        const alertId = payload.data?.alertId || payload.data?.alert_id || payload.data?.id || null;
+                        console.log('[Mobile] 🎯 Tipo extraído:', alertType);
+                        console.log('[Mobile] 🎯 ID extraído:', alertId);
+                        
+                        // Play alert sound with ID for tracking
+                        console.log('[Mobile] 🔊 LLAMANDO A playAlertSound...');
+                        playAlertSound(alertType, alertId);
+                        
+                        // Show in-app notification
+                        showInAppNotification(payload);
+                        
+                        // Refresh alerts
+                        loadActiveAlerts();
+                    });
                     
-                    // Play alert sound with ID for tracking
-                    console.log('[Mobile] 🔊 LLAMANDO A playAlertSound...');
-                    playAlertSound(alertType, alertId);
-                    
-                    // Show in-app notification
-                    showInAppNotification(payload);
-                    
-                    // Refresh alerts
-                    loadActiveAlerts();
-                });
+                    messagingListenerRegistered = true;
+                } else {
+                    console.log('[Mobile] ⚠️ Listener ya registrado, saltando...');
+                }
                 
                 return token;
             } catch (error) {
