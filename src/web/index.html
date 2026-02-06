@@ -9,7 +9,7 @@
     <meta name="description" content="Sistema de control de acceso RFID con alertas de emergencia en tiempo real">
     <meta name="theme-color" content="#2563EB">
     <link rel="manifest" href="/manifest.json">
-    <!-- Version: 2026-02-06-v2.5.1-SYNTAX-FIXES -->
+    <!-- Version: 2026-02-03-v2.5.0-PUSH-NOTIFICATIONS -->
     <title>NeosTech RFID System Pro v2.5.0</title>
     <link rel="icon" href="assets/images/neostechc.png" type="image/png">
     <link rel="apple-touch-icon" href="assets/images/neostechc.png">
@@ -4718,7 +4718,7 @@
         
         // Observador de estado de autenticación de Firebase
         firebase.auth().onAuthStateChanged(async (user) => {
-            console.log('🔑 Estado de auth cambi�:', user  user.email : 'no autenticado');
+            console.log('🔑 Estado de auth cambió:', user ? user.email : 'no autenticado');
             
             if (user) {
                 currentUser = user;
@@ -9311,8 +9311,8 @@
                     valign: 'middle'
                 },
                 styles: { 
-                    fontSize: isEvents  8 : 9, 
-                    cellPadding: isEvents  2 : 3,
+                    fontSize: isEvents ? 8 : 9, 
+                    cellPadding: isEvents ? 2 : 3,
                     lineWidth: 0.2,
                     lineColor: [200, 200, 200],
                     textColor: [0, 0, 0]
@@ -10128,7 +10128,7 @@
                 WorkMode: parseInt(document.getElementById('readerWorkMode').value),
                 Session: parseInt(document.getElementById('readerSession').value),
                 QValue: parseInt(document.getElementById('readerQValue').value),
-                Beep: document.getElementById('readerBeep').checked  1 : 0,
+                Beep: document.getElementById('readerBeep').checked ? 1 : 0,
                 RelayMode: parseInt(document.getElementById('readerRelayMode').value),
                 RelayDelay: parseInt(document.getElementById('readerRelayDelay').value),
                 WiegandMode: parseInt(document.getElementById('readerWiegandMode').value),
@@ -10928,7 +10928,7 @@
                     event_type: 'manual_door_open',
                     access_point_id: doorId,
                     access_point_name: doorName,
-                    user_name: currentUser  currentUser : 'Dashboard Manual',
+                    user_name: currentUser ? currentUser.email : 'Dashboard Manual',
                     action: 'open',
                     timestamp: now,
                     processed_at: firebase.firestore.FieldValue.serverTimestamp(),
