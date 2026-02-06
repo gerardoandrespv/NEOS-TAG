@@ -559,12 +559,27 @@
         // Get FCM Token
         async function getFCMToken() {
             try {
+                // Verificar si ya se registró en esta sesión para evitar duplicados
+                const sessionRegistered = sessionStorage.getItem('fcmTokenRegistered');
+                if (sessionRegistered === 'true') {
+                    console.log('[Mobile] ⏭️ Token ya registrado en esta sesión, saltando...');
+                    return localStorage.getItem('fcmToken');
+                }
+                
                 const messaging = firebase.messaging();
                 const token = await messaging.getToken({
                     vapidKey: 'BEd-BNhI_7rq5_sjALjNVA7UKpXhvrsfDX23vSVHr7GPsvAZ654qFAN7LkKudcLLF_Ot8EPZ03ebzHcKZO8WgtM'
                 });
                 
                 console.log('[Mobile] 🔑 FCM Token obtenido:', token);
+                
+                // Verificar si el token cambió desde la última vez
+                const previousToken = localStorage.getItem('fcmToken');
+                if (previousToken === token) {
+                    console.log('[Mobile] ✅ Token no cambió, no es necesario re-registrar');
+                    sessionStorage.setItem('fcmTokenRegistered', 'true');
+                    return token;
+                }
                 
                 // Save to localStorage
                 localStorage.setItem('fcmToken', token);
@@ -588,6 +603,17 @@
                     }, { merge: true });
                     
                     console.log('[Mobile] ✅ Token guardado en alert_subscribers');
+                    
+                    // Si había un token anterior diferente, limpiarlo
+                    if (previousToken && previousToken !== token) {
+                        console.log('[Mobile] 🗑️ Limpiando token anterior:', previousToken);
+                        try {
+                            await db.collection('alert_subscribers').doc(previousToken).delete();
+                            console.log('[Mobile] ✅ Token anterior eliminado');
+                        } catch (deleteError) {
+                            console.warn('[Mobile] ⚠️ No se pudo eliminar token anterior:', deleteError);
+                        }
+                    }
                     
                     // Suscribir al topic all-users
                     try {
@@ -651,6 +677,10 @@
                 } else {
                     console.log('[Mobile] ⚠️ Listener FCM ya estaba registrado, saltando...');
                 }
+                
+                // Marcar que el registro se completó en esta sesión
+                sessionStorage.setItem('fcmTokenRegistered', 'true');
+                console.log('[Mobile] ✅ Registro completo marcado para esta sesión');
                 
                 return token;
             } catch (error) {
