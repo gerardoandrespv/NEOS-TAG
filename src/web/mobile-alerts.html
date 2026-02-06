@@ -69,6 +69,12 @@
             50% { opacity: 0.8; }
         }
 
+        @keyframes shake {
+            0%, 100% { transform: translateX(-50%) translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-50%) translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(-50%) translateX(5px); }
+        }
+
         .container {
             padding: 20px;
             max-width: 600px;
@@ -518,58 +524,51 @@
                 console.log('[Mobile] Paso 2: Obteniendo token FCM...');
                 await getFCMToken();
                 
-                // Step 3: Test audio permission - SIN LOOP
-                console.log('[Mobile] Paso 3: Activando sonidos...');
-                const testAudio = document.getElementById('alertSoundGeneral');
-                if (testAudio) {
-                    // Safari iOS: Forzar carga del audio primero
-                    console.log('[Mobile] Forzando carga de audio...');
-                    testAudio.load();
+                // Step 3: Test ALL audio files to unlock autoplay - CRÍTICO para política de autoplay
+                console.log('[Mobile] Paso 3: Activando sonidos (desbloqueando autoplay)...');
+                const audioIds = ['alertSoundFire', 'alertSoundFlood', 'alertSoundEvacuation', 'alertSoundGeneral', 'alertSoundCancel'];
+                let unlockedCount = 0;
+                
+                for (const audioId of audioIds) {
+                    const audio = document.getElementById(audioId);
+                    if (!audio) continue;
                     
-                    // Esperar a que esté listo
-                    await new Promise((resolve) => {
-                        if (testAudio.readyState >= 2) {
-                            console.log('[Mobile] Audio ya listo (readyState:', testAudio.readyState, ')');
-                            resolve();
-                        } else {
-                            console.log('[Mobile] Esperando a que audio esté listo...');
-                            testAudio.addEventListener('canplay', () => {
-                                console.log('[Mobile] Audio listo para reproducir');
-                                resolve();
-                            }, { once: true });
-                            
-                            // Timeout de seguridad
-                            setTimeout(resolve, 2000);
+                    try {
+                        console.log('[Mobile] Desbloqueando:', audioId);
+                        
+                        // Asegurar que esté cargado
+                        if (audio.readyState < 2) {
+                            audio.load();
+                            await new Promise(resolve => {
+                                if (audio.readyState >= 2) resolve();
+                                else audio.addEventListener('canplay', resolve, { once: true });
+                                setTimeout(resolve, 1000);
+                            });
                         }
-                    });
-                    
-                    console.log('[Mobile] Audio.src:', testAudio.src || testAudio.currentSrc);
-                    console.log('[Mobile] Audio.readyState:', testAudio.readyState);
-                    
-                    testAudio.volume = 0.01; // Casi inaudible
-                    testAudio.loop = false; // IMPORTANTE: sin loop
-                    testAudio.currentTime = 0;
-                    
-                    const playPromise = testAudio.play();
-                    
-                    // Detener INMEDIATAMENTE
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            setTimeout(() => {
-                                testAudio.pause();
-                                testAudio.currentTime = 0;
-                                testAudio.volume = 1.0;
-                                console.log('[Mobile] ✅ Sonido de prueba detenido correctamente');
-                            }, 100); // Muy rápido
-                        }).catch(err => {
-                            console.warn('[Mobile] ⚠️ Error en sonido de prueba (puede ser normal en algunos navegadores):', err);
-                            // No fallar si el test falla, solo logear
-                        });
+                        
+                        // Reproducir brevemente para desbloquear
+                        audio.volume = 0.01;
+                        audio.loop = false;
+                        audio.currentTime = 0;
+                        
+                        await audio.play();
+                        
+                        // Detener inmediatamente
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        audio.pause();
+                        audio.currentTime = 0;
+                        audio.volume = 1.0;
+                        
+                        unlockedCount++;
+                        console.log('[Mobile] ✅ Desbloqueado:', audioId);
+                        
+                    } catch (err) {
+                        console.warn('[Mobile] ⚠️ No se pudo desbloquear', audioId, ':', err.name);
                     }
-                    
-                    console.log('[Mobile] ✅ Sonidos activados');
-                    localStorage.setItem('audioPermissionGranted', 'true');
                 }
+                
+                console.log('[Mobile] ✅ Sonidos desbloqueados:', unlockedCount, '/', audioIds.length);
+                localStorage.setItem('audioPermissionGranted', 'true');
                 
                 // Step 4: Hide prompt and update status
                 document.getElementById('activationPrompt').classList.add('hidden');
@@ -845,8 +844,53 @@
                                 }
                                 updateStatusIndicators();
                             } else {
-                                // Ya hay permisos, solo logear (puede ser un fallo temporal del navegador)
-                                console.log('[Mobile] ⚠️ NotAllowedError pero permisos están activos - ignorando');
+                                // Ya hay permisos pero autoplay bloqueado - mostrar botón para reproducir
+                                console.log('[Mobile] ⚠️ Autoplay bloqueado a pesar de permisos - requiere interacción');
+                                
+                                // Crear botón de reproducción manual
+                                window.blockedAlertSound = { type: alertType, id: alertId };
+                                
+                                // Mostrar banner de acción
+                                const banner = document.createElement('div');
+                                banner.id = 'playAlertBanner';
+                                banner.style.cssText = `
+                                    position: fixed;
+                                    top: 100px;
+                                    left: 50%;
+                                    transform: translateX(-50%);
+                                    background: linear-gradient(135deg, #DC2626, #991B1B);
+                                    color: white;
+                                    padding: 20px 30px;
+                                    border-radius: 12px;
+                                    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                                    z-index: 10000;
+                                    animation: shake 0.5s;
+                                    text-align: center;
+                                    max-width: 90%;
+                                `;
+                                banner.innerHTML = `
+                                    <div style="font-size: 24px; margin-bottom: 10px;">🚨</div>
+                                    <div style="font-weight: bold; margin-bottom: 10px;">¡NUEVA ALERTA DE EMERGENCIA!</div>
+                                    <button onclick="playBlockedAlert()" style="
+                                        background: white;
+                                        color: #DC2626;
+                                        border: none;
+                                        padding: 12px 24px;
+                                        border-radius: 8px;
+                                        font-weight: bold;
+                                        font-size: 16px;
+                                        cursor: pointer;
+                                    ">🔊 REPRODUCIR SONIDO</button>
+                                `;
+                                
+                                // Remover banner anterior si existe
+                                const oldBanner = document.getElementById('playAlertBanner');
+                                if (oldBanner) oldBanner.remove();
+                                
+                                document.body.appendChild(banner);
+                                
+                                // Auto-ocultar después de 10 segundos
+                                setTimeout(() => banner.remove(), 10000);
                             }
                             
                             // Vibrar para llamar atención
@@ -866,6 +910,36 @@
                     const el = document.getElementById(id);
                     console.log(`  - ${id}: ${!!el}`);
                 });
+            }
+        }
+
+        // Play blocked alert sound (called from banner button)
+        async function playBlockedAlert() {
+            console.log('[Mobile] 🎵 Reproduciendo sonido bloqueado desde botón...');
+            
+            if (!window.blockedAlertSound) {
+                console.warn('[Mobile] No hay alerta bloqueada guardada');
+                return;
+            }
+            
+            const { type, id } = window.blockedAlertSound;
+            
+            try {
+                // Remover banner
+                const banner = document.getElementById('playAlertBanner');
+                if (banner) banner.remove();
+                
+                // Reproducir sonido
+                await playAlertSound(type, id);
+                
+                // Limpiar
+                window.blockedAlertSound = null;
+                
+                console.log('[Mobile] ✅ Sonido reproducido exitosamente desde botón');
+                
+            } catch (error) {
+                console.error('[Mobile] ❌ Error reproduciendo desde botón:', error);
+                alert('❌ No se pudo reproducir el sonido. Intenta recargar la página.');
             }
         }
 
