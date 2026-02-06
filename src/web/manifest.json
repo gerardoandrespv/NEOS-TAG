@@ -1,11 +1,11 @@
 {
-  "name": "NeosTech RFID System Pro",
-  "short_name": "NeosTech",
-  "description": "Sistema de control de acceso RFID con alertas de emergencia en tiempo real",
-  "start_url": "/",
+  "name": "NeosTech Alertas - Residente",
+  "short_name": "NeosTech Alertas",
+  "description": "Recibe alertas de emergencia del edificio en tiempo real",
+  "start_url": "/mobile-alerts.html",
   "display": "standalone",
   "background_color": "#0F172A",
-  "theme_color": "#2563EB",
+  "theme_color": "#DC2626",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -25,24 +25,10 @@
   "screenshots": [],
   "shortcuts": [
     {
-      "name": "Dashboard",
-      "short_name": "Dashboard",
-      "description": "Ver dashboard principal",
-      "url": "/?tab=dashboard",
-      "icons": [{ "src": "/assets/images/neostechc.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Alertas",
+      "name": "Alertas Activas",
       "short_name": "Alertas",
-      "description": "Sistema de alertas de emergencia",
-      "url": "/?tab=alerts",
-      "icons": [{ "src": "/assets/images/neostechc.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Tags RFID",
-      "short_name": "Tags",
-      "description": "Gestión de tags RFID",
-      "url": "/?tab=tags",
+      "description": "Ver alertas de emergencia activas",
+      "url": "/mobile-alerts.html",
       "icons": [{ "src": "/assets/images/neostechc.png", "sizes": "96x96" }]
     }
   ],

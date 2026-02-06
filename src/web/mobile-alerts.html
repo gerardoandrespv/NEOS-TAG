@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#DC2626">
+    <title>NeosTech Alertas - Residente</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/assets/images/neostechc.png" type="image/png">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .header {
+            background: rgba(220, 38, 38, 0.1);
+            border-bottom: 2px solid rgba(220, 38, 38, 0.3);
+            padding: 20px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        .status-bar {
+            background: linear-gradient(135deg, #10B981, #059669);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-bar.alert-active {
+            background: linear-gradient(135deg, #DC2626, #991B1B);
+            animation: pulse-bg 2s infinite;
+        }
+
+        @keyframes pulse-bg {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .alert-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            color: #1F2937;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border-left: 6px solid #DC2626;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .alert-type-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .alert-type-badge.fire {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .alert-type-badge.evacuation {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .alert-type-badge.general {
+            background: #E0E7FF;
+            color: #3730A3;
+        }
+
+        .alert-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #111827;
+        }
+
+        .alert-message {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #374151;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: #F9FAFB;
+            border-radius: 10px;
+        }
+
+        .alert-details {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #6B7280;
+        }
+
+        .detail-item strong {
+            color: #111827;
+        }
+
+        .btn-confirm {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #10B981, #059669);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-confirm:active {
+            transform: scale(0.98);
+        }
+
+        .btn-confirm.confirmed {
+            background: linear-gradient(135deg, #6B7280, #4B5563);
+            pointer-events: none;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-state-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .empty-state h3 {
+            font-size: 22px;
+            margin-bottom: 10px;
+            opacity: 0.8;
+        }
+
+        .empty-state p {
+            opacity: 0.6;
+            font-size: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .version {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            opacity: 0.5;
+        }
+
+        .notification-prompt {
+            background: rgba(37, 99, 235, 0.1);
+            border: 2px solid rgba(37, 99, 235, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .notification-prompt h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .notification-prompt p {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 15px;
+        }
+
+        .btn-enable-notifications {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #3B82F6, #2563EB);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚨 NeosTech Alertas</h1>
+        <div class="subtitle">Sistema de Notificaciones de Emergencia</div>
+    </div>
+
+    <div class="status-bar" id="statusBar">
+        <span id="statusText">🔍 Cargando...</span>
+        <span id="alertCount">0 alertas</span>
+    </div>
+
+    <div class="container">
+        <!-- Notification Prompt -->
+        <div id="notificationPrompt" class="notification-prompt hidden">
+            <h3>🔔 Activar Notificaciones</h3>
+            <p>Permite recibir alertas de emergencia en tiempo real</p>
+            <button class="btn-enable-notifications" onclick="enableNotifications()">
+                Activar Notificaciones
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading">
+            <div class="spinner"></div>
+            <div>Cargando alertas...</div>
+        </div>
+
+        <!-- Alerts Container -->
+        <div id="alertsContainer"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state hidden">
+            <div class="empty-state-icon">✅</div>
+            <h3>No hay alertas activas</h3>
+            <p>El edificio está en estado normal</p>
+        </div>
+
+        <div class="version">v1.0.0 - App Móvil Residentes</div>
+    </div>
+
+    <!-- Hidden audio elements for alert sounds -->
+    <audio id="alertSound" preload="auto">
+        <source src="/sounds/emergency_alarm_general.wav" type="audio/wav">
+    </audio>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZ-XRSRgC2gz9E6zdYpes7yv5nLZtKmSw",
+            authDomain: "neos-tech.firebaseapp.com",
+            projectId: "neos-tech",
+            storageBucket: "neos-tech.firebasestorage.app",
+            messagingSenderId: "738411977369",
+            appId: "1:738411977369:web:7facc71cea4c271d217608",
+            measurementId: "G-DL4X5MX5JL"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let activeAlerts = [];
+        let confirmedAlerts = JSON.parse(localStorage.getItem('confirmedAlerts') || '{}');
+
+        // Check notification permission on load
+        window.addEventListener('load', () => {
+            checkNotificationPermission();
+            loadActiveAlerts();
+            
+            // Register Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/firebase-messaging-sw.js')
+                    .then(reg => console.log('[Mobile] Service Worker registrado:', reg.scope))
+                    .catch(err => console.error('[Mobile] Error en Service Worker:', err));
+            }
+        });
+
+        // Check notification permission
+        function checkNotificationPermission() {
+            if ('Notification' in window) {
+                if (Notification.permission === 'default') {
+                    document.getElementById('notificationPrompt').classList.remove('hidden');
+                } else if (Notification.permission === 'granted') {
+                    console.log('[Mobile] Notificaciones permitidas');
+                    // Get FCM token
+                    getFCMToken();
+                }
+            }
+        }
+
+        // Enable notifications
+        async function enableNotifications() {
+            try {
+                console.log('[Mobile] 🔔 Solicitando permiso de notificaciones...');
+                
+                const permission = await Notification.requestPermission();
+                
+                if (permission === 'granted') {
+                    console.log('[Mobile] ✅ Permiso concedido');
+                    document.getElementById('notificationPrompt').classList.add('hidden');
+                    
+                    // Get FCM token
+                    await getFCMToken();
+                    
+                    alert('✅ Notificaciones activadas correctamente');
+                } else {
+                    alert('⚠️ Debes permitir notificaciones para recibir alertas de emergencia');
+                }
+            } catch (error) {
+                console.error('[Mobile] Error al solicitar notificaciones:', error);
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        // Get FCM Token
+        async function getFCMToken() {
+            try {
+                const messaging = firebase.messaging();
+                const token = await messaging.getToken({
+                    vapidKey: 'BEd-BNhI_7rq5_sjALjNVA7UKpXhvrsfDX23vSVHr7GPsvAZ654qFAN7LkKudcLLF_Ot8EPZ03ebzHcKZO8WgtM'
+                });
+                
+                console.log('[Mobile] 🔑 FCM Token:', token);
+                
+                // Save to localStorage
+                localStorage.setItem('fcmToken', token);
+                
+                // Listen for foreground messages
+                messaging.onMessage((payload) => {
+                    console.log('[Mobile] 📨 Mensaje recibido en foreground:', payload);
+                    
+                    // Play alert sound
+                    playAlertSound();
+                    
+                    // Show in-app notification
+                    showInAppNotification(payload);
+                    
+                    // Refresh alerts
+                    loadActiveAlerts();
+                });
+                
+                return token;
+            } catch (error) {
+                console.error('[Mobile] Error obteniendo FCM token:', error);
+                return null;
+            }
+        }
+
+        // Play alert sound
+        function playAlertSound() {
+            const audio = document.getElementById('alertSound');
+            audio.volume = 1.0;
+            audio.play().catch(err => {
+                console.warn('[Mobile] No se pudo reproducir sonido:', err);
+            });
+        }
+
+        // Show in-app notification
+        function showInAppNotification(payload) {
+            const title = payload.data?.title || payload.notification?.title || 'Nueva Alerta';
+            const message = payload.data?.body || payload.notification?.body || '';
+            
+            // Vibrar dispositivo
+            if ('vibrate' in navigator) {
+                navigator.vibrate([200, 100, 200, 100, 200]);
+            }
+            
+            // Mostrar notificación nativa si la app está en foreground
+            if (Notification.permission === 'granted') {
+                new Notification(title, {
+                    body: message,
+                    icon: '/assets/images/neostechc.png',
+                    badge: '/assets/images/neostechc.png',
+                    tag: 'emergency-alert',
+                    requireInteraction: true
+                });
+            }
+        }
+
+        // Load active alerts
+        async function loadActiveAlerts() {
+            try {
+                console.log('[Mobile] 🔍 Cargando alertas activas...');
+                
+                const snapshot = await db.collection('emergency_alerts')
+                    .where('status', '==', 'ACTIVE')
+                    .orderBy('issued_at', 'desc')
+                    .get();
+                
+                activeAlerts = [];
+                snapshot.forEach(doc => {
+                    activeAlerts.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                console.log('[Mobile] 📊 Alertas encontradas:', activeAlerts.length);
+                
+                renderAlerts();
+                updateStatusBar();
+                
+            } catch (error) {
+                console.error('[Mobile] Error cargando alertas:', error);
+                document.getElementById('loadingState').innerHTML = 
+                    '<div style="color: #EF4444;">❌ Error al cargar alertas</div>';
+            }
+        }
+
+        // Render alerts
+        function renderAlerts() {
+            document.getElementById('loadingState').classList.add('hidden');
+            
+            const container = document.getElementById('alertsContainer');
+            
+            if (activeAlerts.length === 0) {
+                container.innerHTML = '';
+                document.getElementById('emptyState').classList.remove('hidden');
+                return;
+            }
+            
+            document.getElementById('emptyState').classList.add('hidden');
+            
+            container.innerHTML = activeAlerts.map(alert => {
+                const isConfirmed = confirmedAlerts[alert.id];
+                const typeIcon = getAlertIcon(alert.type);
+                const typeClass = alert.type?.toLowerCase() || 'general';
+                const typeDisplay = getAlertTypeDisplay(alert.type);
+                
+                const issuedTime = alert.issued_at ? 
+                    new Date(alert.issued_at.seconds * 1000).toLocaleString('es-CL', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        day: '2-digit',
+                        month: '2-digit'
+                    }) : 'Recién';
+                
+                return `
+                    <div class="alert-card">
+                        <span class="alert-type-badge ${typeClass}">
+                            ${typeIcon} ${typeDisplay}
+                        </span>
+                        
+                        <div class="alert-title">${alert.title || 'Alerta de Emergencia'}</div>
+                        
+                        <div class="alert-message">
+                            ${alert.message || 'Sin mensaje'}
+                        </div>
+                        
+                        <div class="alert-details">
+                            <div class="detail-item">
+                                🕐 <strong>Hora:</strong> ${issuedTime}
+                            </div>
+                            <div class="detail-item">
+                                🏛️ <strong>Ubicación:</strong> ${alert.blocks_display || alert.building_zone || 'Sin especificar'}
+                            </div>
+                            <div class="detail-item">
+                                📍 <strong>Punto de encuentro:</strong> ${alert.meeting_point || 'Plaza principal'}
+                            </div>
+                        </div>
+                        
+                        <button 
+                            class="btn-confirm ${isConfirmed ? 'confirmed' : ''}"
+                            onclick="confirmSafe('${alert.id}')"
+                            ${isConfirmed ? 'disabled' : ''}
+                        >
+                            ${isConfirmed ? '✅ Ya confirmaste que estás a salvo' : '✓ Confirmar que estoy a salvo'}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Get alert icon
+        function getAlertIcon(type) {
+            const icons = {
+                'FIRE': '🔥',
+                'FIGHT': '🥊',
+                'ROBBERY': '🚨',
+                'EVACUATION': '🚨',
+                'FLOOD': '💧',
+                'POWER_OUTAGE': '⚡',
+                'GENERAL': '📢'
+            };
+            return icons[type] || '🔔';
+        }
+
+        // Get alert type display
+        function getAlertTypeDisplay(type) {
+            const displays = {
+                'FIRE': 'INCENDIO',
+                'FIGHT': 'PELEA',
+                'ROBBERY': 'ROBO',
+                'EVACUATION': 'EVACUACIÓN',
+                'FLOOD': 'FUGA DE AGUA',
+                'POWER_OUTAGE': 'CORTE ENERGÍA',
+                'GENERAL': 'GENERAL'
+            };
+            return displays[type] || type || 'ALERTA';
+        }
+
+        // Update status bar
+        function updateStatusBar() {
+            const statusBar = document.getElementById('statusBar');
+            const statusText = document.getElementById('statusText');
+            const alertCount = document.getElementById('alertCount');
+            
+            if (activeAlerts.length > 0) {
+                statusBar.classList.add('alert-active');
+                statusText.textContent = '🚨 ALERTA ACTIVA';
+                alertCount.textContent = `${activeAlerts.length} alerta${activeAlerts.length > 1 ? 's' : ''}`;
+            } else {
+                statusBar.classList.remove('alert-active');
+                statusText.textContent = '✅ Estado Normal';
+                alertCount.textContent = '0 alertas';
+            }
+        }
+
+        // Confirm safe
+        async function confirmSafe(alertId) {
+            try {
+                console.log('[Mobile] ✅ Confirmando seguridad para alerta:', alertId);
+                
+                // Guardar localmente
+                confirmedAlerts[alertId] = true;
+                localStorage.setItem('confirmedAlerts', JSON.stringify(confirmedAlerts));
+                
+                // Actualizar en Firestore
+                const alertRef = db.collection('emergency_alerts').doc(alertId);
+                await alertRef.update({
+                    confirmed_safe_count: firebase.firestore.FieldValue.increment(1)
+                });
+                
+                console.log('[Mobile] ✅ Confirmación guardada');
+                
+                // Re-renderizar
+                renderAlerts();
+                
+                // Mostrar mensaje
+                alert('✅ Gracias por confirmar que estás a salvo');
+                
+            } catch (error) {
+                console.error('[Mobile] Error confirmando:', error);
+                alert('❌ Error al confirmar: ' + error.message);
+            }
+        }
+
+        // Listen to real-time updates
+        db.collection('emergency_alerts')
+            .where('status', '==', 'ACTIVE')
+            .onSnapshot(snapshot => {
+                console.log('[Mobile] 🔄 Actualización en tiempo real');
+                loadActiveAlerts();
+            });
+
+        // Refresh every 30 seconds
+        setInterval(() => {
+            loadActiveAlerts();
+        }, 30000);
+    </script>
+</body>
+</html>

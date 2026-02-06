@@ -42,8 +42,17 @@ messaging.onBackgroundMessage((payload) => {
     const title = payload.data?.title || payload.notification?.title || 'Alerta de Emergencia';
     const message = payload.data?.body || payload.notification?.body || 'Nueva alerta del sistema';
     
-    // Build alert-view URL with parameters
-    const alertUrl = `/alert-view.html?type=${encodeURIComponent(alertType)}&severity=${encodeURIComponent(severity)}&title=${encodeURIComponent(title)}&message=${encodeURIComponent(message)}&location=Edificio&alertId=${encodeURIComponent(alertId)}`;
+    // Build mobile-alerts URL (redirect to mobile app)
+    const alertUrl = `/mobile-alerts.html`;
+    
+    // Try to play sound (may not work in all browsers for service workers)
+    try {
+        const audio = new Audio(soundUrl);
+        audio.volume = 1.0;
+        audio.play().catch(err => console.log('[SW] Sound play failed:', err));
+    } catch (err) {
+        console.log('[SW] Audio not supported in service worker');
+    }
     
     const notificationTitle = title;
     const notificationOptions = {
