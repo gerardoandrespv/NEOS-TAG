@@ -12406,6 +12406,14 @@ Se actualizará información en breve.`,
                 console.log('[Alertas] ✅ Validación de campos pasada');
                 console.log('[Alertas] 🏛️ Bloques afectados:', affectedBlocks);
                 
+                // Mostrar loading en el botón
+                const emitButton = event?.target || document.querySelector('[onclick*="emitAlert"]');
+                const originalButtonText = emitButton ? emitButton.innerHTML : '';
+                if (emitButton) {
+                    emitButton.disabled = true;
+                    emitButton.innerHTML = '⏳ Emitiendo alerta...';
+                }
+                
                 // Formatear bloques para mostrar
                 const blocksDisplay = affectedBlocks.length === 19 ? 'Todos los bloques' : 
                                      affectedBlocks.length > 5 ? `Bloques ${affectedBlocks.slice(0, 3).join(', ')} y ${affectedBlocks.length - 3} más` :
@@ -12480,9 +12488,22 @@ Se actualizará información en breve.`,
                     });
                 });
                 
+                // Actualizar total_recipients en el documento
+                await db.collection('emergency_alerts').doc(docRef.id).update({
+                    total_recipients: subscribersCount
+                });
+                console.log('[Alertas] ✅ total_recipients actualizado:', subscribersCount);
+                
                 // Enviar push notifications si está habilitado
+                let pushSent = false;
+                let pushError = null;
+                
                 if (alertData.send_push && subscribersSnapshot.size > 0) {
                     console.log(`[Alertas] 📱 Enviando notificaciones a ${subscribersSnapshot.size} suscriptores...`);
+                    
+                    if (emitButton) {
+                        emitButton.innerHTML = '📤 Enviando notificaciones...';
+                    }
                     
                     // Llamar al Cloud Function existente sendEmergencyPush
                     try {
@@ -12515,19 +12536,21 @@ Se actualizará información en breve.`,
                         if (pushResponse.ok) {
                             const pushResult = await pushResponse.json();
                             console.log('[Alertas] ✅ Notificaciones enviadas exitosamente:', pushResult);
+                            pushSent = true;
                         } else {
                             const errorText = await pushResponse.text();
                             console.error('[Alertas] ❌ Error en respuesta:', errorText);
                             console.warn(`[Alertas] ⚠️ Cloud Function falló con status ${pushResponse.status}`);
+                            pushError = `Error ${pushResponse.status}: ${errorText.substring(0, 100)}`;
                         }
-                    } catch (pushError) {
-                        console.error('[Alertas] ❌ Error al enviar push:', pushError);
+                    } catch (error) {
+                        console.error('[Alertas] ❌ Error al enviar push:', error);
                         console.error('[Alertas] Error completo:', {
-                            name: pushError.name,
-                            message: pushError.message,
-                            stack: pushError.stack
+                            name: error.name,
+                            message: error.message,
+                            stack: error.stack
                         });
-                        // No bloquear el flujo si falla el push
+                        pushError = error.message;
                     }
                 } else if (!alertData.send_push) {
                     console.log('[Alertas] ⏭️ Notificaciones push deshabilitadas (checkbox no marcado)');
@@ -12535,10 +12558,36 @@ Se actualizará información en breve.`,
                     console.log('[Alertas] ⚠️ No hay suscriptores activos para enviar notificaciones');
                 }
                 
-                alert(`✅ Alerta emitida exitosamente\n\nID: ${docRef.id}\nSuscriptores registrados: ${allSubscribersSnapshot.size}\nSuscriptores activos: ${subscribersCount}\n\n${alertData.blocks_display || 'Todos los bloques'}`);
+                // Restaurar botón
+                if (emitButton) {
+                    emitButton.disabled = false;
+                    emitButton.innerHTML = originalButtonText;
+                }
+                
+                // Construir mensaje de resultado
+                let resultMessage = `✅ ALERTA EMITIDA EXITOSAMENTE\n\n`;
+                resultMessage += `📋 ID: ${docRef.id}\n`;
+                resultMessage += `📊 Suscriptores registrados: ${allSubscribersSnapshot.size}\n`;
+                resultMessage += `✅ Suscriptores activos: ${subscribersCount}\n`;
+                resultMessage += `🏛️ Alcance: ${alertData.blocks_display}\n`;
+                
+                if (alertData.send_push) {
+                    if (pushSent) {
+                        resultMessage += `\n📱 ✅ Notificaciones push enviadas a ${subscribersCount} dispositivos`;
+                    } else if (pushError) {
+                        resultMessage += `\n📱 ⚠️ Error enviando notificaciones:\n${pushError}`;
+                    }
+                }
+                
+                if (subscribersCount === 0 && alertData.send_push) {
+                    resultMessage += `\n\n⚠️ ADVERTENCIA: No hay suscriptores activos.\nLas notificaciones no se enviarán hasta que haya usuarios suscritos.`;
+                }
+                
+                alert(resultMessage);
                 
                 closeNewAlertModal();
                 loadActiveAlerts();
+
                 
             } catch (error) {
                 console.error('[Alertas] Error emitiendo alerta:', error);

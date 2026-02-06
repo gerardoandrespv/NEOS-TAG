@@ -403,47 +403,139 @@
         
         document.getElementById('appUrl').textContent = appUrl;
         
-        // PWA Install Prompt
+        // PWA Install Logic
         let deferredPrompt;
         let installPromptFired = false;
+        let serviceWorkerRegistration = null;
         
-        // Detectar si es móvil
+        // Detectar características del dispositivo
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        const isSecureContext = window.isSecureContext;
         
-        // Si es móvil, ocultar QR y pasos
-        if (isMobile) {
-            console.log('[Install] Dispositivo móvil detectado');
-            document.getElementById('qrSection').style.display = 'none';
+        console.log('[Install] 🔍 Diagnóstico del dispositivo:', {
+            isMobile,
+            isIOS,
+            isStandalone,
+            isSecureContext,
+            userAgent: navigator.userAgent,
+            protocol: window.location.protocol
+        });
+        
+        // PASO 1: Registrar Service Worker PRIMERO (crítico para PWA)
+        async function registerServiceWorker() {
+            if (!('serviceWorker' in navigator)) {
+                console.warn('[Install] ⚠️ Service Worker no soportado por este navegador');
+                return null;
+            }
             
-            const steps = document.querySelectorAll('.step');
-            steps.forEach(step => step.style.display = 'none');
-            
-            // Esperar 2 segundos para ver si beforeinstallprompt se dispara
-            setTimeout(() => {
-                if (!installPromptFired) {
-                    // Si no se disparó el evento, verificar si está instalado
-                    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
-                        console.log('[Install] App detectada como instalada (standalone mode)');
-                        document.getElementById('alreadyInstalledSection').classList.remove('hidden');
-                    } else {
-                        // Navegador no soporta PWA o ya está instalada sin evento
-                        console.log('[Install] beforeinstallprompt no se disparó');
-                        document.getElementById('installSection').classList.remove('hidden');
-                    }
-                }
-            }, 2000);
-        } else {
-            console.log('[Install] Desktop - mostrando QR');
+            try {
+                console.log('[Install] 📱 Registrando Service Worker...');
+                const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                console.log('[Install] ✅ Service Worker registrado:', registration.scope);
+                serviceWorkerRegistration = registration;
+                return registration;
+            } catch (error) {
+                console.error('[Install] ❌ Error registrando Service Worker:', error);
+                return null;
+            }
         }
         
+        // PASO 2: Inicializar instalación PWA
+        async function initPWAInstall() {
+            // Registrar service worker primero
+            await registerServiceWorker();
+            
+            // Si ya está instalado, mostrar mensaje
+            if (isStandalone) {
+                console.log('[Install] ✅ App ya instalada (modo standalone)');
+                document.getElementById('alreadyInstalledSection').classList.remove('hidden');
+                return;
+            }
+            
+            // Si es iOS, mostrar instrucciones especiales
+            if (isIOS) {
+                console.log('[Install] 🍎 iOS detectado - mostrando instrucciones Safari');
+                showIOSInstructions();
+                return;
+            }
+            
+            // Si es móvil Android/otros, ocultar QR
+            if (isMobile) {
+                console.log('[Install] 📱 Móvil detectado - ocultando QR');
+                document.getElementById('qrSection').style.display = 'none';
+                const steps = document.querySelectorAll('.step');
+                steps.forEach(step => step.style.display = 'none');
+                
+                // Esperar a que beforeinstallprompt se dispare
+                setTimeout(() => {
+                    if (!installPromptFired) {
+                        console.log('[Install] ⏰ Timeout: beforeinstallprompt no se disparó');
+                        showFallbackInstallButton();
+                    }
+                }, 3000); // Aumentado a 3 segundos para dar más tiempo
+            } else {
+                console.log('[Install] 💻 Desktop - mostrando QR');
+            }
+        }
+        
+        // Mostrar instrucciones para iOS
+        function showIOSInstructions() {
+            const iosSection = document.getElementById('installSection');
+            iosSection.innerHTML = `
+                <div class="icon">🍎</div>
+                <h2>Instalación en iOS</h2>
+                <div style="text-align: left; margin: 20px 0;">
+                    <p style="margin-bottom: 15px;"><strong>Sigue estos pasos:</strong></p>
+                    <ol style="line-height: 2; padding-left: 20px;">
+                        <li>Toca el botón <strong>Compartir</strong> 
+                            <svg style="width: 20px; height: 20px; display: inline-block; vertical-align: middle;" 
+                                 fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M16 5l-1.42 1.42-1.59-1.59V16h-1.98V4.83L9.42 6.42 8 5l4-4 4 4zm4 5v11c0 1.1-.9 2-2 2H6c-1.11 0-2-.9-2-2V10c0-1.11.89-2 2-2h3v2H6v11h12V10h-3V8h3c1.1 0 2 .89 2 2z"/>
+                            </svg>
+                        </li>
+                        <li>Selecciona <strong>"Añadir a pantalla de inicio"</strong></li>
+                        <li>Toca <strong>"Añadir"</strong> en la esquina superior derecha</li>
+                    </ol>
+                </div>
+                <button class="btn" onclick="window.location.href='/'">
+                    Ir al Dashboard
+                </button>
+            `;
+            iosSection.classList.remove('hidden');
+        }
+        
+        // Mostrar botón de instalación cuando beforeinstallprompt no está disponible
+        function showFallbackInstallButton() {
+            const installSection = document.getElementById('installSection');
+            installSection.innerHTML = `
+                <div class="icon">📲</div>
+                <h2>Instalación Manual</h2>
+                <p class="status">Tu navegador requiere instalación manual</p>
+                <div style="text-align: left; margin: 20px 0; font-size: 14px; line-height: 1.8;">
+                    <p><strong>Opciones:</strong></p>
+                    <ul style="padding-left: 20px;">
+                        <li>Abre el menú del navegador (⋮)</li>
+                        <li>Busca "Agregar a pantalla de inicio" o "Instalar app"</li>
+                        <li>O simplemente usa la app desde el navegador</li>
+                    </ul>
+                </div>
+                <button class="btn" onclick="window.location.href='/'">
+                    Usar desde Navegador
+                </button>
+            `;
+            installSection.classList.remove('hidden');
+        }
+        
+        // Event listener para beforeinstallprompt
         window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('[Install] 🎉 beforeinstallprompt disparado!');
             e.preventDefault();
             deferredPrompt = e;
             installPromptFired = true;
             
-            console.log('[Install] beforeinstallprompt disparado - app NO instalada');
-            
-            // Ocultar "ya instalada" si estaba visible
+            // Ocultar sección de "ya instalada" si estaba visible
             document.getElementById('alreadyInstalledSection').classList.add('hidden');
             
             // Mostrar botón de instalación
@@ -452,33 +544,65 @@
             }
         });
         
+        // Botón de instalación
         document.getElementById('installBtn').addEventListener('click', async () => {
+            console.log('[Install] 👆 Botón de instalación presionado');
+            
             if (!deferredPrompt) {
-                alert('La aplicación ya está instalada o tu navegador no soporta instalación');
+                console.warn('[Install] ⚠️ No hay prompt diferido');
+                alert('⚠️ No se puede instalar:\n\n' + 
+                      '• La app ya está instalada, o\n' +
+                      '• Tu navegador no soporta instalación automática\n\n' +
+                      'Intenta agregar a pantalla de inicio desde el menú del navegador.');
                 return;
             }
             
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            
-            if (outcome === 'accepted') {
-                console.log('Usuario aceptó instalación');
-                document.getElementById('installSection').classList.add('hidden');
-                document.getElementById('notificationSection').classList.remove('hidden');
+            try {
+                console.log('[Install] 🚀 Mostrando prompt de instalación...');
+                await deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                
+                console.log('[Install] 📊 Resultado del usuario:', outcome);
+                
+                if (outcome === 'accepted') {
+                    console.log('[Install] ✅ Usuario aceptó instalación');
+                    document.getElementById('installSection').classList.add('hidden');
+                    document.getElementById('notificationSection').classList.remove('hidden');
+                } else {
+                    console.log('[Install] ❌ Usuario rechazó instalación');
+                }
+                
+                deferredPrompt = null;
+            } catch (error) {
+                console.error('[Install] ❌ Error en prompt:', error);
+                alert('Error al intentar instalar: ' + error.message);
             }
-            
-            deferredPrompt = null;
         });
         
         // Notification Permission
         document.getElementById('enableNotificationsBtn').addEventListener('click', async () => {
+            console.log('[Install] 🔔 Solicitando permisos de notificación...');
+            
             try {
+                // Verificar si las notificaciones están soportadas
+                if (!('Notification' in window)) {
+                    throw new Error('Este navegador no soporta notificaciones');
+                }
+                
                 const permission = await Notification.requestPermission();
+                console.log('[Install] 📋 Permiso de notificaciones:', permission);
                 
                 if (permission === 'granted') {
-                    // Register Service Worker
-                    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                    // Registrar Service Worker si no está registrado
+                    let registration = serviceWorkerRegistration;
+                    if (!registration) {
+                        console.log('[Install] 📱 Registrando Service Worker para notificaciones...');
+                        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                        serviceWorkerRegistration = registration;
+                    }
+                    
                     await navigator.serviceWorker.ready;
+                    console.log('[Install] ✅ Service Worker listo');
                     
                     // Get FCM token
                     const messaging = firebase.messaging();
@@ -487,9 +611,10 @@
                         serviceWorkerRegistration: registration
                     });
                     
-                    console.log('FCM Token:', token);
+                    console.log('[Install] 🔑 FCM Token obtenido:', token.substring(0, 20) + '...');
                     
                     // Subscribe to topic
+                    console.log('[Install] 📡 Suscribiendo al topic all-users...');
                     await fetch('https://us-central1-neos-tech.cloudfunctions.net/sendEmergencyPush', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -500,16 +625,19 @@
                         })
                     });
                     
+                    console.log('[Install] ✅ Suscripción exitosa');
+                    
                     // Show success
                     document.getElementById('notificationSection').classList.add('hidden');
                     document.getElementById('successSection').classList.remove('hidden');
                     
                 } else {
+                    console.warn('[Install] ⚠️ Permiso de notificaciones denegado');
                     document.getElementById('notificationStatus').innerHTML = 
-                        '<p class="status error">❌ Debes permitir notificaciones para recibir alertas</p>';
+                        '<p class="status error">❌ Debes permitir notificaciones para recibir alertas de emergencia</p>';
                 }
             } catch (error) {
-                console.error('Error activando notificaciones:', error);
+                console.error('[Install] ❌ Error activando notificaciones:', error);
                 document.getElementById('notificationStatus').innerHTML = 
                     '<p class="status error">❌ Error: ' + error.message + '</p>';
             }
@@ -529,6 +657,13 @@
                 document.body.removeChild(input);
                 alert('✅ Enlace copiado al portapapeles');
             });
+        }
+        
+        // Iniciar proceso de instalación cuando la página cargue
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPWAInstall);
+        } else {
+            initPWAInstall();
         }
     </script>
 </body>
