@@ -35,15 +35,17 @@ messaging.onBackgroundMessage((payload) => {
     console.log('[firebase-messaging-sw.js] Payload data:', payload.data);
     console.log('[firebase-messaging-sw.js] Payload notification:', payload.notification);
 
-    const alertType = payload.data?.alert_type || 'general';
+    const alertType = payload.data?.alert_type || payload.data?.type || 'GENERAL';
+    const alertTypeUpper = alertType.toUpperCase(); // Asegurar mayúsculas
     const soundUrl = getAlertSound(alertType);
     const severity = payload.data?.severity || 'critical';
-    const alertId = payload.data?.alertId || 'unknown';
+    const alertId = payload.data?.alertId || payload.data?.alert_id || 'unknown';
     const title = payload.data?.title || payload.notification?.title || 'Alerta de Emergencia';
     const message = payload.data?.body || payload.notification?.body || 'Nueva alerta del sistema';
     
-    // Build mobile-alerts URL (redirect to mobile app)
-    const alertUrl = `/mobile-alerts.html`;
+    // Build mobile-alerts URL with parameters for IMMEDIATE sound playback
+    const alertUrl = `/mobile-alerts.html?alertId=${alertId}&alertType=${alertTypeUpper}`;
+    console.log('[SW] 🎵 Alert URL con parámetros:', alertUrl);
     
     // Try to play sound (may not work in all browsers for service workers)
     try {
@@ -68,7 +70,7 @@ messaging.onBackgroundMessage((payload) => {
             url: alertUrl,
             alertId: alertId,
             severity: severity,
-            alertType: alertType,
+            alertType: alertTypeUpper, // Usar versión en mayúsculas
             title: title,
             message: message,
             timestamp: Date.now()
@@ -116,11 +118,11 @@ self.addEventListener('notificationclick', (event) => {
             })
         );
     } else if (event.action === 'view' || !event.action) {
-        // Open app to view alert with sound trigger
-        const urlWithParams = event.notification.data.url + 
-            '?alertId=' + event.notification.data.alertId + 
-            '&alertType=' + event.notification.data.alertType;
-            
+        // Open app to view alert with sound trigger - ALWAYS pass alertId and alertType
+        const urlWithParams = `/mobile-alerts.html?alertId=${event.notification.data.alertId}&alertType=${event.notification.data.alertType}`;
+        
+        console.log('[SW] 🚀 Abriendo app con parámetros:', urlWithParams);
+        
         event.waitUntil(
             clients.openWindow(urlWithParams)
         );

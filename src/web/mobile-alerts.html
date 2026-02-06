@@ -929,23 +929,72 @@
             const alertType = urlParams.get('alertType');
             
             if (alertId && alertType) {
-                console.log('[Mobile] 🔔 Abriendo desde notificación:', alertId, alertType);
+                console.log('[Mobile] 🔔 ========== ABRIENDO DESDE NOTIFICACIÓN ==========');
+                console.log('[Mobile] Alert ID:', alertId);
+                console.log('[Mobile] Alert Type:', alertType);
+                console.log('[Mobile] Esta es una INTERACCIÓN DEL USUARIO - autoplay permitido');
                 
-                // Verificar si tiene permiso de audio
-                const hasAudioPermission = localStorage.getItem('audioPermissionGranted');
+                // REPRODUCIR SONIDO INMEDIATAMENTE (aprovechando user gesture)
+                // El click en la notificación ES una interacción del usuario
+                console.log('[Mobile] 🔊 Reproduciendo sonido INMEDIATAMENTE...');
                 
-                if (hasAudioPermission) {
-                    // Play sound immediately
-                    setTimeout(() => {
-                        playAlertSound(alertType, alertId);
-                    }, 500);
-                } else {
-                    // Mostrar banner primero
-                    console.log('[Mobile] Sin permiso de audio, mostrando banner');
-                    document.getElementById('soundPermissionBanner').classList.remove('hidden');
+                // Map alert type to sound ID
+                const soundMap = {
+                    'FIRE': 'alertSoundFire',
+                    'FLOOD': 'alertSoundFlood',
+                    'EVACUATION': 'alertSoundEvacuation',
+                    'ROBBERY': 'alertSoundGeneral',
+                    'FIGHT': 'alertSoundGeneral',
+                    'POWER_OUTAGE': 'alertSoundGeneral',
+                    'GENERAL': 'alertSoundGeneral'
+                };
+                
+                const normalizedType = (alertType || 'GENERAL').toString().toUpperCase();
+                const soundId = soundMap[normalizedType] || 'alertSoundGeneral';
+                const audio = document.getElementById(soundId);
+                
+                if (audio) {
+                    audio.volume = 1.0;
+                    audio.loop = true;
+                    audio.currentTime = 0;
                     
-                    // Guardar alerta pendiente para reproducir después
-                    window.pendingAlert = { alertType, alertId };
+                    console.log('[Mobile] Audio element:', soundId);
+                    console.log('[Mobile] Intentando play()...');
+                    
+                    const playPromise = audio.play();
+                    
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            console.log('[Mobile] ✅✅✅ SONIDO REPRODUCIDO EXITOSAMENTE DESDE NOTIFICACIÓN');
+                            // Guardar permiso automáticamente
+                            localStorage.setItem('audioPermissionGranted', 'true');
+                            updateStatusIndicators();
+                            
+                            // Track sound
+                            currentlyPlayingSounds.set(alertId, soundId);
+                            
+                            // Vibrar
+                            if ('vibrate' in navigator) {
+                                navigator.vibrate([500, 200, 500, 200, 500, 200, 500]);
+                            }
+                        }).catch(err => {
+                            console.error('[Mobile] ❌ Error reproduciendo desde notificación:', err);
+                            console.error('[Mobile] Error name:', err.name);
+                            
+                            // Si falla, mostrar banner de activación
+                            if (err.name === 'NotAllowedError') {
+                                console.log('[Mobile] NotAllowedError - mostrando banner');
+                                const prompt = document.getElementById('activationPrompt');
+                                if (prompt) {
+                                    prompt.classList.remove('hidden');
+                                }
+                                // Guardar alerta pendiente
+                                window.pendingAlert = { alertType, alertId };
+                            }
+                        });
+                    }
+                } else {
+                    console.error('[Mobile] ❌ No se encontró elemento de audio:', soundId);
                 }
                 
                 // Clean URL
