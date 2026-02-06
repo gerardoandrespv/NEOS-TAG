@@ -59,9 +59,11 @@ messaging.onBackgroundMessage((payload) => {
         body: message,
         icon: '/assets/images/neostechc.png',
         badge: '/assets/images/neostechc.png',
-        tag: 'emergency-alert',
+        tag: 'emergency-alert-' + alertId,
         requireInteraction: true,
-        vibrate: [200, 100, 200, 100, 200, 100, 200],
+        vibrate: [500, 200, 500, 200, 500, 200, 500, 200, 500],
+        silent: false,
+        renotify: true,
         data: {
             url: alertUrl,
             alertId: alertId,
@@ -114,9 +116,13 @@ self.addEventListener('notificationclick', (event) => {
             })
         );
     } else if (event.action === 'view' || !event.action) {
-        // Open app to view alert
+        // Open app to view alert with sound trigger
+        const urlWithParams = event.notification.data.url + 
+            '?alertId=' + event.notification.data.alertId + 
+            '&alertType=' + event.notification.data.alertType;
+            
         event.waitUntil(
-            clients.openWindow(event.notification.data.url || '/')
+            clients.openWindow(urlWithParams)
         );
     }
 });
