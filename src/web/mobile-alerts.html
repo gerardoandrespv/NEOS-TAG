@@ -704,7 +704,7 @@
         }
 
         // Play alert sound based on type (LOOPS UNTIL STOPPED)
-        function playAlertSound(alertType, alertId = null) {
+        async function playAlertSound(alertType, alertId = null) {
             console.log('[Mobile] ========== PLAY ALERT SOUND ==========');
             console.log('[Mobile] alertType recibido:', alertType);
             console.log('[Mobile] alertId recibido:', alertId);
@@ -736,10 +736,34 @@
                 console.log('[Mobile] playAlertSound - Audio.src:', audio.src || audio.currentSrc);
                 console.log('[Mobile] playAlertSound - Audio.readyState:', audio.readyState);
                 
-                // Forzar load si no está listo
+                // CRÍTICO: Esperar a que el audio esté listo antes de reproducir
                 if (audio.readyState < 2) {
-                    console.log('[Mobile] Audio no listo, forzando load()...');
+                    console.log('[Mobile] Audio no listo (readyState:', audio.readyState, '), cargando...');
                     audio.load();
+                    
+                    // Esperar a que esté listo
+                    await new Promise((resolve) => {
+                        const checkReady = () => {
+                            if (audio.readyState >= 2) {
+                                console.log('[Mobile] ✅ Audio listo (readyState:', audio.readyState, ')');
+                                resolve();
+                            } else {
+                                audio.addEventListener('canplay', () => {
+                                    console.log('[Mobile] ✅ Audio canplay event (readyState:', audio.readyState, ')');
+                                    resolve();
+                                }, { once: true });
+                                
+                                // Timeout de seguridad
+                                setTimeout(() => {
+                                    console.log('[Mobile] ⏱️ Timeout alcanzado, intentando reproducir de todos modos');
+                                    resolve();
+                                }, 2000);
+                            }
+                        };
+                        checkReady();
+                    });
+                } else {
+                    console.log('[Mobile] ✅ Audio ya listo (readyState:', audio.readyState, ')');
                 }
                 
                 // Track this sound
