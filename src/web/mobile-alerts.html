@@ -1494,7 +1494,7 @@
                     console.log('[Mobile] 🎵 Nueva alerta detectada DESPUÉS de carga inicial');
                     console.log('[Mobile] audioPermission:', hasAudioPermission);
                     
-                    if (hasAudioPermission) {
+                    if (hasAudioPermission === 'true') {
                         console.log('[Mobile] 🔊 REPRODUCIENDO SONIDO PARA NUEVA ALERTA');
                         console.log('[Mobile] Tipo:', newAlert.type, 'ID:', newAlert.id);
                         playAlertSound(newAlert.type || 'GENERAL', newAlert.id);
