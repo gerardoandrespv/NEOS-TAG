@@ -481,15 +481,14 @@
                 document.getElementById('activationPrompt').classList.add('hidden');
                 updateStatusIndicators();
                 
-                // Step 5: Play pending alert if exists (SOLO si hay pendiente, no las existentes)
+                // Step 5: NO reproducir alertas pendientes después de activar
+                // Las alertas existentes ya están visibles en pantalla
+                // Solo sonarán las NUEVAS alertas que lleguen DESPUÉS de activar
                 if (window.pendingAlert) {
-                    console.log('[Mobile] Reproduciendo alerta pendiente:', window.pendingAlert);
-                    setTimeout(() => {
-                        playAlertSound(window.pendingAlert.alertType, window.pendingAlert.alertId);
-                        window.pendingAlert = null;
-                    }, 500);
+                    console.log('[Mobile] ⏭️ Alerta pendiente BORRADA (no reproducir alertas existentes):', window.pendingAlert);
+                    window.pendingAlert = null; // Limpiar sin reproducir
                 } else {
-                    console.log('[Mobile] No hay alerta pendiente para reproducir');
+                    console.log('[Mobile] No hay alerta pendiente');
                 }
                 
                 alert('✅ Sistema de Alertas Activado\n\n🔔 Notificaciones: Activas\n🔊 Sonidos: Activos\n\n¡Recibirás alertas en tiempo real!');
@@ -671,24 +670,29 @@
                         console.error('[Mobile] Error completo:', err.name, err.message);
                         console.error('[Mobile] Audio state on error - paused:', audio.paused, 'src:', audio.src);
                         
-                        // Si es NotAllowedError, mostrar banner para activar sonidos
+                        // Si es NotAllowedError, verificar si ya hay permisos guardados antes de mostrar prompt
                         if (err.name === 'NotAllowedError') {
-                            console.log('[Mobile] 🚨 NotAllowedError detectado - mostrando prompt');
+                            const currentPermission = localStorage.getItem('audioPermissionGranted');
+                            console.log('[Mobile] 🚨 NotAllowedError - permiso actual:', currentPermission);
                             
-                            // Mostrar prompt de activación
-                            const prompt = document.getElementById('activationPrompt');
-                            if (prompt) {
-                                prompt.classList.remove('hidden');
-                                prompt.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // SOLO mostrar prompt si NO hay permisos guardados
+                            if (currentPermission !== 'true') {
+                                console.log('[Mobile] Mostrando prompt porque NO hay permisos guardados');
+                                const prompt = document.getElementById('activationPrompt');
+                                // Verificar que no esté ya visible
+                                if (prompt && prompt.classList.contains('hidden')) {
+                                    prompt.classList.remove('hidden');
+                                    prompt.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                                updateStatusIndicators();
+                            } else {
+                                // Ya hay permisos, solo logear (puede ser un fallo temporal del navegador)
+                                console.log('[Mobile] ⚠️ NotAllowedError pero permisos están activos - ignorando');
                             }
-                            
-                            // Borrar flag de permiso
-                            localStorage.removeItem('audioPermissionGranted');
-                            updateStatusIndicators();
                             
                             // Vibrar para llamar atención
                             if ('vibrate' in navigator) {
-                                navigator.vibrate([500, 200, 500, 200, 500]);
+                                navigator.vibrate([300, 100, 300]);
                             }
                         }
                     });
@@ -981,15 +985,21 @@
                             console.error('[Mobile] ❌ Error reproduciendo desde notificación:', err);
                             console.error('[Mobile] Error name:', err.name);
                             
-                            // Si falla, mostrar banner de activación
+                            // Si falla, verificar permisos antes de mostrar banner
                             if (err.name === 'NotAllowedError') {
-                                console.log('[Mobile] NotAllowedError - mostrando banner');
-                                const prompt = document.getElementById('activationPrompt');
-                                if (prompt) {
-                                    prompt.classList.remove('hidden');
+                                const currentPermission = localStorage.getItem('audioPermissionGranted');
+                                // SOLO mostrar si realmente NO hay permisos
+                                if (currentPermission !== 'true') {
+                                    console.log('[Mobile] NotAllowedError - mostrando banner');
+                                    const prompt = document.getElementById('activationPrompt');
+                                    if (prompt && prompt.classList.contains('hidden')) {
+                                        prompt.classList.remove('hidden');
+                                    }
+                                    // Guardar alerta pendiente
+                                    window.pendingAlert = { alertType, alertId };
+                                } else {
+                                    console.log('[Mobile] NotAllowedError pero permisos activos - ignorando');
                                 }
-                                // Guardar alerta pendiente
-                                window.pendingAlert = { alertType, alertId };
                             }
                         });
                     }
@@ -1053,10 +1063,11 @@
                     } else {
                         console.log('[Mobile] ⚠️ Nueva alerta pero sin permiso de audio - mostrando prompt');
                         const prompt = document.getElementById('activationPrompt');
-                        if (prompt) {
+                        // SOLO mostrar si no está ya visible
+                        if (prompt && prompt.classList.contains('hidden')) {
                             prompt.classList.remove('hidden');
                         }
-                        // Guardar para reproducir después
+                        // Guardar SOLO la alerta NUEVA para reproducir después
                         window.pendingAlert = { alertType: newAlert.type || 'GENERAL', alertId: newAlert.id };
                     }
                 } else if (newAlert && previousAlertIds.size === 0) {
