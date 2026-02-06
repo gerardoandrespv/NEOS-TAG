@@ -75,6 +75,28 @@
             20%, 40%, 60%, 80% { transform: translateX(-50%) translateX(5px); }
         }
 
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-20px);
+            }
+        }
+
         .container {
             padding: 20px;
             max-width: 600px;
@@ -553,8 +575,8 @@
                         
                         await audio.play();
                         
-                        // Detener inmediatamente
-                        await new Promise(resolve => setTimeout(resolve, 50));
+                        // Detener después de 150ms (necesario para desbloqueo)
+                        await new Promise(resolve => setTimeout(resolve, 150));
                         audio.pause();
                         audio.currentTime = 0;
                         audio.volume = 1.0;
@@ -584,11 +606,12 @@
                     console.log('[Mobile] No hay alerta pendiente');
                 }
                 
-                alert('✅ Sistema de Alertas Activado\n\n🔔 Notificaciones: Activas\n🔊 Sonidos: Activos\n\n¡Recibirás alertas en tiempo real!');
+                // Mostrar banner de éxito NO bloqueante
+                showSuccessBanner('✅ Sistema de Alertas Activado', '🔔 Notificaciones y 🔊 sonidos activos. ¡Recibirás alertas en tiempo real!');
                 
             } catch (error) {
                 console.error('[Mobile] Error activando sistema:', error);
-                alert('❌ Error: ' + error.message + '\n\nIntenta nuevamente');
+                showErrorBanner('❌ Error al Activar', error.message + '. Intenta nuevamente.');
                 updateStatusIndicators();
             }
         }
@@ -939,8 +962,82 @@
                 
             } catch (error) {
                 console.error('[Mobile] ❌ Error reproduciendo desde botón:', error);
-                alert('❌ No se pudo reproducir el sonido. Intenta recargar la página.');
+                showErrorBanner('❌ Error de Reproducción', 'No se pudo reproducir el sonido. Intenta recargar la página.');
             }
+        }
+
+        // Show success banner (non-blocking alternative to alert)
+        function showSuccessBanner(title, message) {
+            const banner = document.createElement('div');
+            banner.id = 'successBanner';
+            banner.style.cssText = `
+                position: fixed;
+                top: 80px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: linear-gradient(135deg, #10B981, #059669);
+                color: white;
+                padding: 20px 30px;
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                z-index: 10000;
+                text-align: center;
+                max-width: 90%;
+                animation: slideDown 0.3s ease;
+            `;
+            banner.innerHTML = `
+                <div style="font-size: 24px; margin-bottom: 8px;">${title}</div>
+                <div style="font-size: 14px; opacity: 0.95;">${message}</div>
+            `;
+            
+            // Remover banner anterior si existe
+            const oldBanner = document.getElementById('successBanner');
+            if (oldBanner) oldBanner.remove();
+            
+            document.body.appendChild(banner);
+            
+            // Auto-ocultar después de 4 segundos
+            setTimeout(() => {
+                banner.style.animation = 'slideUp 0.3s ease';
+                setTimeout(() => banner.remove(), 300);
+            }, 4000);
+        }
+
+        // Show error banner (non-blocking alternative to alert)
+        function showErrorBanner(title, message) {
+            const banner = document.createElement('div');
+            banner.id = 'errorBanner';
+            banner.style.cssText = `
+                position: fixed;
+                top: 80px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: linear-gradient(135deg, #DC2626, #991B1B);
+                color: white;
+                padding: 20px 30px;
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                z-index: 10000;
+                text-align: center;
+                max-width: 90%;
+                animation: slideDown 0.3s ease;
+            `;
+            banner.innerHTML = `
+                <div style="font-size: 24px; margin-bottom: 8px;">${title}</div>
+                <div style="font-size: 14px; opacity: 0.95;">${message}</div>
+            `;
+            
+            // Remover banner anterior si existe
+            const oldBanner = document.getElementById('errorBanner');
+            if (oldBanner) oldBanner.remove();
+            
+            document.body.appendChild(banner);
+            
+            // Auto-ocultar después de 5 segundos
+            setTimeout(() => {
+                banner.style.animation = 'slideUp 0.3s ease';
+                setTimeout(() => banner.remove(), 300);
+            }, 5000);
         }
 
         // Show in-app notification
