@@ -1,0 +1,45 @@
+# INSTRUCCIONES DE INSTALACION RAPIDA
+# ====================================
+
+1. DESCOMPRIMIR EL ZIP
+   - Extrae "NeosTech-Gateway-Installer.zip" en cualquier ubicacion
+
+2. EJECUTAR INSTALADOR
+   - Clic derecho en "install.ps1"
+   - Seleccionar "Ejecutar como Administrador"
+   - Seguir las instrucciones en pantalla
+
+3. VERIFICAR INSTALACION
+   - El Gateway se instalara en: C:\NeosTech-Gateway
+   - Se creara un servicio de Windows: NeosTechGateway
+   - Puerto 8080 se abrira en el firewall
+
+4. CONFIGURAR LECTORA
+   - Editar: C:\NeosTech-Gateway\lectora.config.json
+   - IP Lectora: 192.168.1.200
+   - Puerto: 60000
+
+5. CONFIGURAR FIREBASE
+   - Editar: C:\NeosTech-Gateway\gateway.config.json
+   - Proyecto: neos-tech
+   - Verificar credenciales en firebase-credentials.json
+
+6. INICIAR SERVICIO
+   - El instalador preguntara si deseas iniciar el servicio
+   - O inicialo manualmente: Start-Service NeosTechGateway
+
+7. VERIFICAR FUNCIONAMIENTO
+   - Abrir navegador: http://localhost:8080/status
+   - Ver logs: C:\NeosTech-Gateway\logs\
+
+SOPORTE:
+- Lee README.md para documentacion completa
+- Resolucion de problemas en README.md seccion "Solucion de Problemas"
+
+COMANDOS UTILES:
+  Iniciar:   Start-Service NeosTechGateway
+  Detener:   Stop-Service NeosTechGateway
+  Estado:    Get-Service NeosTechGateway
+  Ver logs:  Get-EventLog -LogName Application -Source NeosTechGateway -Newest 50
+
+(c) 2026 NeosTech RFID System

@@ -25,3 +25,10 @@ __pycache__/
 
 # Configuraciones locales sensibles
 config/firebase-admin-sdk.json
+# Archivos grandes excluidos
+Instalador/*.exe
+Instalador/*.msi
+*.dll
+*.pdb
+temp/
+src/Gateway/Binaries/
