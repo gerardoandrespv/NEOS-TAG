@@ -287,6 +287,15 @@
             </button>
         </div>
 
+        <!-- Sound Permission Banner -->
+        <div id="soundPermissionBanner" class="notification-prompt hidden" style="background: #FEF3C7; border: 2px solid #F59E0B;">
+            <h3>🔊 Activar Sonidos de Emergencia</h3>
+            <p style="color: #92400E;"><strong>Importante:</strong> Debes tocar este botón para que las alarmas puedan sonar</p>
+            <button class="btn-enable-notifications" onclick="enableSounds()" style="background: #F59E0B;">
+                🔊 Activar Sonidos Ahora
+            </button>
+        </div>
+
         <!-- Loading State -->
         <div id="loadingState" class="loading">
             <div class="spinner"></div>
@@ -371,6 +380,49 @@
         }
 
         // Enable notifications
+        // Enable sounds - get audio permission
+        async function enableSounds() {
+            console.log('[Mobile] 🔊 Activando sonidos de emergencia...');
+            
+            try {
+                // Intentar reproducir un sonido de prueba muy bajo
+                const testAudio = document.getElementById('alertSoundGeneral');
+                if (testAudio) {
+                    testAudio.volume = 0.1; // Muy bajo para la prueba
+                    testAudio.loop = false;
+                    await testAudio.play();
+                    
+                    // Detener inmediatamente
+                    setTimeout(() => {
+                        testAudio.pause();
+                        testAudio.currentTime = 0;
+                        testAudio.volume = 1.0;
+                        console.log('[Mobile] ✅ Permiso de audio obtenido exitosamente');
+                        
+                        // Ocultar banner
+                        document.getElementById('soundPermissionBanner').classList.add('hidden');
+                        
+                        // Guardar en localStorage que ya tiene permiso
+                        localStorage.setItem('audioPermissionGranted', 'true');
+                        
+                        // Si hay una alerta pendiente, reproducirla ahora
+                        if (window.pendingAlert) {
+                            console.log('[Mobile] Reproduciendo alerta pendiente:', window.pendingAlert);
+                            setTimeout(() => {
+                                playAlertSound(window.pendingAlert.alertType, window.pendingAlert.alertId);
+                                window.pendingAlert = null;
+                            }, 500);
+                        }
+                        
+                        alert('✅ Sonidos de emergencia activados correctamente');
+                    }, 200);
+                }
+            } catch (error) {
+                console.error('[Mobile] Error activando sonidos:', error);
+                alert('❌ Error: ' + error.message + '\n\nIntenta nuevamente');
+            }
+        }
+        
         async function enableNotifications() {
             try {
                 console.log('[Mobile] 🔔 Solicitando permiso de notificaciones...');
@@ -384,7 +436,14 @@
                     // Get FCM token
                     await getFCMToken();
                     
-                    alert('✅ Notificaciones activadas correctamente');
+                    // Mostrar banner de sonidos si aún no tiene permiso
+                    const hasAudioPermission = localStorage.getItem('audioPermissionGranted');
+                    if (!hasAudioPermission) {
+                        console.log('[Mobile] Mostrando banner de sonidos...');
+                        document.getElementById('soundPermissionBanner').classList.remove('hidden');
+                    }
+                    
+                    alert('✅ Notificaciones activadas correctamente\n\n🔊 Importante: Activa los SONIDOS en el siguiente paso');
                 } else {
                     alert('⚠️ Debes permitir notificaciones para recibir alertas de emergencia');
                 }
@@ -502,19 +561,25 @@
                         console.error('[Mobile] ❌ ERROR AL REPRODUCIR:', err);
                         console.error('[Mobile] Error completo:', err.name, err.message);
                         
-                        // Mostrar alerta al usuario para interacción
-                        const playOnClick = () => {
-                            console.log('[Mobile] 👆 Usuario hizo clic, intentando reproducir...');
-                            audio.play().then(() => {
-                                console.log('[Mobile] ✅ Sonido reproducido después del clic');
-                                document.removeEventListener('click', playOnClick);
-                            }).catch(e => console.error('[Mobile] Error en segundo intento:', e));
-                        };
-                        
-                        document.addEventListener('click', playOnClick, { once: true });
-                        
-                        // Mostrar mensaje visible
-                        alert('🔊 ALERTA DE EMERGENCIA\n\nToca ACEPTAR para activar el sonido de alerta');
+                        // Si es NotAllowedError, mostrar banner para activar sonidos
+                        if (err.name === 'NotAllowedError') {
+                            console.log('[Mobile] 🚨 NotAllowedError detectado - mostrando banner');
+                            
+                            // Mostrar banner de permisos de sonido
+                            const banner = document.getElementById('soundPermissionBanner');
+                            if (banner) {
+                                banner.classList.remove('hidden');
+                                banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                            
+                            // Borrar flag de permiso
+                            localStorage.removeItem('audioPermissionGranted');
+                            
+                            // Vibrar para llamar atención
+                            if ('vibrate' in navigator) {
+                                navigator.vibrate([500, 200, 500, 200, 500]);
+                            }
+                        }
                     });
                 } else {
                     console.error('[Mobile] ❌ play() no devolvió una promesa');
@@ -755,10 +820,22 @@
             if (alertId && alertType) {
                 console.log('[Mobile] 🔔 Abriendo desde notificación:', alertId, alertType);
                 
-                // Play sound immediately (app was opened from background notification)
-                setTimeout(() => {
-                    playAlertSound(alertType, alertId);
-                }, 500);
+                // Verificar si tiene permiso de audio
+                const hasAudioPermission = localStorage.getItem('audioPermissionGranted');
+                
+                if (hasAudioPermission) {
+                    // Play sound immediately
+                    setTimeout(() => {
+                        playAlertSound(alertType, alertId);
+                    }, 500);
+                } else {
+                    // Mostrar banner primero
+                    console.log('[Mobile] Sin permiso de audio, mostrando banner');
+                    document.getElementById('soundPermissionBanner').classList.remove('hidden');
+                    
+                    // Guardar alerta pendiente para reproducir después
+                    window.pendingAlert = { alertType, alertId };
+                }
                 
                 // Clean URL
                 window.history.replaceState({}, document.title, window.location.pathname);
