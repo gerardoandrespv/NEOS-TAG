@@ -53,7 +53,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
@@ -4575,9 +4575,9 @@
                     event_type: 'manual_open',
                     access_point_id: accessPointId,
                     access_point_name: accessPointName,
-                    user_name: userDisplayName || (currentUser  currentUser.email : 'Dashboard Manual'),
-                    user_id: currentUser  currentUser.uid : null,
-                    user_email: currentUser  currentUser.email : null,
+                    user_name: userDisplayName || (currentUser ? currentUser.email : 'Dashboard Manual'),
+                    user_id: currentUser ? currentUser.uid : null,
+                    user_email: currentUser ? currentUser.email : null,
                     action: 'open',
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     client_timestamp: now,
@@ -8428,7 +8428,7 @@
                         tag_id: tagId,
                         reason: reason,
                         added_at: firebase.firestore.FieldValue.serverTimestamp(),
-                        added_by: currentUser  currentUser.email : 'system'
+                        added_by: currentUser ? currentUser.email : 'system'
                     });
                 });
                 
@@ -8463,7 +8463,7 @@
                         user_name: userName,
                         departamento: dept,
                         added_at: firebase.firestore.FieldValue.serverTimestamp(),
-                        added_by: currentUser  currentUser.email : 'system'
+                        added_by: currentUser ? currentUser.email : 'system'
                     });
                 });
                 
@@ -8549,7 +8549,7 @@
                         temporary: true,
                         expires_at: firebase.firestore.Timestamp.fromDate(expiryDate),
                         added_at: firebase.firestore.FieldValue.serverTimestamp(),
-                        added_by: currentUser  currentUser.email : 'system'
+                        added_by: currentUser ? currentUser.email : 'system'
                     });
                 });
                 
@@ -8597,7 +8597,7 @@
                         tag_id: tagId,
                         reason: reason,
                         added_at: firebase.firestore.FieldValue.serverTimestamp(),
-                        added_by: currentUser  currentUser.email : 'system'
+                        added_by: currentUser ? currentUser.email : 'system'
                     });
                     
                     const whitelistRef = db.collection('whitelist').doc(tagId);
@@ -9009,7 +9009,7 @@
                     guard_comment: comment,
                     comment_category: category,
                     comment_added_at: firebase.firestore.FieldValue.serverTimestamp(),
-                    comment_added_by: currentUser  currentUser.email : 'guardia'
+                    comment_added_by: currentUser ? currentUser.email : 'guardia'
                 };
                 
                 await db.collection(collection).doc(log.id).update(updateData);
