@@ -366,11 +366,38 @@
             checkNotificationPermission();
             loadActiveAlerts();
             
-            // Register Service Worker
+            // Register Service Worker PRIMERO antes de cualquier cosa
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/firebase-messaging-sw.js')
-                    .then(reg => console.log('[Mobile] Service Worker registrado:', reg.scope))
-                    .catch(err => console.error('[Mobile] Error en Service Worker:', err));
+                // Primero desregistrar SWs viejos/incorrectos
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    console.log(`[Mobile] 🔍 Service Workers registrados: ${registrations.length}`);
+                    
+                    registrations.forEach((reg, index) => {
+                        console.log(`[Mobile] SW ${index + 1}: scope="${reg.scope}", active=${!!reg.active}`);
+                        
+                        // Desregistrar si NO es el correcto
+                        // El correcto debe tener 'firebase-messaging-sw.js' en el scope
+                        if (!reg.scope.includes('firebase-messaging-sw.js')) {
+                            console.log(`[Mobile] 🗑️ Desregistrando SW INCORRECTO: ${reg.scope}`);
+                            reg.unregister().then(() => {
+                                console.log(`[Mobile] ✅ SW desregistrado: ${reg.scope}`);
+                            });
+                        } else {
+                            console.log(`[Mobile] ✅ SW CORRECTO encontrado: ${reg.scope}`);
+                        }
+                    });
+                    
+                    // Esperar un poco y luego registrar el correcto
+                    setTimeout(() => {
+                        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+                            .then(reg => {
+                                console.log('[Mobile] ✅ Service Worker CORRECTO registrado:', reg.scope);
+                            })
+                            .catch(err => {
+                                console.error('[Mobile] ❌ Error registrando Service Worker:', err);
+                            });
+                    }, 1000);
+                });
             }
         });
 
@@ -1062,25 +1089,7 @@
         }
         
         // Check on load - EJECUTAR CUANDO TODO ESTÉ LISTO
-        // Primero desregistrar service workers viejos/duplicados
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(registrations => {
-                console.log(`[Mobile] 🔍 Service Workers encontrados: ${registrations.length}`);
-                registrations.forEach((reg, index) => {
-                    console.log(`[Mobile] SW ${index + 1}: ${reg.scope}`);
-                });
-                
-                // Si hay múltiples, desregistrar todos excepto el correcto
-                const correctScope = '/firebase-messaging-sw.js';
-                registrations.forEach(reg => {
-                    if (!reg.scope.includes(correctScope) && registrations.length > 1) {
-                        console.log(`[Mobile] 🗑️ Desregistrando SW antiguo: ${reg.scope}`);
-                        reg.unregister();
-                    }
-                });
-            });
-        }
-        
+        // NO necesitamos desregistrar SWs aquí porque ya se hace en window.load
         // Usar setTimeout para asegurar que los elementos de audio estén cargados
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
