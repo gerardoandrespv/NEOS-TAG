@@ -409,14 +409,19 @@
                 
                 // Listen for foreground messages
                 messaging.onMessage((payload) => {
-                    console.log('[Mobile] 📨 Mensaje recibido en foreground:', payload);
+                    console.log('[Mobile] 📨 ========== MENSAJE RECIBIDO EN FOREGROUND ==========');
+                    console.log('[Mobile] Payload completo:', JSON.stringify(payload, null, 2));
+                    console.log('[Mobile] payload.data:', payload.data);
+                    console.log('[Mobile] payload.notification:', payload.notification);
                     
-                    // Get alert type and ID from payload
-                    const alertType = payload.data?.type || payload.data?.alert_type || 'GENERAL';
-                    const alertId = payload.data?.alertId || payload.data?.alert_id || null;
-                    console.log('[Mobile] 🎯 Tipo de alerta:', alertType, 'ID:', alertId);
+                    // Get alert type and ID from payload - intentar múltiples campos
+                    const alertType = (payload.data?.type || payload.data?.alert_type || 'GENERAL').toUpperCase();
+                    const alertId = payload.data?.alertId || payload.data?.alert_id || payload.data?.id || null;
+                    console.log('[Mobile] 🎯 Tipo extraído:', alertType);
+                    console.log('[Mobile] 🎯 ID extraído:', alertId);
                     
                     // Play alert sound with ID for tracking
+                    console.log('[Mobile] 🔊 LLAMANDO A playAlertSound...');
                     playAlertSound(alertType, alertId);
                     
                     // Show in-app notification
@@ -449,7 +454,13 @@
 
         // Play alert sound based on type (LOOPS UNTIL STOPPED)
         function playAlertSound(alertType, alertId = null) {
-            console.log('[Mobile] 🔊 Reproduciendo sonido en LOOP para tipo:', alertType);
+            console.log('[Mobile] ========== PLAY ALERT SOUND ==========');
+            console.log('[Mobile] alertType recibido:', alertType);
+            console.log('[Mobile] alertId recibido:', alertId);
+            
+            // Asegurar que el tipo esté en mayúsculas
+            const normalizedType = (alertType || 'GENERAL').toString().toUpperCase();
+            console.log('[Mobile] Tipo normalizado:', normalizedType);
             
             // Map alert type to sound ID
             const soundMap = {
@@ -462,29 +473,60 @@
                 'GENERAL': 'alertSoundGeneral'
             };
             
-            const soundId = soundMap[alertType] || 'alertSoundGeneral';
+            const soundId = soundMap[normalizedType] || 'alertSoundGeneral';
+            console.log('[Mobile] Sound ID seleccionado:', soundId);
+            
             const audio = document.getElementById(soundId);
+            console.log('[Mobile] Elemento audio encontrado:', !!audio);
             
             if (audio) {
                 // Track this sound
                 if (alertId) {
                     currentlyPlayingSounds.set(alertId, soundId);
+                    console.log('[Mobile] Sonido rastreado para alerta:', alertId);
                 }
                 
                 audio.volume = 1.0;
                 audio.currentTime = 0;
-                audio.loop = true; // Ensure loop is enabled
-                audio.play().then(() => {
-                    console.log('[Mobile] ✅ Sonido en LOOP reproducido exitosamente');
-                }).catch(err => {
-                    console.warn('[Mobile] ⚠️ No se pudo reproducir sonido:', err);
-                    // Intentar reproducir con interacción del usuario
-                    document.addEventListener('click', () => {
-                        audio.play().catch(e => console.error('[Mobile] Error en play:', e));
-                    }, { once: true });
-                });
+                audio.loop = true;
+                
+                console.log('[Mobile] ▶️ Intentando reproducir...');
+                
+                // Intentar reproducir inmediatamente
+                const playPromise = audio.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('[Mobile] ✅✅✅ SONIDO REPRODUCIDO EXITOSAMENTE EN LOOP');
+                    }).catch(err => {
+                        console.error('[Mobile] ❌ ERROR AL REPRODUCIR:', err);
+                        console.error('[Mobile] Error completo:', err.name, err.message);
+                        
+                        // Mostrar alerta al usuario para interacción
+                        const playOnClick = () => {
+                            console.log('[Mobile] 👆 Usuario hizo clic, intentando reproducir...');
+                            audio.play().then(() => {
+                                console.log('[Mobile] ✅ Sonido reproducido después del clic');
+                                document.removeEventListener('click', playOnClick);
+                            }).catch(e => console.error('[Mobile] Error en segundo intento:', e));
+                        };
+                        
+                        document.addEventListener('click', playOnClick, { once: true });
+                        
+                        // Mostrar mensaje visible
+                        alert('🔊 ALERTA DE EMERGENCIA\n\nToca ACEPTAR para activar el sonido de alerta');
+                    });
+                } else {
+                    console.error('[Mobile] ❌ play() no devolvió una promesa');
+                }
             } else {
-                console.error('[Mobile] ❌ Audio element no encontrado:', soundId);
+                console.error('[Mobile] ❌❌❌ NO SE ENCONTRÓ EL ELEMENTO DE AUDIO:', soundId);
+                // Listar todos los elementos de audio disponibles
+                console.log('[Mobile] Elementos de audio disponibles:');
+                ['alertSoundFire', 'alertSoundFlood', 'alertSoundEvacuation', 'alertSoundGeneral', 'alertSoundCancel'].forEach(id => {
+                    const el = document.getElementById(id);
+                    console.log(`  - ${id}: ${!!el}`);
+                });
             }
         }
 
