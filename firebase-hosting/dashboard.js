@@ -251,44 +251,51 @@ function showNewEventNotification(eventData) {
     // Verificar si las notificaciones están habilitadas
     const notificationsEnabled = localStorage.getItem('rfidNotifications') === 'true';
     if (!notificationsEnabled) return;
-    
+
     const tagId = eventData.epc || "Nuevo Tag";
     const readerId = eventData.reader_sn || "Desconocido";
-    
-    // Crear notificación toast
+
+    // Crear notificación toast simple (sin dependencia de Bootstrap)
     const toastContainer = document.getElementById('toastContainer');
     if (!toastContainer) return;
-    
+
     const toastId = 'toast-' + Date.now();
     const toastHTML = `
-        <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header">
-                <strong class="me-auto">🚨 Nuevo Evento RFID</strong>
-                <small class="text-muted">justo ahora</small>
-                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        <div id="${toastId}" style="
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            min-width: 300px;
+            animation: slideInRight 0.3s ease;
+        ">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <strong>🚨 Nuevo Evento RFID</strong>
+                <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#999;">&times;</button>
             </div>
-            <div class="toast-body">
+            <div style="font-size: 13px; color: #555;">
                 <strong>Tag:</strong> ${formatEPC(tagId)}<br>
                 <strong>Lector:</strong> ${readerId}<br>
                 <strong>Ubicación:</strong> ${eventData.location || 'N/A'}
             </div>
         </div>
     `;
-    
+
     toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-    
-    // Mostrar toast
-    const toastElement = document.getElementById(toastId);
-    const toast = new bootstrap.Toast(toastElement);
-    toast.show();
-    
+
     // Reproducir sonido de notificación
     playNotificationSound();
-    
-    // Eliminar toast después de que desaparezca
-    toastElement.addEventListener('hidden.bs.toast', function () {
-        this.remove();
-    });
+
+    // Auto-eliminar después de 5 segundos
+    const toastElement = document.getElementById(toastId);
+    setTimeout(() => {
+        if (toastElement && toastElement.parentNode) {
+            toastElement.style.opacity = '0';
+            toastElement.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => toastElement.remove(), 300);
+        }
+    }, 5000);
 }
 
 // 🔊 FUNCIÓN: Reproducir sonido de notificación

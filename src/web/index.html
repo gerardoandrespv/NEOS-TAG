@@ -852,23 +852,25 @@
             color: #7f8c8d;
         }
 
-        .form-group {
+        .modal .form-group {
             margin-bottom: 15px;
         }
 
-        .form-group label {
+        .modal .form-group label {
             display: block;
             margin-bottom: 5px;
             color: var(--dark-text);
             font-weight: 500;
         }
 
-        .form-group input, .form-group select, .form-group textarea {
+        .modal .form-group input, .modal .form-group select, .modal .form-group textarea {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 14px;
+            background: white;
+            color: var(--dark-text);
         }
 
         .form-actions {
@@ -970,22 +972,22 @@
 
         <!-- Navigation Tabs -->
         <div class="tabs">
-            <button class="tab-button active" onclick="switchTab('control')">
+            <button class="tab-button active" onclick="switchTab('control', event)">
                 <i class="fas fa-tachometer-alt"></i> Control
             </button>
-            <button class="tab-button" onclick="switchTab('users')">
+            <button class="tab-button" onclick="switchTab('users', event)">
                 <i class="fas fa-users"></i> Residentes
             </button>
-            <button class="tab-button" onclick="switchTab('lists')">
+            <button class="tab-button" onclick="switchTab('lists', event)">
                 <i class="fas fa-list-check"></i> Listas
             </button>
-            <button class="tab-button" onclick="switchTab('alerts')">
+            <button class="tab-button" onclick="switchTab('alerts', event)">
                 <i class="fas fa-bell"></i> Alertas
             </button>
-            <button class="tab-button" onclick="switchTab('logs')">
+            <button class="tab-button" onclick="switchTab('logs', event)">
                 <i class="fas fa-clipboard-list"></i> Registros
             </button>
-            <button class="tab-button" onclick="switchTab('charts')">
+            <button class="tab-button" onclick="switchTab('charts', event)">
                 <i class="fas fa-chart-line"></i> Gráficos
             </button>
         </div>
@@ -1229,7 +1231,7 @@
             <form id="userForm">
                 <div class="form-group">
                     <label>Nombre Completo *</label>
-                    <input type="text" id="userName" required>
+                    <input type="text" id="userNameInput" required>
                 </div>
                 <div class="form-group">
                     <label>Unidad/Departamento *</label>
@@ -1295,6 +1297,7 @@
         let logs = [];
         let selectedTags = [];
         let currentUser = null;
+        let editingUser = null; // Track user being edited in modal (separate from currentUser auth)
         let userRole = 'guest'; // 'admin', 'guard', 'guest'
         let charts = {};
 
@@ -1304,8 +1307,8 @@
             guardia: { password: 'guardia123', role: 'guard', name: 'Guardia' }
         };
 
-        // Tabs restringidas para guardias
-        const restrictedTabsForGuards = ['users-tab', 'lists-tab', 'charts-tab'];
+        // Tabs restringidas para guardias (sin sufijo '-tab', debe coincidir con el parámetro de switchTab)
+        const restrictedTabsForGuards = ['users', 'lists', 'charts'];
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -1363,19 +1366,22 @@
                 });
         }
 
-        function switchTab(tab) {
+        function switchTab(tab, evt) {
             // Verificar restricciones
             if (userRole === 'guard' && restrictedTabsForGuards.includes(tab)) {
                 showNotification('⛔ Acceso restringido - Solo administradores', 'error');
                 return;
             }
-            
+
             // Remove active class from all tabs
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            
-            // Add active class to selected tab
-            event.target.classList.add('active');
+
+            // Add active class to selected tab button (handle click on child <i> element)
+            const clickedEl = evt ? (evt.target.closest('.tab-button') || evt.target) : null;
+            if (clickedEl) {
+                clickedEl.classList.add('active');
+            }
             document.getElementById(tab + '-tab').classList.add('active');
             
             // Load tab data
@@ -1630,7 +1636,7 @@
             showNotification('👋 Sesión cerrada', 'info');
             
             // Volver a Control Panel
-            switchTab('control-tab');
+            switchTab('control');
             
             // Mostrar login nuevamente
             setTimeout(() => showLoginModal(), 500);
@@ -1732,22 +1738,22 @@
         }
 
         function showAddUserModal() {
-            currentUser = null;
+            editingUser = null;
             document.getElementById('modalTitle').textContent = 'Nuevo Residente';
             document.getElementById('userForm').reset();
             document.getElementById('userModal').classList.add('show');
         }
 
         function editUser(userId) {
-            currentUser = users.find(u => u.id === userId);
+            editingUser = users.find(u => u.id === userId);
             document.getElementById('modalTitle').textContent = 'Editar Residente';
-            document.getElementById('userName').value = currentUser.name || '';
-            document.getElementById('userUnit').value = currentUser.unit || '';
-            document.getElementById('userType').value = currentUser.type || 'propietario';
-            document.getElementById('userPhone').value = currentUser.phone || '';
-            document.getElementById('userEmail').value = currentUser.email || '';
-            document.getElementById('userVehicle').value = currentUser.vehicle || '';
-            document.getElementById('userTags').value = (currentUser.tags || []).join(', ');
+            document.getElementById('userNameInput').value = editingUser.name || '';
+            document.getElementById('userUnit').value = editingUser.unit || '';
+            document.getElementById('userType').value = editingUser.type || 'propietario';
+            document.getElementById('userPhone').value = editingUser.phone || '';
+            document.getElementById('userEmail').value = editingUser.email || '';
+            document.getElementById('userVehicle').value = editingUser.vehicle || '';
+            document.getElementById('userTags').value = (editingUser.tags || []).join(', ');
             document.getElementById('userModal').classList.add('show');
         }
 
@@ -1756,9 +1762,9 @@
                 showNotification('⛔ Solo administradores pueden modificar usuarios', 'error');
                 return;
             }
-            
+
             const data = {
-                name: document.getElementById('userName').value,
+                name: document.getElementById('userNameInput').value,
                 unit: document.getElementById('userUnit').value,
                 type: document.getElementById('userType').value,
                 phone: document.getElementById('userPhone').value,
@@ -1768,10 +1774,10 @@
                 active: true,
                 updated_at: firebase.firestore.FieldValue.serverTimestamp()
             };
-            
+
             try {
-                if (currentUser) {
-                    await db.collection('users').doc(currentUser.id).update(data);
+                if (editingUser) {
+                    await db.collection('users').doc(editingUser.id).update(data);
                 } else {
                     data.created_at = firebase.firestore.FieldValue.serverTimestamp();
                     await db.collection('users').add(data);
@@ -1804,7 +1810,7 @@
 
         function closeUserModal() {
             document.getElementById('userModal').classList.remove('show');
-            currentUser = null;
+            editingUser = null;
         }
 
         function exportUsers() {
@@ -2031,8 +2037,46 @@
 
         function filterAlerts() {
             const filter = document.getElementById('alertFilter').value;
-            // Implement filtering logic
-            renderAlerts();
+            const container = document.getElementById('alertsList');
+
+            if (alerts.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#7f8c8d;">No hay alertas</p>';
+                return;
+            }
+
+            let filtered = alerts;
+            const now = new Date();
+
+            if (filter === 'critical') {
+                filtered = alerts.filter(a => a.level === 'critical');
+            } else if (filter === 'warning') {
+                filtered = alerts.filter(a => a.level === 'warning');
+            } else if (filter === 'info') {
+                filtered = alerts.filter(a => a.level === 'info');
+            } else if (filter === 'today') {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                filtered = alerts.filter(a => {
+                    const alertDate = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+                    return alertDate >= today;
+                });
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#7f8c8d;">No hay alertas para este filtro</p>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(alert => `
+                <div class="alert-item ${alert.level || 'info'}">
+                    <i class="fas fa-${getAlertIcon(alert.level)}"></i>
+                    <div style="flex: 1;">
+                        <strong>${alert.title || 'Alerta'}</strong>
+                        <p>${alert.message || ''}</p>
+                        <small>${formatTimestamp(alert.timestamp)}</small>
+                    </div>
+                </div>
+            `).join('');
         }
 
         function markAllAsRead() {
@@ -2099,7 +2143,42 @@
         }
 
         function filterLogs() {
-            renderLogs();
+            const logType = document.getElementById('logType').value;
+            const tbody = document.getElementById('logsTableBody');
+
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No hay registros</td></tr>';
+                return;
+            }
+
+            let filtered = logs;
+
+            if (logType === 'entrada') {
+                filtered = logs.filter(l => (l.event_type || 'entrada') === 'entrada');
+            } else if (logType === 'salida') {
+                filtered = logs.filter(l => l.event_type === 'salida');
+            } else if (logType === 'denegado') {
+                filtered = logs.filter(l => l.granted === false);
+            } else if (logType === 'remoto') {
+                filtered = logs.filter(l => l.event_type === 'remoto');
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No hay registros para este filtro</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(log => `
+                <tr>
+                    <td>${formatTimestamp(log.timestamp)}</td>
+                    <td>${log.user_name || 'Desconocido'}</td>
+                    <td>${log.unit || 'N/A'}</td>
+                    <td>${log.event_type || 'entrada'}</td>
+                    <td>${log.epc || 'N/A'}</td>
+                    <td><span style="color: ${log.granted ? 'green' : 'red'}">${log.granted ? 'Permitido' : 'Denegado'}</span></td>
+                    <td>${log.location || log.reader_serial || 'N/A'}</td>
+                </tr>
+            `).join('');
         }
 
         function exportLogs() {
