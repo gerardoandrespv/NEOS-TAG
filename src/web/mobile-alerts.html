@@ -307,8 +307,20 @@
     </div>
 
     <!-- Hidden audio elements for alert sounds -->
-    <audio id="alertSound" preload="auto">
+    <audio id="alertSoundFire" preload="auto">
+        <source src="/sounds/emergency_alarm_fire.wav" type="audio/wav">
+    </audio>
+    <audio id="alertSoundFlood" preload="auto">
+        <source src="/sounds/emergency_alarm_flood.wav" type="audio/wav">
+    </audio>
+    <audio id="alertSoundEvacuation" preload="auto">
+        <source src="/sounds/emergency_alarm_evacuation.wav" type="audio/wav">
+    </audio>
+    <audio id="alertSoundGeneral" preload="auto">
         <source src="/sounds/emergency_alarm_general.wav" type="audio/wav">
+    </audio>
+    <audio id="alertSoundCancel" preload="auto">
+        <source src="/sounds/emergency_alarm_cancel.wav" type="audio/wav">
     </audio>
 
     <script>
@@ -328,6 +340,7 @@
         const db = firebase.firestore();
 
         let activeAlerts = [];
+        let previousAlertIds = new Set();
         let confirmedAlerts = JSON.parse(localStorage.getItem('confirmedAlerts') || '{}');
 
         // Check notification permission on load
@@ -397,8 +410,12 @@
                 messaging.onMessage((payload) => {
                     console.log('[Mobile] 📨 Mensaje recibido en foreground:', payload);
                     
+                    // Get alert type from payload
+                    const alertType = payload.data?.type || payload.data?.alert_type || 'GENERAL';
+                    console.log('[Mobile] 🎯 Tipo de alerta:', alertType);
+                    
                     // Play alert sound
-                    playAlertSound();
+                    playAlertSound(alertType);
                     
                     // Show in-app notification
                     showInAppNotification(payload);
@@ -414,13 +431,39 @@
             }
         }
 
-        // Play alert sound
-        function playAlertSound() {
-            const audio = document.getElementById('alertSound');
-            audio.volume = 1.0;
-            audio.play().catch(err => {
-                console.warn('[Mobile] No se pudo reproducir sonido:', err);
-            });
+        // Play alert sound based on type
+        function playAlertSound(alertType) {
+            console.log('[Mobile] 🔊 Reproduciendo sonido para tipo:', alertType);
+            
+            // Map alert type to sound ID
+            const soundMap = {
+                'FIRE': 'alertSoundFire',
+                'FLOOD': 'alertSoundFlood',
+                'EVACUATION': 'alertSoundEvacuation',
+                'ROBBERY': 'alertSoundGeneral',
+                'FIGHT': 'alertSoundGeneral',
+                'POWER_OUTAGE': 'alertSoundGeneral',
+                'GENERAL': 'alertSoundGeneral'
+            };
+            
+            const soundId = soundMap[alertType] || 'alertSoundGeneral';
+            const audio = document.getElementById(soundId);
+            
+            if (audio) {
+                audio.volume = 1.0;
+                audio.currentTime = 0; // Restart from beginning
+                audio.play().then(() => {
+                    console.log('[Mobile] ✅ Sonido reproducido exitosamente');
+                }).catch(err => {
+                    console.warn('[Mobile] ⚠️ No se pudo reproducir sonido:', err);
+                    // Intentar reproducir con interacción del usuario
+                    document.addEventListener('click', () => {
+                        audio.play().catch(e => console.error('[Mobile] Error en play:', e));
+                    }, { once: true });
+                });
+            } else {
+                console.error('[Mobile] ❌ Audio element no encontrado:', soundId);
+            }
         }
 
         // Show in-app notification
@@ -520,7 +563,7 @@
                                 🕐 <strong>Hora:</strong> ${issuedTime}
                             </div>
                             <div class="detail-item">
-                                🏛️ <strong>Ubicación:</strong> ${alert.blocks_display || alert.building_zone || 'Sin especificar'}
+                                🏛️ <strong>Blocks:</strong> ${alert.blocks_display || alert.building_zone || 'Sin especificar'}
                             </div>
                             <div class="detail-item">
                                 📍 <strong>Punto de encuentro:</strong> ${alert.meeting_point || 'Plaza principal'}
@@ -618,6 +661,37 @@
             .where('status', '==', 'ACTIVE')
             .onSnapshot(snapshot => {
                 console.log('[Mobile] 🔄 Actualización en tiempo real');
+                
+                // Detectar nuevas alertas
+                const currentAlertIds = new Set();
+                let newAlert = null;
+                
+                snapshot.forEach(doc => {
+                    const alertId = doc.id;
+                    currentAlertIds.add(alertId);
+                    
+                    // Si es una alerta nueva (no estaba antes)
+                    if (!previousAlertIds.has(alertId)) {
+                        newAlert = { id: alertId, ...doc.data() };
+                        console.log('[Mobile] 🆕 Nueva alerta detectada:', newAlert);
+                    }
+                });
+                
+                // Si hay una nueva alerta, reproducir sonido
+                if (newAlert && previousAlertIds.size > 0) { // Solo si no es la carga inicial
+                    console.log('[Mobile] 🔊 Reproduciendo sonido para nueva alerta');
+                    playAlertSound(newAlert.type || 'GENERAL');
+                    
+                    // Vibrar
+                    if ('vibrate' in navigator) {
+                        navigator.vibrate([300, 100, 300, 100, 300]);
+                    }
+                }
+                
+                // Actualizar conjunto de IDs
+                previousAlertIds = currentAlertIds;
+                
+                // Cargar alertas
                 loadActiveAlerts();
             });
 
