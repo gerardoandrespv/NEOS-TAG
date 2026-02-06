@@ -525,6 +525,7 @@
             console.log('[Mobile] ========== PLAY ALERT SOUND ==========');
             console.log('[Mobile] alertType recibido:', alertType);
             console.log('[Mobile] alertId recibido:', alertId);
+            console.log('[Mobile] audioPermissionGranted:', localStorage.getItem('audioPermissionGranted'));
             
             // Asegurar que el tipo esté en mayúsculas
             const normalizedType = (alertType || 'GENERAL').toString().toUpperCase();
@@ -559,6 +560,7 @@
                 audio.loop = true;
                 
                 console.log('[Mobile] ▶️ Intentando reproducir...');
+                console.log('[Mobile] Audio state - paused:', audio.paused, 'currentTime:', audio.currentTime, 'duration:', audio.duration);
                 
                 // Intentar reproducir inmediatamente
                 const playPromise = audio.play();
@@ -566,9 +568,11 @@
                 if (playPromise !== undefined) {
                     playPromise.then(() => {
                         console.log('[Mobile] ✅✅✅ SONIDO REPRODUCIDO EXITOSAMENTE EN LOOP');
+                        console.log('[Mobile] Audio playing - paused:', audio.paused, 'currentTime:', audio.currentTime);
                     }).catch(err => {
                         console.error('[Mobile] ❌ ERROR AL REPRODUCIR:', err);
                         console.error('[Mobile] Error completo:', err.name, err.message);
+                        console.error('[Mobile] Audio state on error - paused:', audio.paused, 'src:', audio.src);
                         
                         // Si es NotAllowedError, mostrar banner para activar sonidos
                         if (err.name === 'NotAllowedError') {
@@ -877,12 +881,22 @@
                 
                 // Si hay una nueva alerta, reproducir sonido
                 if (newAlert && previousAlertIds.size > 0) { // Solo si no es la carga inicial
-                    console.log('[Mobile] 🔊 Reproduciendo sonido para nueva alerta');
+                    console.log('[Mobile] 🔊 NUEVA ALERTA DETECTADA - Reproduciendo sonido');
+                    console.log('[Mobile] newAlert:', newAlert);
+                    console.log('[Mobile] previousAlertIds.size:', previousAlertIds.size);
                     playAlertSound(newAlert.type || 'GENERAL', newAlert.id);
                     
                     // Vibrar
                     if ('vibrate' in navigator) {
                         navigator.vibrate([300, 100, 300, 100, 300]);
+                    }
+                } else {
+                    if (!newAlert) {
+                        console.log('[Mobile] ℹ️ No hay nueva alerta (actualización o carga inicial)');
+                    }
+                    if (previousAlertIds.size === 0) {
+                        console.log('[Mobile] ℹ️ Carga inicial, no reproducir sonido todavía');
+                        console.log('[Mobile] Setting previousAlertIds para próxima detección');
                     }
                 }
                 
