@@ -567,7 +567,7 @@
                     console.log('[Mobile] 👂 Registrando listener de FCM (PRIMERA VEZ)');
                     
                     messaging.onMessage((payload) => {
-                        console.log('[Mobile] 📨 ========== MENSAJE FCM RECIBIDO ==========');
+                        console.log('[Mobile] 📨 ========== MENSAJE FCM RECIBIDO (FOREGROUND) ==========');
                         console.log('[Mobile] Payload completo:', JSON.stringify(payload, null, 2));
                         console.log('[Mobile] payload.data:', payload.data);
                         console.log('[Mobile] payload.notification:', payload.notification);
@@ -582,8 +582,9 @@
                         console.log('[Mobile] 🔊 LLAMANDO A playAlertSound desde FCM...');
                         playAlertSound(alertType, alertId);
                         
-                        // Show in-app notification
-                        showInAppNotification(payload);
+                        // NO mostrar notificación aquí - el Service Worker ya la muestra
+                        // Esto evita notificaciones duplicadas
+                        console.log('[Mobile] ℹ️ Notificación será mostrada por Service Worker');
                         
                         // Refresh alerts
                         loadActiveAlerts();
@@ -937,6 +938,7 @@
                 console.log('[Mobile] Alert ID:', alertId);
                 console.log('[Mobile] Alert Type:', alertType);
                 console.log('[Mobile] Esta es una INTERACCIÓN DEL USUARIO - autoplay permitido');
+                console.log('[Mobile] document.readyState:', document.readyState);
                 
                 // REPRODUCIR SONIDO INMEDIATAMENTE (aprovechando user gesture)
                 // El click en la notificación ES una interacción del usuario
@@ -955,15 +957,18 @@
                 
                 const normalizedType = (alertType || 'GENERAL').toString().toUpperCase();
                 const soundId = soundMap[normalizedType] || 'alertSoundGeneral';
+                
+                console.log('[Mobile] Buscando elemento de audio:', soundId);
                 const audio = document.getElementById(soundId);
+                console.log('[Mobile] Audio element encontrado:', !!audio);
                 
                 if (audio) {
                     audio.volume = 1.0;
                     audio.loop = true;
                     audio.currentTime = 0;
                     
-                    console.log('[Mobile] Audio element:', soundId);
-                    console.log('[Mobile] Intentando play()...');
+                    console.log('[Mobile] ▶️ Iniciando reproducción INMEDIATA...');
+                    console.log('[Mobile] Audio.paused antes de play:', audio.paused);
                     
                     const playPromise = audio.play();
                     
@@ -1009,11 +1014,22 @@
                 
                 // Clean URL
                 window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+                console.log('[Mobile] No hay parámetros de alerta en URL');
             }
         }
         
-        // Check on load
-        checkURLParams();
+        // Check on load - EJECUTAR CUANDO TODO ESTÉ LISTO
+        // Usar setTimeout para asegurar que los elementos de audio estén cargados
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('[Mobile] DOMContentLoaded - ejecutando checkURLParams');
+                setTimeout(checkURLParams, 500);
+            });
+        } else {
+            console.log('[Mobile] DOM ya listo - ejecutando checkURLParams inmediatamente');
+            setTimeout(checkURLParams, 100);
+        }
 
         // Listen to real-time updates
         db.collection('emergency_alerts')
