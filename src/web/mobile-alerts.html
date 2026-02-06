@@ -509,10 +509,59 @@
                     vapidKey: 'BEd-BNhI_7rq5_sjALjNVA7UKpXhvrsfDX23vSVHr7GPsvAZ654qFAN7LkKudcLLF_Ot8EPZ03ebzHcKZO8WgtM'
                 });
                 
-                console.log('[Mobile] 🔑 FCM Token:', token);
+                console.log('[Mobile] 🔑 FCM Token obtenido:', token);
                 
                 // Save to localStorage
                 localStorage.setItem('fcmToken', token);
+                
+                // IMPORTANTE: Guardar en Firestore para que Cloud Function pueda enviar push
+                try {
+                    console.log('[Mobile] 💾 Guardando token en Firestore...');
+                    
+                    // Usar el token como ID del documento para evitar duplicados
+                    const docRef = db.collection('alert_subscribers').doc(token);
+                    
+                    await docRef.set({
+                        fcm_token: token,
+                        device_type: 'mobile_app',
+                        platform: navigator.platform || 'Unknown',
+                        user_agent: navigator.userAgent,
+                        notifications_enabled: true,
+                        created_at: firebase.firestore.FieldValue.serverTimestamp(),
+                        last_updated: firebase.firestore.FieldValue.serverTimestamp(),
+                        app_version: 'mobile-alerts-v1.0'
+                    }, { merge: true });
+                    
+                    console.log('[Mobile] ✅ Token guardado en alert_subscribers');
+                    
+                    // Suscribir al topic all-users
+                    try {
+                        console.log('[Mobile] 📡 Suscribiendo al topic all-users...');
+                        const subscribeResponse = await fetch('https://us-central1-neos-tech.cloudfunctions.net/subscribeToTopic', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                token: token,
+                                topic: 'all-users'
+                            })
+                        });
+                        
+                        const subscribeResult = await subscribeResponse.json();
+                        if (subscribeResult.success) {
+                            console.log('[Mobile] ✅ Suscrito exitosamente al topic all-users');
+                            console.log('[Mobile] Resultado:', subscribeResult);
+                        } else {
+                            console.error('[Mobile] ❌ Error suscribiendo al topic:', subscribeResult.error);
+                        }
+                    } catch (subError) {
+                        console.error('[Mobile] ❌ Error en suscripción al topic:', subError);
+                    }
+                    
+                } catch (firestoreError) {
+                    console.error('[Mobile] ❌ Error guardando en Firestore:', firestoreError);
+                }
                 
                 // Listen for foreground messages - SOLO UNA VEZ con verificación más robusta
                 if (!window.fcmListenerRegistered) {
@@ -549,7 +598,7 @@
                 
                 return token;
             } catch (error) {
-                console.error('[Mobile] Error obteniendo FCM token:', error);
+                console.error('[Mobile] ❌ Error obteniendo FCM token:', error);
                 return null;
             }
         }
