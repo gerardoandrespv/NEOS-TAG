@@ -347,25 +347,63 @@
         let confirmedAlerts = JSON.parse(localStorage.getItem('confirmedAlerts') || '{}');
         let currentlyPlayingSounds = new Map();
 
+        // Preload audio files properly
+        async function preloadAudioFiles() {
+            console.log('[Mobile] 🔊 Iniciando precarga de audio...');
+            const audioIds = ['alertSoundFire', 'alertSoundFlood', 'alertSoundEvacuation', 'alertSoundGeneral', 'alertSoundCancel'];
+            
+            for (const id of audioIds) {
+                const audio = document.getElementById(id);
+                if (!audio) {
+                    console.error(`[Mobile] ❌ No se encontró: ${id}`);
+                    continue;
+                }
+                
+                try {
+                    // Wait for audio to load
+                    await new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => {
+                            console.warn(`[Mobile] ⚠️ Timeout cargando ${id}, readyState: ${audio.readyState}`);
+                            resolve(); // Continue anyway
+                        }, 5000);
+                        
+                        if (audio.readyState >= 2) {
+                            clearTimeout(timeout);
+                            resolve();
+                        } else {
+                            audio.addEventListener('canplay', () => {
+                                clearTimeout(timeout);
+                                resolve();
+                            }, { once: true });
+                            
+                            audio.addEventListener('error', (e) => {
+                                clearTimeout(timeout);
+                                console.error(`[Mobile] ❌ Error cargando ${id}:`, e);
+                                reject(e);
+                            }, { once: true });
+                            
+                            audio.load();
+                        }
+                    });
+                    
+                    console.log(`[Mobile] ✅ Audio listo: ${id}, readyState: ${audio.readyState}, src: ${audio.currentSrc}`);
+                } catch (error) {
+                    console.error(`[Mobile] ❌ Falló ${id}:`, error);
+                }
+            }
+            
+            console.log('[Mobile] 🎵 Precarga de audio completada');
+        }
+
         // Check notification permission on load
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
             console.log('[Mobile] 🚀 ========== APP CARGADA ==========');
             console.log('[Mobile] audioPermissionGranted:', localStorage.getItem('audioPermissionGranted'));
             console.log('[Mobile] fcmToken:', localStorage.getItem('fcmToken') ? 'Presente' : 'No presente');
             console.log('[Mobile] Notification.permission:', Notification.permission);
             
-            // CRÍTICO Safari iOS: Forzar carga de TODOS los elementos de audio
-            console.log('[Mobile] 🔊 Precargando elementos de audio...');
-            const audioIds = ['alertSoundFire', 'alertSoundFlood', 'alertSoundEvacuation', 'alertSoundGeneral', 'alertSoundCancel'];
-            audioIds.forEach(id => {
-                const audio = document.getElementById(id);
-                if (audio) {
-                    audio.load(); // Forzar carga
-                    console.log(`[Mobile] ✅ Audio cargado: ${id}, src: ${audio.src || audio.currentSrc}, readyState: ${audio.readyState}`);
-                } else {
-                    console.error(`[Mobile] ❌ No se encontró elemento: ${id}`);
-                }
-            });
+            // Preload audio files properly
+            await preloadAudioFiles();
             
             checkNotificationPermission();
             loadActiveAlerts();
@@ -863,23 +901,56 @@
                     .orderBy('issued_at', 'desc')
                     .get();
                 
+                console.log('[Mobile] 📦 Snapshot recibido, size:', snapshot.size);
+                console.log('[Mobile] 📦 Snapshot empty?', snapshot.empty);
+                
                 activeAlerts = [];
                 snapshot.forEach(doc => {
-                    activeAlerts.push({
-                        id: doc.id,
-                        ...doc.data()
-                    });
+                    const alertData = { id: doc.id, ...doc.data() };
+                    console.log('[Mobile] 📄 Procesando doc:', doc.id, 'tipo:', alertData.type);
+                    activeAlerts.push(alertData);
                 });
                 
                 console.log('[Mobile] 📊 Alertas encontradas:', activeAlerts.length);
+                console.log('[Mobile] 📊 Alertas array:', activeAlerts.map(a => ({ id: a.id, type: a.type, status: a.status })));
                 
                 renderAlerts();
                 updateStatusBar();
                 
             } catch (error) {
-                console.error('[Mobile] Error cargando alertas:', error);
+                console.error('[Mobile] ❌ Error cargando alertas:', error);
+                console.error('[Mobile] ❌ Error code:', error.code);
+                console.error('[Mobile] ❌ Error message:', error.message);
                 document.getElementById('loadingState').innerHTML = 
                     '<div style="color: #EF4444;">❌ Error al cargar alertas</div>';
+                
+                // Si falla el orderBy, intentar sin él (problema de índice)
+                if (error.code === 'failed-precondition' || error.message.includes('index')) {
+                    console.log('[Mobile] 🔄 Reintentando sin orderBy...');
+                    try {
+                        const snapshot = await db.collection('emergency_alerts')
+                            .where('status', '==', 'ACTIVE')
+                            .get();
+                        
+                        activeAlerts = [];
+                        snapshot.forEach(doc => {
+                            activeAlerts.push({ id: doc.id, ...doc.data() });
+                        });
+                        
+                        // Sort manually
+                        activeAlerts.sort((a, b) => {
+                            const aTime = a.issued_at?.toDate?.() || new Date(a.issued_at);
+                            const bTime = b.issued_at?.toDate?.() || new Date(b.issued_at);
+                            return bTime - aTime;
+                        });
+                        
+                        console.log('[Mobile] ✅ Alertas cargadas sin orderBy:', activeAlerts.length);
+                        renderAlerts();
+                        updateStatusBar();
+                    } catch (retryError) {
+                        console.error('[Mobile] ❌ Error en reintento:', retryError);
+                    }
+                }
             }
         }
 
