@@ -319,21 +319,12 @@
     </div>
 
     <!-- Hidden audio elements for alert sounds -->
-    <audio id="alertSoundFire" preload="auto" loop>
-        <source src="/sounds/emergency_alarm_fire.wav" type="audio/wav">
-    </audio>
-    <audio id="alertSoundFlood" preload="auto" loop>
-        <source src="/sounds/emergency_alarm_flood.wav" type="audio/wav">
-    </audio>
-    <audio id="alertSoundEvacuation" preload="auto" loop>
-        <source src="/sounds/emergency_alarm_evacuation.wav" type="audio/wav">
-    </audio>
-    <audio id="alertSoundGeneral" preload="auto" loop>
-        <source src="/sounds/emergency_alarm_general.wav" type="audio/wav">
-    </audio>
-    <audio id="alertSoundCancel" preload="auto" loop>
-        <source src="/sounds/emergency_alarm_cancel.wav" type="audio/wav">
-    </audio>
+    <!-- Usar src directo en lugar de <source> para compatibilidad Safari iOS -->
+    <audio id="alertSoundFire" preload="auto" loop src="/sounds/emergency_alarm_fire.wav"></audio>
+    <audio id="alertSoundFlood" preload="auto" loop src="/sounds/emergency_alarm_flood.wav"></audio>
+    <audio id="alertSoundEvacuation" preload="auto" loop src="/sounds/emergency_alarm_evacuation.wav"></audio>
+    <audio id="alertSoundGeneral" preload="auto" loop src="/sounds/emergency_alarm_general.wav"></audio>
+    <audio id="alertSoundCancel" preload="auto" loop src="/sounds/emergency_alarm_cancel.wav"></audio>
 
     <script>
         // Firebase Configuration
@@ -362,6 +353,19 @@
             console.log('[Mobile] audioPermissionGranted:', localStorage.getItem('audioPermissionGranted'));
             console.log('[Mobile] fcmToken:', localStorage.getItem('fcmToken') ? 'Presente' : 'No presente');
             console.log('[Mobile] Notification.permission:', Notification.permission);
+            
+            // CRÍTICO Safari iOS: Forzar carga de TODOS los elementos de audio
+            console.log('[Mobile] 🔊 Precargando elementos de audio...');
+            const audioIds = ['alertSoundFire', 'alertSoundFlood', 'alertSoundEvacuation', 'alertSoundGeneral', 'alertSoundCancel'];
+            audioIds.forEach(id => {
+                const audio = document.getElementById(id);
+                if (audio) {
+                    audio.load(); // Forzar carga
+                    console.log(`[Mobile] ✅ Audio cargado: ${id}, src: ${audio.src || audio.currentSrc}, readyState: ${audio.readyState}`);
+                } else {
+                    console.error(`[Mobile] ❌ No se encontró elemento: ${id}`);
+                }
+            });
             
             checkNotificationPermission();
             loadActiveAlerts();
@@ -480,6 +484,30 @@
                 console.log('[Mobile] Paso 3: Activando sonidos...');
                 const testAudio = document.getElementById('alertSoundGeneral');
                 if (testAudio) {
+                    // Safari iOS: Forzar carga del audio primero
+                    console.log('[Mobile] Forzando carga de audio...');
+                    testAudio.load();
+                    
+                    // Esperar a que esté listo
+                    await new Promise((resolve) => {
+                        if (testAudio.readyState >= 2) {
+                            console.log('[Mobile] Audio ya listo (readyState:', testAudio.readyState, ')');
+                            resolve();
+                        } else {
+                            console.log('[Mobile] Esperando a que audio esté listo...');
+                            testAudio.addEventListener('canplay', () => {
+                                console.log('[Mobile] Audio listo para reproducir');
+                                resolve();
+                            }, { once: true });
+                            
+                            // Timeout de seguridad
+                            setTimeout(resolve, 2000);
+                        }
+                    });
+                    
+                    console.log('[Mobile] Audio.src:', testAudio.src || testAudio.currentSrc);
+                    console.log('[Mobile] Audio.readyState:', testAudio.readyState);
+                    
                     testAudio.volume = 0.01; // Casi inaudible
                     testAudio.loop = false; // IMPORTANTE: sin loop
                     testAudio.currentTime = 0;
@@ -496,7 +524,8 @@
                                 console.log('[Mobile] ✅ Sonido de prueba detenido correctamente');
                             }, 100); // Muy rápido
                         }).catch(err => {
-                            console.warn('[Mobile] Error en sonido de prueba:', err);
+                            console.warn('[Mobile] ⚠️ Error en sonido de prueba (puede ser normal en algunos navegadores):', err);
+                            // No fallar si el test falla, solo logear
                         });
                     }
                     
@@ -673,6 +702,16 @@
             console.log('[Mobile] Elemento audio encontrado:', !!audio);
             
             if (audio) {
+                // Safari iOS: Verificar src usando currentSrc también
+                console.log('[Mobile] playAlertSound - Audio.src:', audio.src || audio.currentSrc);
+                console.log('[Mobile] playAlertSound - Audio.readyState:', audio.readyState);
+                
+                // Forzar load si no está listo
+                if (audio.readyState < 2) {
+                    console.log('[Mobile] Audio no listo, forzando load()...');
+                    audio.load();
+                }
+                
                 // Track this sound
                 if (alertId) {
                     currentlyPlayingSounds.set(alertId, soundId);
@@ -997,9 +1036,15 @@
                 console.log('[Mobile] Audio element encontrado:', !!audio);
                 
                 if (audio) {
-                    console.log('[Mobile] Audio.src:', audio.src);
+                    console.log('[Mobile] Audio.src:', audio.src || audio.currentSrc);
                     console.log('[Mobile] Audio.readyState:', audio.readyState);
                     console.log('[Mobile] Audio.paused:', audio.paused);
+                    
+                    // Safari iOS: Forzar carga del audio si aún no está listo
+                    if (audio.readyState < 2) {
+                        console.log('[Mobile] Audio no listo, forzando load()...');
+                        audio.load();
+                    }
                     
                     audio.volume = 1.0;
                     audio.loop = true;
