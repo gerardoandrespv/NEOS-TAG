@@ -277,22 +277,25 @@
         <span id="alertCount">0 alertas</span>
     </div>
 
-    <div class="container">
-        <!-- Notification Prompt -->
-        <div id="notificationPrompt" class="notification-prompt hidden">
-            <h3>🔔 Activar Notificaciones</h3>
-            <p>Permite recibir alertas de emergencia en tiempo real</p>
-            <button class="btn-enable-notifications" onclick="enableNotifications()">
-                Activar Notificaciones
-            </button>
+    <!-- Permission Status Bar -->
+    <div style="background: #F3F4F6; padding: 12px 20px; border-bottom: 1px solid #E5E7EB; display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <span id="notificationStatusIcon">⚪</span>
+            <span style="font-size: 13px; font-weight: 500;" id="notificationStatusText">Notificaciones</span>
         </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <span id="soundStatusIcon">⚪</span>
+            <span style="font-size: 13px; font-weight: 500;" id="soundStatusText">Sonidos</span>
+        </div>
+    </div>
 
-        <!-- Sound Permission Banner -->
-        <div id="soundPermissionBanner" class="notification-prompt hidden" style="background: #FEF3C7; border: 2px solid #F59E0B;">
-            <h3>🔊 Activar Sonidos de Emergencia</h3>
-            <p style="color: #92400E;"><strong>Importante:</strong> Debes tocar este botón para que las alarmas puedan sonar</p>
-            <button class="btn-enable-notifications" onclick="enableSounds()" style="background: #F59E0B;">
-                🔊 Activar Sonidos Ahora
+    <div class="container">
+        <!-- Unified Activation Prompt -->
+        <div id="activationPrompt" class="notification-prompt hidden" style="background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); border: none;">
+            <h3 style="color: white; margin-bottom: 10px;">🔔🔊 Activar Sistema de Alertas</h3>
+            <p style="color: #E0E7FF; margin-bottom: 15px;">Activa notificaciones push y sonidos de emergencia para recibir alertas en tiempo real</p>
+            <button class="btn-enable-notifications" onclick="activateAlertSystem()" style="background: white; color: #667EEA; font-weight: 600;">
+                ✅ Activar Ahora
             </button>
         </div>
 
@@ -372,29 +375,86 @@
             }
         });
 
+        // Update status indicators
+        function updateStatusIndicators() {
+            const notificationGranted = Notification.permission === 'granted';
+            const soundGranted = localStorage.getItem('audioPermissionGranted') === 'true';
+            
+            // Notification status
+            const notifIcon = document.getElementById('notificationStatusIcon');
+            const notifText = document.getElementById('notificationStatusText');
+            if (notificationGranted) {
+                notifIcon.textContent = '✅';
+                notifText.textContent = 'Notificaciones Activas';
+                notifText.style.color = '#059669';
+            } else {
+                notifIcon.textContent = '❌';
+                notifText.textContent = 'Notificaciones Inactivas';
+                notifText.style.color = '#DC2626';
+            }
+            
+            // Sound status
+            const soundIcon = document.getElementById('soundStatusIcon');
+            const soundText = document.getElementById('soundStatusText');
+            if (soundGranted) {
+                soundIcon.textContent = '✅';
+                soundText.textContent = 'Sonidos Activos';
+                soundText.style.color = '#059669';
+            } else {
+                soundIcon.textContent = '❌';
+                soundText.textContent = 'Sonidos Inactivos';
+                soundText.style.color = '#DC2626';
+            }
+            
+            console.log('[Mobile] Estado actualizado - Notif:', notificationGranted, 'Sound:', soundGranted);
+        }
+        
         // Check notification permission
         function checkNotificationPermission() {
+            updateStatusIndicators();
+            
             if ('Notification' in window) {
-                if (Notification.permission === 'default') {
-                    document.getElementById('notificationPrompt').classList.remove('hidden');
-                } else if (Notification.permission === 'granted') {
-                    console.log('[Mobile] Notificaciones permitidas');
-                    // Get FCM token
-                    getFCMToken();
+                const notificationGranted = Notification.permission === 'granted';
+                const soundGranted = localStorage.getItem('audioPermissionGranted') === 'true';
+                
+                // Mostrar prompt solo si falta alguno
+                if (!notificationGranted || !soundGranted) {
+                    document.getElementById('activationPrompt').classList.remove('hidden');
+                } else {
+                    console.log('[Mobile] ✅ Sistema completamente activado');
+                    if (notificationGranted) {
+                        getFCMToken();
+                    }
                 }
             }
         }
 
-        // Enable notifications
-        // Enable sounds - get audio permission
-        async function enableSounds() {
-            console.log('[Mobile] 🔊 Activando sonidos de emergencia...');
-            
+        // Activate complete alert system (notifications + sounds)
+        async function activateAlertSystem() {
             try {
-                // Intentar reproducir un sonido de prueba muy bajo
+                console.log('[Mobile] 🚀 Activando sistema completo de alertas...');
+                
+                // Step 1: Request notification permission
+                console.log('[Mobile] Paso 1: Solicitando permiso de notificaciones...');
+                const permission = await Notification.requestPermission();
+                
+                if (permission !== 'granted') {
+                    alert('❌ Debes permitir notificaciones para recibir alertas de emergencia');
+                    updateStatusIndicators();
+                    return;
+                }
+                
+                console.log('[Mobile] ✅ Notificaciones permitidas');
+                
+                // Step 2: Get FCM token
+                console.log('[Mobile] Paso 2: Obteniendo token FCM...');
+                await getFCMToken();
+                
+                // Step 3: Test audio permission
+                console.log('[Mobile] Paso 3: Activando sonidos...');
                 const testAudio = document.getElementById('alertSoundGeneral');
                 if (testAudio) {
-                    testAudio.volume = 0.1; // Muy bajo para la prueba
+                    testAudio.volume = 0.1;
                     testAudio.loop = false;
                     await testAudio.play();
                     
@@ -403,59 +463,31 @@
                         testAudio.pause();
                         testAudio.currentTime = 0;
                         testAudio.volume = 1.0;
-                        console.log('[Mobile] ✅ Permiso de audio obtenido exitosamente');
-                        
-                        // Ocultar banner
-                        document.getElementById('soundPermissionBanner').classList.add('hidden');
-                        
-                        // Guardar en localStorage que ya tiene permiso
-                        localStorage.setItem('audioPermissionGranted', 'true');
-                        
-                        // Si hay una alerta pendiente, reproducirla ahora
-                        if (window.pendingAlert) {
-                            console.log('[Mobile] Reproduciendo alerta pendiente:', window.pendingAlert);
-                            setTimeout(() => {
-                                playAlertSound(window.pendingAlert.alertType, window.pendingAlert.alertId);
-                                window.pendingAlert = null;
-                            }, 500);
-                        }
-                        
-                        alert('✅ Sonidos de emergencia activados correctamente');
                     }, 200);
+                    
+                    console.log('[Mobile] ✅ Sonidos activados');
+                    localStorage.setItem('audioPermissionGranted', 'true');
                 }
+                
+                // Step 4: Hide prompt and update status
+                document.getElementById('activationPrompt').classList.add('hidden');
+                updateStatusIndicators();
+                
+                // Step 5: Play pending alert if exists
+                if (window.pendingAlert) {
+                    console.log('[Mobile] Reproduciendo alerta pendiente:', window.pendingAlert);
+                    setTimeout(() => {
+                        playAlertSound(window.pendingAlert.alertType, window.pendingAlert.alertId);
+                        window.pendingAlert = null;
+                    }, 500);
+                }
+                
+                alert('✅ Sistema de Alertas Activado\n\n🔔 Notificaciones: Activas\n🔊 Sonidos: Activos\n\n¡Recibirás alertas en tiempo real!');
+                
             } catch (error) {
-                console.error('[Mobile] Error activando sonidos:', error);
+                console.error('[Mobile] Error activando sistema:', error);
                 alert('❌ Error: ' + error.message + '\n\nIntenta nuevamente');
-            }
-        }
-        
-        async function enableNotifications() {
-            try {
-                console.log('[Mobile] 🔔 Solicitando permiso de notificaciones...');
-                
-                const permission = await Notification.requestPermission();
-                
-                if (permission === 'granted') {
-                    console.log('[Mobile] ✅ Permiso concedido');
-                    document.getElementById('notificationPrompt').classList.add('hidden');
-                    
-                    // Get FCM token
-                    await getFCMToken();
-                    
-                    // Mostrar banner de sonidos si aún no tiene permiso
-                    const hasAudioPermission = localStorage.getItem('audioPermissionGranted');
-                    if (!hasAudioPermission) {
-                        console.log('[Mobile] Mostrando banner de sonidos...');
-                        document.getElementById('soundPermissionBanner').classList.remove('hidden');
-                    }
-                    
-                    alert('✅ Notificaciones activadas correctamente\n\n🔊 Importante: Activa los SONIDOS en el siguiente paso');
-                } else {
-                    alert('⚠️ Debes permitir notificaciones para recibir alertas de emergencia');
-                }
-            } catch (error) {
-                console.error('[Mobile] Error al solicitar notificaciones:', error);
-                alert('❌ Error: ' + error.message);
+                updateStatusIndicators();
             }
         }
 
@@ -581,17 +613,18 @@
                         
                         // Si es NotAllowedError, mostrar banner para activar sonidos
                         if (err.name === 'NotAllowedError') {
-                            console.log('[Mobile] 🚨 NotAllowedError detectado - mostrando banner');
+                            console.log('[Mobile] 🚨 NotAllowedError detectado - mostrando prompt');
                             
-                            // Mostrar banner de permisos de sonido
-                            const banner = document.getElementById('soundPermissionBanner');
-                            if (banner) {
-                                banner.classList.remove('hidden');
-                                banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // Mostrar prompt de activación
+                            const prompt = document.getElementById('activationPrompt');
+                            if (prompt) {
+                                prompt.classList.remove('hidden');
+                                prompt.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             }
                             
                             // Borrar flag de permiso
                             localStorage.removeItem('audioPermissionGranted');
+                            updateStatusIndicators();
                             
                             // Vibrar para llamar atención
                             if ('vibrate' in navigator) {
@@ -908,10 +941,10 @@
                             navigator.vibrate([300, 100, 300, 100, 300]);
                         }
                     } else {
-                        console.log('[Mobile] ⚠️ Nueva alerta pero sin permiso de audio - mostrando banner');
-                        const banner = document.getElementById('soundPermissionBanner');
-                        if (banner) {
-                            banner.classList.remove('hidden');
+                        console.log('[Mobile] ⚠️ Nueva alerta pero sin permiso de audio - mostrando prompt');
+                        const prompt = document.getElementById('activationPrompt');
+                        if (prompt) {
+                            prompt.classList.remove('hidden');
                         }
                         // Guardar para reproducir después
                         window.pendingAlert = { alertType: newAlert.type || 'GENERAL', alertId: newAlert.id };
