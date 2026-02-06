@@ -129,12 +129,5 @@ self.addEventListener('notificationclick', (event) => {
     }
 });
 
-// Handle push event (for custom handling)
-self.addEventListener('push', (event) => {
-    console.log('[Service Worker] Push received.', event);
-    
-    if (event.data) {
-        const data = event.data.json();
-        console.log('[Service Worker] Push data:', data);
-    }
-});
+// NOTE: NO agregamos listener 'push' porque messaging.onBackgroundMessage ya lo maneja
+// Tener ambos causaría notificaciones duplicadas

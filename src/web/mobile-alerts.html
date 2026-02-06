@@ -933,6 +933,10 @@
             const alertId = urlParams.get('alertId');
             const alertType = urlParams.get('alertType');
             
+            console.log('[Mobile] checkURLParams() ejecutado');
+            console.log('[Mobile] URL completa:', window.location.href);
+            console.log('[Mobile] Parámetros encontrados:', { alertId, alertType });
+            
             if (alertId && alertType) {
                 console.log('[Mobile] 🔔 ========== ABRIENDO DESDE NOTIFICACIÓN ==========');
                 console.log('[Mobile] Alert ID:', alertId);
@@ -958,11 +962,18 @@
                 const normalizedType = (alertType || 'GENERAL').toString().toUpperCase();
                 const soundId = soundMap[normalizedType] || 'alertSoundGeneral';
                 
+                console.log('[Mobile] Tipo normalizado:', normalizedType);
+                console.log('[Mobile] Sound ID mapeado:', soundId);
                 console.log('[Mobile] Buscando elemento de audio:', soundId);
+                
                 const audio = document.getElementById(soundId);
                 console.log('[Mobile] Audio element encontrado:', !!audio);
                 
                 if (audio) {
+                    console.log('[Mobile] Audio.src:', audio.src);
+                    console.log('[Mobile] Audio.readyState:', audio.readyState);
+                    console.log('[Mobile] Audio.paused:', audio.paused);
+                    
                     audio.volume = 1.0;
                     audio.loop = true;
                     audio.currentTime = 0;
@@ -970,46 +981,77 @@
                     console.log('[Mobile] ▶️ Iniciando reproducción INMEDIATA...');
                     console.log('[Mobile] Audio.paused antes de play:', audio.paused);
                     
-                    const playPromise = audio.play();
+                    // Intentar reproducir CON REINTENTOS
+                    let attempts = 0;
+                    const maxAttempts = 3;
                     
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            console.log('[Mobile] ✅✅✅ SONIDO REPRODUCIDO EXITOSAMENTE DESDE NOTIFICACIÓN');
-                            // Guardar permiso automáticamente
-                            localStorage.setItem('audioPermissionGranted', 'true');
-                            updateStatusIndicators();
-                            
-                            // Track sound
-                            currentlyPlayingSounds.set(alertId, soundId);
-                            
-                            // Vibrar
-                            if ('vibrate' in navigator) {
-                                navigator.vibrate([500, 200, 500, 200, 500, 200, 500]);
-                            }
-                        }).catch(err => {
-                            console.error('[Mobile] ❌ Error reproduciendo desde notificación:', err);
-                            console.error('[Mobile] Error name:', err.name);
-                            
-                            // Si falla, verificar permisos antes de mostrar banner
-                            if (err.name === 'NotAllowedError') {
-                                const currentPermission = localStorage.getItem('audioPermissionGranted');
-                                // SOLO mostrar si realmente NO hay permisos
-                                if (currentPermission !== 'true') {
-                                    console.log('[Mobile] NotAllowedError - mostrando banner');
-                                    const prompt = document.getElementById('activationPrompt');
-                                    if (prompt && prompt.classList.contains('hidden')) {
-                                        prompt.classList.remove('hidden');
-                                    }
-                                    // Guardar alerta pendiente
-                                    window.pendingAlert = { alertType, alertId };
-                                } else {
-                                    console.log('[Mobile] NotAllowedError pero permisos activos - ignorando');
+                    function tryPlay() {
+                        attempts++;
+                        console.log(`[Mobile] Intento ${attempts}/${maxAttempts} de reproducir...`);
+                        
+                        const playPromise = audio.play();
+                        
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                console.log('[Mobile] ✅✅✅ SONIDO REPRODUCIDO EXITOSAMENTE DESDE NOTIFICACIÓN');
+                                console.log('[Mobile] Audio.paused después de play:', audio.paused);
+                                console.log('[Mobile] Audio.currentTime:', audio.currentTime);
+                                // Guardar permiso automáticamente
+                                localStorage.setItem('audioPermissionGranted', 'true');
+                                updateStatusIndicators();
+                                
+                                // Track sound
+                                currentlyPlayingSounds.set(alertId, soundId);
+                                
+                                // Vibrar
+                                if ('vibrate' in navigator) {
+                                    navigator.vibrate([500, 200, 500, 200, 500, 200, 500]);
                                 }
-                            }
-                        });
+                            }).catch(err => {
+                                console.error(`[Mobile] ❌ Error en intento ${attempts}:`, err);
+                                console.error('[Mobile] Error name:', err.name);
+                                console.error('[Mobile] Error message:', err.message);
+                                
+                                // Reintentar si aun quedan intentos
+                                if (attempts < maxAttempts) {
+                                    console.log('[Mobile] Reintentando en 500ms...');
+                                    setTimeout(tryPlay, 500);
+                                } else {
+                                    console.error('[Mobile] ❌❌❌ TODOS LOS INTENTOS FALLARON');
+                                    // Si falla, verificar permisos antes de mostrar banner
+                                    if (err.name === 'NotAllowedError') {
+                                        const currentPermission = localStorage.getItem('audioPermissionGranted');
+                                        // SOLO mostrar si realmente NO hay permisos
+                                        if (currentPermission !== 'true') {
+                                            console.log('[Mobile] NotAllowedError - mostrando banner');
+                                            const prompt = document.getElementById('activationPrompt');
+                                            if (prompt && prompt.classList.contains('hidden')) {
+                                                prompt.classList.remove('hidden');
+                                            }
+                                            // Guardar alerta pendiente
+                                            window.pendingAlert = { alertType, alertId };
+                                        } else {
+                                            console.log('[Mobile] NotAllowedError pero permisos activos - ignorando');
+                                        }
+                                    }
+                                }
+                            });
+                        } else {
+                            console.error('[Mobile] play() no devolvió una promesa');
+                        }
                     }
+                    
+                    // Iniciar primer intento
+                    tryPlay();
+                    
                 } else {
-                    console.error('[Mobile] ❌ No se encontró elemento de audio:', soundId);
+                    console.error('[Mobile] ❌❌❌ NO SE ENCONTRÓ ELEMENTO DE AUDIO:', soundId);
+                    // Listar elementos disponibles
+                    console.log('[Mobile] Elementos de audio en DOM:');
+                    ['alertSoundFire', 'alertSoundFlood', 'alertSoundEvacuation', 'alertSoundGeneral', 'alertSoundCancel'].forEach(id => {
+                        const el = document.getElementById(id);
+                        console.log(`  - ${id}: ${!!el} ${el ? `(src: ${el.src})` : ''}`);
+                    });
                 }
                 
                 // Clean URL
@@ -1020,15 +1062,34 @@
         }
         
         // Check on load - EJECUTAR CUANDO TODO ESTÉ LISTO
+        // Primero desregistrar service workers viejos/duplicados
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                console.log(`[Mobile] 🔍 Service Workers encontrados: ${registrations.length}`);
+                registrations.forEach((reg, index) => {
+                    console.log(`[Mobile] SW ${index + 1}: ${reg.scope}`);
+                });
+                
+                // Si hay múltiples, desregistrar todos excepto el correcto
+                const correctScope = '/firebase-messaging-sw.js';
+                registrations.forEach(reg => {
+                    if (!reg.scope.includes(correctScope) && registrations.length > 1) {
+                        console.log(`[Mobile] 🗑️ Desregistrando SW antiguo: ${reg.scope}`);
+                        reg.unregister();
+                    }
+                });
+            });
+        }
+        
         // Usar setTimeout para asegurar que los elementos de audio estén cargados
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
-                console.log('[Mobile] DOMContentLoaded - ejecutando checkURLParams');
-                setTimeout(checkURLParams, 500);
+                console.log('[Mobile] DOMContentLoaded - ejecutando checkURLParams en 800ms');
+                setTimeout(checkURLParams, 800);
             });
         } else {
-            console.log('[Mobile] DOM ya listo - ejecutando checkURLParams inmediatamente');
-            setTimeout(checkURLParams, 100);
+            console.log('[Mobile] DOM ya listo - ejecutando checkURLParams en 300ms');
+            setTimeout(checkURLParams, 300);
         }
 
         // Listen to real-time updates
