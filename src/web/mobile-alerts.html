@@ -355,7 +355,6 @@
         let previousAlertIds = new Set();
         let confirmedAlerts = JSON.parse(localStorage.getItem('confirmedAlerts') || '{}');
         let currentlyPlayingSounds = new Map();
-        let messagingListenerRegistered = false; // Flag para evitar listeners duplicados
 
         // Check notification permission on load
         window.addEventListener('load', () => {
@@ -450,20 +449,29 @@
                 console.log('[Mobile] Paso 2: Obteniendo token FCM...');
                 await getFCMToken();
                 
-                // Step 3: Test audio permission
+                // Step 3: Test audio permission - SIN LOOP
                 console.log('[Mobile] Paso 3: Activando sonidos...');
                 const testAudio = document.getElementById('alertSoundGeneral');
                 if (testAudio) {
-                    testAudio.volume = 0.1;
-                    testAudio.loop = false;
-                    await testAudio.play();
+                    testAudio.volume = 0.01; // Casi inaudible
+                    testAudio.loop = false; // IMPORTANTE: sin loop
+                    testAudio.currentTime = 0;
                     
-                    // Detener inmediatamente
-                    setTimeout(() => {
-                        testAudio.pause();
-                        testAudio.currentTime = 0;
-                        testAudio.volume = 1.0;
-                    }, 200);
+                    const playPromise = testAudio.play();
+                    
+                    // Detener INMEDIATAMENTE
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            setTimeout(() => {
+                                testAudio.pause();
+                                testAudio.currentTime = 0;
+                                testAudio.volume = 1.0;
+                                console.log('[Mobile] ✅ Sonido de prueba detenido correctamente');
+                            }, 100); // Muy rápido
+                        }).catch(err => {
+                            console.warn('[Mobile] Error en sonido de prueba:', err);
+                        });
+                    }
                     
                     console.log('[Mobile] ✅ Sonidos activados');
                     localStorage.setItem('audioPermissionGranted', 'true');
@@ -473,13 +481,15 @@
                 document.getElementById('activationPrompt').classList.add('hidden');
                 updateStatusIndicators();
                 
-                // Step 5: Play pending alert if exists
+                // Step 5: Play pending alert if exists (SOLO si hay pendiente, no las existentes)
                 if (window.pendingAlert) {
                     console.log('[Mobile] Reproduciendo alerta pendiente:', window.pendingAlert);
                     setTimeout(() => {
                         playAlertSound(window.pendingAlert.alertType, window.pendingAlert.alertId);
                         window.pendingAlert = null;
                     }, 500);
+                } else {
+                    console.log('[Mobile] No hay alerta pendiente para reproducir');
                 }
                 
                 alert('✅ Sistema de Alertas Activado\n\n🔔 Notificaciones: Activas\n🔊 Sonidos: Activos\n\n¡Recibirás alertas en tiempo real!');
@@ -504,12 +514,12 @@
                 // Save to localStorage
                 localStorage.setItem('fcmToken', token);
                 
-                // Listen for foreground messages - SOLO UNA VEZ
-                if (!messagingListenerRegistered) {
-                    console.log('[Mobile] 👂 Registrando listener de mensajes (PRIMERA VEZ)');
+                // Listen for foreground messages - SOLO UNA VEZ con verificación más robusta
+                if (!window.fcmListenerRegistered) {
+                    console.log('[Mobile] 👂 Registrando listener de FCM (PRIMERA VEZ)');
                     
                     messaging.onMessage((payload) => {
-                        console.log('[Mobile] 📨 ========== MENSAJE RECIBIDO EN FOREGROUND ==========');
+                        console.log('[Mobile] 📨 ========== MENSAJE FCM RECIBIDO ==========');
                         console.log('[Mobile] Payload completo:', JSON.stringify(payload, null, 2));
                         console.log('[Mobile] payload.data:', payload.data);
                         console.log('[Mobile] payload.notification:', payload.notification);
@@ -521,7 +531,7 @@
                         console.log('[Mobile] 🎯 ID extraído:', alertId);
                         
                         // Play alert sound with ID for tracking
-                        console.log('[Mobile] 🔊 LLAMANDO A playAlertSound...');
+                        console.log('[Mobile] 🔊 LLAMANDO A playAlertSound desde FCM...');
                         playAlertSound(alertType, alertId);
                         
                         // Show in-app notification
@@ -531,9 +541,10 @@
                         loadActiveAlerts();
                     });
                     
-                    messagingListenerRegistered = true;
+                    window.fcmListenerRegistered = true;
+                    console.log('[Mobile] ✅ Listener FCM registrado en window.fcmListenerRegistered');
                 } else {
-                    console.log('[Mobile] ⚠️ Listener ya registrado, saltando...');
+                    console.log('[Mobile] ⚠️ Listener FCM ya estaba registrado, saltando...');
                 }
                 
                 return token;
@@ -926,10 +937,11 @@
                 console.log('[Mobile] previousAlertIds.size:', previousAlertIds.size);
                 
                 // Si hay una nueva alerta, reproducir sonido
-                // CAMBIO: Reproducir siempre que haya nueva alerta, incluso en carga inicial SI ya activaron sonidos
-                if (newAlert) {
+                // IMPORTANTE: NO reproducir en carga inicial (previousAlertIds.size === 0)
+                if (newAlert && previousAlertIds.size > 0) {
                     const hasAudioPermission = localStorage.getItem('audioPermissionGranted');
-                    console.log('[Mobile] 🎵 Hay nueva alerta, audioPermission:', hasAudioPermission);
+                    console.log('[Mobile] 🎵 Nueva alerta detectada DESPUÉS de carga inicial');
+                    console.log('[Mobile] audioPermission:', hasAudioPermission);
                     
                     if (hasAudioPermission) {
                         console.log('[Mobile] 🔊 REPRODUCIENDO SONIDO PARA NUEVA ALERTA');
@@ -949,6 +961,9 @@
                         // Guardar para reproducir después
                         window.pendingAlert = { alertType: newAlert.type || 'GENERAL', alertId: newAlert.id };
                     }
+                } else if (newAlert && previousAlertIds.size === 0) {
+                    console.log('[Mobile] 🔇 Nueva alerta detectada en CARGA INICIAL - NO reproducir sonido');
+                    console.log('[Mobile] Esta es la primera carga, las alertas existentes no deben sonar');
                 } else {
                     console.log('[Mobile] ℹ️ No hay nueva alerta (actualización de alerta existente)');
                 }
