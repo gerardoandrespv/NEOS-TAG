@@ -5098,7 +5098,7 @@
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             
-            const clickedButton = event  event.target : document.querySelector(`[onclick*="${tab}"]`);
+            const clickedButton = event ? event.target : document.querySelector(`[onclick*="${tab}"]`);
             if (clickedButton) clickedButton.classList.add('active');
             const tabContent = document.getElementById(tab + '-tab');
             if (tabContent) tabContent.classList.add('active');
@@ -5186,7 +5186,7 @@
                         const tagId = doc.id;
                         const userName = data.user_name || 'Usuario Desconocido';
                         const dept = data.departamento || 'N/A';
-                        const addedAt = data.added_at  formatTimestamp(data.added_at) : 'N/A';
+                        const addedAt = data.added_at ? formatTimestamp(data.added_at) : 'N/A';
                         
                         whitelistHtml += `
                             <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.3); padding: 14px; margin-bottom: 8px; border-radius: 10px;">
@@ -5213,7 +5213,7 @@
                         const data = doc.data();
                         const tagId = doc.id;
                         const reason = data.reason || 'Sin raz�n especificada';
-                        const addedAt = data.added_at  formatTimestamp(data.added_at) : 'N/A';
+                        const addedAt = data.added_at ? formatTimestamp(data.added_at) : 'N/A';
                         
                         blacklistHtml += `
                             <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); padding: 14px; margin-bottom: 8px; border-radius: 10px;">
@@ -5237,7 +5237,7 @@
         }
 
         function filterTags(filter, containerType) {
-            const containerId = containerType === 'Control'  'liveTagsContainerControl' : 'liveTagsContainer';
+            const containerId = containerType === 'Control' ? 'liveTagsContainerControl' : 'liveTagsContainer';
             const container = document.getElementById(containerId);
             
             if (!container) {
@@ -5259,9 +5259,9 @@
                     if (filter === 'all') {
                         item.style.display = 'block';
                     } else if (filter === 'granted') {
-                        item.style.display = header.classList.contains('granted')  'block' : 'none';
+                        item.style.display = header.classList.contains('granted') ? 'block' : 'none';
                     } else if (filter === 'denied') {
-                        item.style.display = header.classList.contains('denied')  'block' : 'none';
+                        item.style.display = header.classList.contains('denied') ? 'block' : 'none';
                     }
                 });
             }
@@ -5355,17 +5355,17 @@
                     card.className = 'card';
                     card.style.padding = '20px';
                     card.style.textAlign = 'center';
-                    card.style.background = block.enabled  'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05))' : 'rgba(100, 100, 100, 0.1)';
-                    card.style.border = block.enabled  '2px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(148, 163, 184, 0.2)';
+                    card.style.background = block.enabled ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05))' : 'rgba(100, 100, 100, 0.1)';
+                    card.style.border = block.enabled ? '2px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(148, 163, 184, 0.2)';
                     card.innerHTML = `
-                        <div style="font-size: 32px; margin-bottom: 10px;">${block.enabled  '' : ''}</div>
-                        <h4 style="color: ${block.enabled  '#3b82f6' : '#94a3b8'}; margin: 0 0 8px 0; font-size: 18px; font-weight: 700;">Block ${block.block_number}</h4>
-                        <div style="font-size: 12px; color: ${block.enabled  '#22c55e' : '#ef4444'}; margin-bottom: 12px; font-weight: 600;">
-                            ${block.enabled  ' Activo' : ' Inactivo'}
+                        <div style="font-size: 32px; margin-bottom: 10px;">${block.enabled ? '' : ''}</div>
+                        <h4 style="color: ${block.enabled ? '#3b82f6' : '#94a3b8'}; margin: 0 0 8px 0; font-size: 18px; font-weight: 700;">Block ${block.block_number}</h4>
+                        <div style="font-size: 12px; color: ${block.enabled ? '#22c55e' : '#ef4444'}; margin-bottom: 12px; font-weight: 600;">
+                            ${block.enabled ? ' Activo' : ' Inactivo'}
                         </div>
-                        <button class="btn ${block.enabled  'btn-danger' : 'btn-success'}" onclick="toggleBlock('${doc.id}', ${!block.enabled})" 
+                        <button class="btn ${block.enabled ? 'btn-danger' : 'btn-success'}" onclick="toggleBlock('${doc.id}', ${!block.enabled})" 
                                 style="padding: 8px 12px; font-size: 12px; width: 100%; font-weight: 600;">
-                            ${block.enabled  ' Desactivar' : ' Activar'}
+                            ${block.enabled ? ' Desactivar' : ' Activar'}
                         </button>
                     `;
                     blocksList.appendChild(card);
@@ -5391,7 +5391,7 @@
                     enabled: newState,
                     updated_at: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                showNotification(` Bloque ${newState  'activado' : 'desactivado'}`, 'success');
+                showNotification(` Bloque ${newState ? 'activado' : 'desactivado'}`, 'success');
                 loadBlocks();
             } catch (error) {
                 console.error('Error:', error);
@@ -5482,8 +5482,8 @@
                 let html = '';
                 snapshot.forEach(doc => {
                     const ap = doc.data();
-                    const statusIcon = ap.enabled  '' : '';
-                    const statusColor = ap.enabled  '#22c55e' : '#ef4444';
+                    const statusIcon = ap.enabled ? '' : '';
+                    const statusColor = ap.enabled ? '#22c55e' : '#ef4444';
                     
                     html += `
                         <tr style="border-bottom: 1px solid #e5e7eb;">
@@ -5492,12 +5492,12 @@
                             <td style="padding: 12px;">${ap.ip || 'N/A'}</td>
                             <td style="padding: 12px;">${ap.port || 'N/A'}</td>
                             <td style="padding: 12px; text-align: center;">
-                                <span style="color: ${statusColor}; font-weight: bold;">${statusIcon} ${ap.enabled  'Activo' : 'Inactivo'}</span>
+                                <span style="color: ${statusColor}; font-weight: bold;">${statusIcon} ${ap.enabled ? 'Activo' : 'Inactivo'}</span>
                             </td>
                             <td style="padding: 12px; text-align: center;">
                                 <button onclick="editAccessPoint('${doc.id}')" class="btn-primary" style="padding: 6px 12px; font-size: 0.85em; margin-right: 5px;"></button>
-                                <button onclick="toggleAccessPoint('${doc.id}', ${!ap.enabled})" class="btn ${ap.enabled  'btn-danger' : 'btn-success'}" style="padding: 6px 12px; font-size: 0.85em; margin-right: 5px;">
-                                    ${ap.enabled  '' : ''}
+                                <button onclick="toggleAccessPoint('${doc.id}', ${!ap.enabled})" class="btn ${ap.enabled ? 'btn-danger' : 'btn-success'}" style="padding: 6px 12px; font-size: 0.85em; margin-right: 5px;">
+                                    ${ap.enabled ? '' : ''}
                                 </button>
                                 <button onclick="deleteAccessPoint('${doc.id}')" class="btn-danger" style="padding: 6px 12px; font-size: 0.85em;"></button>
                             </td>
@@ -5705,14 +5705,14 @@
                             
                             <div class="form-group">
                                 <label style="display: flex; align-items: center; gap: 10px;">
-                                    <input type="checkbox" id="apEnabled" ${ap.enabled  'checked' : ''} style="width: 20px; height: 20px;">
+                                    <input type="checkbox" id="apEnabled" ${ap.enabled ? 'checked' : ''} style="width: 20px; height: 20px;">
                                     <span>Activar punto de acceso</span>
                                 </label>
                             </div>
                             
                             <div class="form-group">
                                 <label style="display: flex; align-items: center; gap: 10px;">
-                                    <input type="checkbox" id="apAutoOpen" ${ap.auto_open  'checked' : ''} style="width: 20px; height: 20px;">
+                                    <input type="checkbox" id="apAutoOpen" ${ap.auto_open ? 'checked' : ''} style="width: 20px; height: 20px;">
                                     <span>Apertura autom�tica al detectar tag v�lido</span>
                                 </label>
                             </div>
@@ -5739,7 +5739,7 @@
                     enabled: newState,
                     updated_at: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                showNotification(` Punto de acceso ${newState  'activado' : 'desactivado'}`, 'success');
+                showNotification(` Punto de acceso ${newState ? 'activado' : 'desactivado'}`, 'success');
                 loadAccessPoints();
             } catch (error) {
                 console.error('Error:', error);
@@ -5788,11 +5788,11 @@
                     tr.innerHTML = `
                         <td style="padding: 10px; color: #1a1f3a; font-weight: 600;">Block ${dept.block}</td>
                         <td style="padding: 10px; color: #2563eb; font-weight: 600; font-family: 'Courier New', monospace;">${dept.block}-${dept.number}</td>
-                        <td style="padding: 10px;">${dept.occupied  ' Ocupado' : ' Disponible'}</td>
+                        <td style="padding: 10px;">${dept.occupied ? ' Ocupado' : ' Disponible'}</td>
                         <td style="padding: 10px; text-align: center;">
                             <button class="btn" onclick="toggleDepartmentOccupied('${doc.id}', ${!dept.occupied})" 
                                     style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">
-                                ${dept.occupied  'Marcar Disponible' : 'Marcar Ocupado'}
+                                ${dept.occupied ? 'Marcar Disponible' : 'Marcar Ocupado'}
                             </button>
                             <button class="btn" onclick="deleteDepartment('${doc.id}')" 
                                     style="padding: 5px 10px; font-size: 12px; background: #e74c3c;">
@@ -5901,7 +5901,7 @@
                 
                 // Recargar lista de departamentos
                 const blockFilterEl = document.getElementById('blockFilter');
-                loadDepartments(blockFilterEl  blockFilterEl.value : '');
+                loadDepartments(blockFilterEl ? blockFilterEl.value : '');
                 
             } catch (error) {
                 console.error('Error:', error);
@@ -5917,7 +5917,7 @@
                 });
                 showNotification(` Departamento actualizado`, 'success');
                 const blockFilterEl = document.getElementById('blockFilter');
-                loadDepartments(blockFilterEl  blockFilterEl.value : '');
+                loadDepartments(blockFilterEl ? blockFilterEl.value : '');
             } catch (error) {
                 console.error('Error:', error);
                 showNotification('❌ Error al actualizar departamento', 'error');
@@ -5933,7 +5933,7 @@
                 await db.collection('departments').doc(deptId).delete();
                 showNotification(' Departamento eliminado', 'success');
                 const blockFilterEl = document.getElementById('blockFilter');
-                loadDepartments(blockFilterEl  blockFilterEl.value : '');
+                loadDepartments(blockFilterEl ? blockFilterEl.value : '');
             } catch (error) {
                 console.error('Error:', error);
                 showNotification('❌ Error al eliminar departamento', 'error');
@@ -6088,7 +6088,7 @@
                     active: newState,
                     updated_at: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                showNotification(` Estado actualizado: ${newState  'Activo' : 'Inactivo'}`, 'success');
+                showNotification(` Estado actualizado: ${newState ? 'Activo' : 'Inactivo'}`, 'success');
                 loadAccessPointsList();
             } catch (error) {
                 console.error('Error:', error);
@@ -6137,10 +6137,10 @@
 
                 snapshot.forEach(doc => {
                     const ap = doc.data();
-                    const typeIcon = ap.type === 'puerta'  '' : '';
-                    const typeLabel = ap.type === 'puerta'  'Puerta' : 'Portón';
-                    const statusColor = ap.active  '#0ea5e9' : '#94a3b8';
-                    const statusText = ap.active  'Activo' : 'Inactivo';
+                    const typeIcon = ap.type === 'puerta' ? '' : '';
+                    const typeLabel = ap.type === 'puerta' ? 'Puerta' : 'Portón';
+                    const statusColor = ap.active ? '#0ea5e9' : '#94a3b8';
+                    const statusText = ap.active ? 'Activo' : 'Inactivo';
 
                     html += `<tr style="border-bottom: 1px solid rgba(100, 116, 139, 0.2);">`;
                     html += `<td style="padding: 12px; color: #cbd5e1;">${typeIcon} ${escapeHtml(ap.name || 'Sin nombre')}</td>`;
@@ -6150,8 +6150,8 @@
                     html += `<td style="padding: 12px; text-align: center;"><span style="color: ${statusColor}; font-weight: 600;">${statusText}</span></td>`;
                     html += `<td style="padding: 12px; text-align: center;">`;
                     html += `<button onclick="editAccessPoint('${doc.id}')" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.85em; margin-right: 5px;"> Editar</button>`;
-                    html += `<button onclick="toggleAccessPoint('${doc.id}', ${!ap.active})" class="btn ${ap.active  'btn-danger' : 'btn-success'}" style="padding: 6px 12px; font-size: 0.85em; margin-right: 5px;">`;
-                    html += `${ap.active  ' Desactivar' : ' Activar'}</button>`;
+                    html += `<button onclick="toggleAccessPoint('${doc.id}', ${!ap.active})" class="btn ${ap.active ? 'btn-danger' : 'btn-success'}" style="padding: 6px 12px; font-size: 0.85em; margin-right: 5px;">`;
+                    html += `${ap.active ? ' Desactivar' : ' Activar'}</button>`;
                     html += `<button onclick="deleteAccessPoint('${doc.id}')" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;"></button>`;
                     html += `</td></tr>`;
                 });
@@ -6227,8 +6227,8 @@
                     
                     // Actualizar estado
                     if (statusEl) {
-                        statusEl.textContent = config.active  ' Activo' : ' Inactivo';
-                        statusEl.style.color = config.active  '#22c55e' : '#ef4444';
+                        statusEl.textContent = config.active ? ' Activo' : ' Inactivo';
+                        statusEl.style.color = config.active ? '#22c55e' : '#ef4444';
                     }
                     
                     // Actualizar �ltima actividad
@@ -6407,7 +6407,7 @@
             element.classList.toggle('open');
             const submenu = element.nextElementSibling;
             if (submenu && submenu.classList.contains('sidebar-submenu')) {
-                submenu.style.display = submenu.style.display === 'block'  'none' : 'block';
+                submenu.style.display = submenu.style.display === 'block' ? 'none' : 'block';
             }
         }
 
@@ -6511,7 +6511,7 @@
             if (results.events.length > 0) {
                 html += '<div class="search-result-category">Eventos Recientes (' + results.events.length + ')</div>';
                 results.events.slice(0, 5).forEach(event => {
-                    const timestamp = event.timestamp.toDate  event.timestamp.toDate() : new Date(event.timestamp);
+                    const timestamp = event.timestamp.toDate ? event.timestamp.toDate() : new Date(event.timestamp);
                     html += `<div class="search-result-item" onclick="navigateTo('logs'); closeGlobalSearch();">
                         <i class="fas fa-history"></i> ${escapeHtml(event.user_name || 'Desconocido')} - ${timestamp.toLocaleString()}
                     </div>`;
@@ -6689,25 +6689,25 @@
             let html = '';
 
             recent.forEach(event => {
-                const timestamp = event.timestamp.toDate  event.timestamp.toDate() : new Date(event.timestamp);
+                const timestamp = event.timestamp.toDate ? event.timestamp.toDate() : new Date(event.timestamp);
                 const time = timestamp.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'});
                 const isGranted = event.access_granted !== false;
                 const userName = escapeHtml(event.user_name || 'Desconocido');
                 const dept = escapeHtml(event.departamento || '--');
                 
                 html += `
-                    <div style="display: flex; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid ${isGranted  '#10b981' : '#ef4444'};">
+                    <div style="display: flex; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid ${isGranted ? '#10b981' : '#ef4444'};">
                         <div style="width: 60px; text-align: center;">
-                            <div style="font-size: 18px; margin-bottom: 2px;">${isGranted  '' : ''}</div>
+                            <div style="font-size: 18px; margin-bottom: 2px;">${isGranted ? '' : ''}</div>
                             <div style="font-size: 11px; color: rgba(255, 255, 255, 0.5);">${time}</div>
                         </div>
                         <div style="flex: 1; margin-left: 16px;">
                             <div style="font-weight: 600; color: #ffffff; margin-bottom: 2px;">${userName}</div>
-                            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6);">${dept} � Tag: ${event.tag_id  escapeHtml(event.tag_id.slice(-8)) : 'N/A'}</div>
+                            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6);">${dept} � Tag: ${event.tag_id ? escapeHtml(event.tag_id.slice(-8)) : 'N/A'}</div>
                         </div>
                         <div style="text-align: right;">
-                            <span style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${isGranted  'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${isGranted  '#10b981' : '#ef4444'};">
-                                ${isGranted  'Permitido' : 'Denegado'}
+                            <span style="padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: ${isGranted ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${isGranted ? '#10b981' : '#ef4444'};">
+                                ${isGranted ? 'Permitido' : 'Denegado'}
                             </span>
                         </div>
                     </div>
@@ -6756,7 +6756,7 @@
                         console.log('📋 Primeros 3 timestamps:', allEvents.slice(0, 3).map(e => ({
                             id: e.id.slice(-8),
                             ts: e.timestamp,
-                            converted: e.timestamp.toDate  e.timestamp.toDate().toISOString() : 'NO_TODATE'
+                            converted: e.timestamp.toDate ? e.timestamp.toDate().toISOString() : 'NO_TODATE'
                         })));
                     }
                     
@@ -6808,13 +6808,13 @@
                             console.warn(' Evento sin timestamp:', event);
                             timestamp = null;
                         }
-                        const fecha = timestamp  timestamp.toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric'}) : 'N/A';
+                        const fecha = timestamp ? timestamp.toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric'}) : 'N/A';
                         // Agregar milisegundos para diferenciar eventos r�pidos
-                        const hora = timestamp  timestamp.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) + '.' + String(timestamp.getMilliseconds()).padStart(3, '0') : 'N/A';
+                        const hora = timestamp ? timestamp.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) + '.' + String(timestamp.getMilliseconds()).padStart(3, '0') : 'N/A';
                         
                         if (idx < 3) console.log(`📦 Evento ${idx} renderizado: ${fecha} ${hora}`);
                         const tagId = event.tag_id || event.tagId || 'N/A';
-                        const tagShort = tagId !== 'N/A'  escapeHtml(tagId.slice(-8)) : 'N/A';
+                        const tagShort = tagId !== 'N/A' ? escapeHtml(tagId.slice(-8)) : 'N/A';
                         const userName = escapeHtml(event.user_name || event.userName || 'Desconocido');
                         const dept = escapeHtml(event.departamento || event.department || '--');
                         const isGranted = event.access_granted !== false && event.granted !== false;
@@ -6833,7 +6833,7 @@
                             statusColor = '#ef4444';
                         }
                         
-                        const actionButton = isUnknown && !isManual  
+                        const actionButton = (isUnknown && !isManual) ? 
                             `<button class="btn btn-small" onclick="showRegisterTagModal('${escapeHtml(tagId)}')" style="padding: 5px 10px; font-size: 12px; background: #3b82f6;"> Registrar</button>` : 
                             '--';
                         
@@ -6842,7 +6842,7 @@
                                 <td style="color: #475569;">${fecha}</td>
                                 <td style="color: #475569; font-weight: 600;">${hora}</td>
                                 <td style="font-family: 'Courier New', monospace; color: #3b82f6; font-size: 13px;">${tagShort}</td>
-                                <td style="color: ${isUnknown  '#f59e0b' : '#1e293b'}; font-weight: ${isUnknown  '600' : '500'};">${userName}</td>
+                                <td style="color: ${isUnknown ? '#f59e0b' : '#1e293b'}; font-weight: ${isUnknown ? '600' : '500'};">${userName}</td>
                                 <td style="color: #64748b;">${dept}</td>
                                 <td><span style="background: ${statusColor}; color: white; padding: 5px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap;">${statusBadge}</span></td>
                                 <td style="color: #64748b; font-size: 12px;">${escapeHtml(event.access_point_name || event.reader_id || 'N/A')}</td>
@@ -6960,7 +6960,7 @@
             }
             
             tbody.innerHTML = filteredUsers.map(user => {
-                const blockDisplay = user.block  
+                const blockDisplay = user.block ? 
                     `<strong style="color: #2563eb;">Block ${escapeHtml(user.block)}</strong>` : 
                     '<span style="color: #94a3b8;">N/A</span>';
                     
@@ -6971,7 +6971,7 @@
                 }
                 const deptoDisplay = deptoNumber;
                 
-                const vehicleDisplay = user.vehicle && user.vehicle !== 'N/A' && user.vehicle.trim() !== '' 
+                const vehicleDisplay = user.vehicle && user.vehicle !== 'N/A' && user.vehicle.trim() !== '' ? 
                     `<strong style="color: #2563eb;">${escapeHtml(user.vehicle)}</strong>` : 
                     '<span style="color: #94a3b8;">Sin veh�culo</span>';
                 
@@ -6983,7 +6983,7 @@
                     <td>${escapeHtml(user.phone) || 'N/A'}</td>
                     <td style="font-family: 'Courier New', monospace;">${vehicleDisplay}</td>
                     <td style="font-family: 'Courier New', monospace; font-size: 14px;">${(user.tags || []).map(t => escapeHtml(t.slice(-8))).join(', ') || 'Sin tags'}</td>
-                    <td><span style="color: ${user.active  '#22c55e' : '#ef4444'}; font-weight: 600;">${user.active  ' Activo' : ' Inactivo'}</span></td>
+                    <td><span style="color: ${user.active ? '#22c55e' : '#ef4444'}; font-weight: 600;">${user.active ? ' Activo' : ' Inactivo'}</span></td>
                     <td>
                         <button class="btn btn-primary btn-small" onclick="editUser('${escapeHtml(user.id)}')"></button>
                         <button class="btn btn-danger btn-small" onclick="deleteUser('${escapeHtml(user.id)}')"></button>
@@ -7032,7 +7032,7 @@
             
             for (let row of rows) {
                 const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(searchValue)  '' : 'none';
+                row.style.display = text.includes(searchValue) ? '' : 'none';
             }
         }
 
@@ -7111,17 +7111,17 @@
                     row.values = [
                         u.vehicle || '',
                         u.name || '',
-                        (u.block && u.unit)  `Block ${u.block}-${u.unit}` : (u.departamento || ''),
+                        (u.block && u.unit) ? `Block ${u.block}-${u.unit}` : (u.departamento || ''),
                         u.phone || '',
                         (u.tags || []).map(t => t.slice(-8)).join('; '),
-                        u.active  'Activo' : 'Inactivo'
+                        u.active ? 'Activo' : 'Inactivo'
                     ];
                     
                     // Filas con fondo blanco muy transparente para ver el logo
                     row.fill = {
                         type: 'pattern',
                         pattern: 'solid',
-                        fgColor: { argb: index % 2 === 0  'F5FFFFFF' : 'F5F0F9FF' }
+                        fgColor: { argb: index % 2 === 0 ? 'F5FFFFFF' : 'F5F0F9FF' }
                     };
                     
                     // Agregar bordes para mejorar legibilidad
@@ -7197,10 +7197,10 @@
             const data = vehiclesWithData.map(u => [
                 u.vehicle || '',
                 u.name || '',
-                (u.block && u.unit)  `Block ${u.block}-${u.unit}` : (u.departamento || ''),
+                (u.block && u.unit) ? `Block ${u.block}-${u.unit}` : (u.departamento || ''),
                 u.phone || '',
                 (u.tags || []).map(t => t.slice(-8)).join('; '),
-                u.active  'Activo' : 'Inactivo'
+                u.active ? 'Activo' : 'Inactivo'
             ]);
             
             await generatePDFWithLogo(headers, data, 'Veh�culos', currentDate);
@@ -7221,7 +7221,7 @@
             const tbody = document.getElementById('usersTableBody');
             if (!tbody) return;
             tbody.innerHTML = filtered.map(user => {
-                const blockDepto = user.block && user.departamento  
+                const blockDepto = user.block && user.departamento ? 
                     `Block ${user.block}-${user.departamento}` : 
                     (user.departamento || user.unit || 'N/A');
                 
@@ -7232,7 +7232,7 @@
                     <td>${user.phone || 'N/A'}</td>
                     <td style="font-family: 'Courier New', monospace; font-weight: 600;">${user.vehicle || 'N/A'}</td>
                     <td style="font-family: 'Courier New', monospace; font-size: 12px;">${(user.tags || []).map(t => t.slice(-8)).join(', ') || 'Sin tags'}</td>
-                    <td><span style="color: ${user.active  '#22c55e' : '#ef4444'}; font-weight: 600;">${user.active  ' Activo' : ' Inactivo'}</span></td>
+                    <td><span style="color: ${user.active ? '#22c55e' : '#ef4444'}; font-weight: 600;">${user.active ? ' Activo' : ' Inactivo'}</span></td>
                     <td>
                         <button class="btn btn-primary btn-small" onclick="editUser('${user.id}')"></button>
                         <button class="btn btn-danger btn-small" onclick="deleteUser('${user.id}')"></button>
@@ -7301,7 +7301,7 @@
             
             // Obtener tags actuales
             const hiddenInput = document.getElementById('userTags');
-            const currentTags = hiddenInput.value  hiddenInput.value.split(',').map(t => t.trim()) : [];
+            const currentTags = hiddenInput.value ? hiddenInput.value.split(',').map(t => t.trim()) : [];
             
             // Verificar si ya existe en la lista actual
             if (currentTags.includes(tagId)) {
@@ -7346,7 +7346,7 @@
 
         function removeTag(tagId) {
             const hiddenInput = document.getElementById('userTags');
-            let currentTags = hiddenInput.value  hiddenInput.value.split(',').map(t => t.trim()) : [];
+            let currentTags = hiddenInput.value ? hiddenInput.value.split(',').map(t => t.trim()) : [];
             
             // Remover tag
             currentTags = currentTags.filter(t => t !== tagId);
@@ -7714,7 +7714,7 @@
                         timestamp: firebase.firestore.Timestamp.fromDate(eventTime), //  FIRESTORE TIMESTAMP
                         client_id: 'condominio-neos',
                         source: 'testing_script',
-                        status: randomTag.granted  'whitelist' : 'not_registered'
+                        status: randomTag.granted ? 'whitelist' : 'not_registered'
                     };
 
                     await db.collection('rfid_tags').add(eventData);
@@ -7915,7 +7915,7 @@
             }
             
             // CORRECCI�N: Tags son OPCIONALES
-            const tags = tagsStr  tagsStr.split(',').map(t => t.trim()).filter(t => t && t.length > 0) : [];
+            const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(t => t && t.length > 0) : [];
             
             // Validar formato solo si hay tags
             if (tags.length > 0) {
@@ -8100,18 +8100,18 @@
                     const row = worksheet.getRow(6 + index);
                     row.values = [
                         u.name || '',
-                        (u.block && u.unit)  `Block ${u.block}-${u.unit}` : (u.departamento || ''),
+                        (u.block && u.unit) ? `Block ${u.block}-${u.unit}` : (u.departamento || ''),
                         u.phone || '',
                         u.vehicle || '',
                         (u.tags || []).map(t => t.slice(-8)).join('; '),
-                        u.active  'Activo' : 'Inactivo'
+                        u.active ? 'Activo' : 'Inactivo'
                     ];
                     
                     // Filas con fondo blanco muy transparente para ver el logo
                     row.fill = {
                         type: 'pattern',
                         pattern: 'solid',
-                        fgColor: { argb: index % 2 === 0  'F5FFFFFF' : 'F5F0F9FF' }
+                        fgColor: { argb: index % 2 === 0 ? 'F5FFFFFF' : 'F5F0F9FF' }
                     };
                     
                     // Agregar bordes para mejorar legibilidad
@@ -8185,11 +8185,11 @@
             const headers = ['Nombre', 'Block-Departamento', 'Tel�fono', 'Veh�culo', 'Tags RFID', 'Estado'];
             const data = users.map(u => [
                 u.name || '',
-                (u.block && u.unit)  `Block ${u.block}-${u.unit}` : (u.departamento || ''),
+                (u.block && u.unit) ? `Block ${u.block}-${u.unit}` : (u.departamento || ''),
                 u.phone || '',
                 u.vehicle || '',
                 (u.tags || []).map(t => t.slice(-8)).join('; '),
-                u.active  'Activo' : 'Inactivo'
+                u.active ? 'Activo' : 'Inactivo'
             ]);
             
             await generatePDFWithLogo(headers, data, 'Residentes', currentDate);
@@ -8235,7 +8235,7 @@
             const tags = container.querySelectorAll('[data-tag-item]');
             tags.forEach(tag => {
                 const text = tag.textContent.toLowerCase();
-                tag.style.display = text.includes(searchValue)  'flex' : 'none';
+                tag.style.display = text.includes(searchValue) ? 'flex' : 'none';
             });
         }
 
@@ -8247,7 +8247,7 @@
             const tags = container.querySelectorAll('[data-tag-item]');
             tags.forEach(tag => {
                 const text = tag.textContent.toLowerCase();
-                tag.style.display = text.includes(searchValue)  'flex' : 'none';
+                tag.style.display = text.includes(searchValue) ? 'flex' : 'none';
             });
         }
 
@@ -8259,7 +8259,7 @@
             const tags = container.querySelectorAll('[data-tag-item]');
             tags.forEach(tag => {
                 const text = tag.textContent.toLowerCase();
-                tag.style.display = text.includes(searchValue)  'flex' : 'none';
+                tag.style.display = text.includes(searchValue) ? 'flex' : 'none';
             });
         }
 
@@ -8686,7 +8686,7 @@
                     }
                     
                     if (isOffline) {
-                        const timeSince = lastSeen === 'Nunca'  'Sin actividad registrada' : `�ltima conexi�n: ${formatTimeAgo(lastSeen)}`;
+                        const timeSince = lastSeen === 'Nunca' ? 'Sin actividad registrada' : `Última conexión: ${formatTimeAgo(lastSeen)}`;
                         alerts.push({
                             type: 'offline',
                             severity: 'high',
@@ -8796,9 +8796,9 @@
             const days = Math.floor(diff / 86400000);
             
             if (minutes < 1) return 'Hace menos de 1 minuto';
-            if (minutes < 60) return `Hace ${minutes} minuto${minutes > 1  's' : ''}`;
-            if (hours < 24) return `Hace ${hours} hora${hours > 1  's' : ''}`;
-            return `Hace ${days} día${days > 1  's' : ''}`;
+            if (minutes < 60) return `Hace ${minutes} minuto${minutes > 1 ? 's' : ''}`;
+            if (hours < 24) return `Hace ${hours} hora${hours > 1 ? 's' : ''}`;
+            return `Hace ${days} día${days > 1 ? 's' : ''}`;
         }
 
         async function loadLogs() {
@@ -8808,8 +8808,8 @@
             
             try {
                 const dateInput = document.getElementById('logDate');
-                const dateStr = dateInput  dateInput.value : '';
-                const date = dateStr  new Date(dateStr) : new Date();
+                const dateStr = dateInput ? dateInput.value : '';
+                const date = dateStr ? new Date(dateStr) : new Date();
                 date.setHours(0, 0, 0, 0);
                 
                 const endDate = new Date(date);
@@ -8851,8 +8851,8 @@
                 
                 // Ordenar por timestamp descendente
                 logs.sort((a, b) => {
-                    const timeA = a.timestamp  (a.timestamp.toDate  a.timestamp.toDate() : new Date(a.timestamp)) : new Date(0);
-                    const timeB = b.timestamp  (b.timestamp.toDate  b.timestamp.toDate() : new Date(b.timestamp)) : new Date(0);
+                    const timeA = a.timestamp ? (a.timestamp.toDate ? a.timestamp.toDate() : new Date(a.timestamp)) : new Date(0);
+                    const timeB = b.timestamp ? (b.timestamp.toDate ? b.timestamp.toDate() : new Date(b.timestamp)) : new Date(0);
                     return timeB - timeA;
                 });
                 
@@ -8893,10 +8893,10 @@
                     eventIcon = '';
                 }
                 
-                const tagShort = log.tag_id  log.tag_id.slice(-8) : (log.id && log.source === 'rfid_tags'  log.id.slice(-8) : 'N/A');
+                const tagShort = log.tag_id ? log.tag_id.slice(-8) : (log.id && log.source === 'rfid_tags' ? log.id.slice(-8) : 'N/A');
                 const isSuccess = log.access_granted !== false && log.granted !== false && log.success !== false;
-                const statusColor = isSuccess  'var(--success-color)' : 'var(--danger-color)';
-                const statusText = isSuccess  ' OK' : ' Denegado';
+                const statusColor = isSuccess ? 'var(--success-color)' : 'var(--danger-color)';
+                const statusText = isSuccess ? ' OK' : ' Denegado';
                 const userName = log.user_name || log.userName || log.user || 'Desconocido';
                 const userDept = log.departamento || log.department || 'N/A';
                 
@@ -8910,7 +8910,7 @@
                 }
                 
                 const comment = log.guard_comment || log.comment || '';
-                const commentDisplay = comment  `<small style="color: #3498db;">${comment}</small>` : `<button onclick="addGuardComment(${index})" class="btn-primary" style="padding: 4px 8px; font-size: 0.75em;"></button>`;
+                const commentDisplay = comment ? `<small style="color: #3498db;">${comment}</small>` : `<button onclick="addGuardComment(${index})" class="btn-primary" style="padding: 4px 8px; font-size: 0.75em;"></button>`;
                 
                 return `
                     <tr>
@@ -8922,9 +8922,9 @@
                         <td><small>${readerInfo}</small></td>
                         <td><span style="color: ${statusColor}; font-weight: bold;">${statusText}</span></td>
                         <td style="position: relative;">
-                            ${comment  `<small style="color: #3498db;">${comment}</small>` : ''}
+                            ${comment ? `<small style="color: #3498db;">${comment}</small>` : ''}
                             <button onclick="addGuardComment(${index})" class="btn-primary" style="padding: 4px 8px; font-size: 0.75em; margin-left: 5px;">
-                                ${comment  '' : ''}
+                                ${comment ? '' : ''}
                             </button>
                         </td>
                     </tr>
@@ -8942,7 +8942,7 @@
             modal.innerHTML = `
                 <div class="modal-content" style="max-width: 600px;">
                     <div class="modal-header">
-                        <h2> ${existingComment  'Editar' : 'Agregar'} Comentario</h2>
+                        <h2> ${existingComment ? 'Editar' : 'Agregar'} Comentario</h2>
                         <button class="close-btn" onclick="this.closest('.modal').remove()">�</button>
                     </div>
                     <div class="modal-body">
@@ -8977,7 +8977,7 @@
                     </div>
                     <div class="modal-footer">
                         <button onclick="this.closest('.modal').remove()" class="btn-secondary">Cancelar</button>
-                        ${existingComment  `<button onclick="deleteGuardComment(${logIndex})" class="btn-danger"> Eliminar</button>` : ''}
+                        ${existingComment ? `<button onclick="deleteGuardComment(${logIndex})" class="btn-danger"> Eliminar</button>` : ''}
                         <button onclick="saveGuardComment(${logIndex})" class="btn-primary"> Guardar</button>
                     </div>
                 </div>
@@ -9132,9 +9132,9 @@
                     const row = worksheet.getRow(6 + index);
                     row.values = [
                         formatTimestamp(event.timestamp),
-                        event.tag_id  event.tag_id.slice(-8) : 'N/A',
+                        event.tag_id ? event.tag_id.slice(-8) : 'N/A',
                         event.user_name || 'Desconocido',
-                        event.status === 'granted'  'Permitido' : 'Denegado',
+                        event.status === 'granted' ? 'Permitido' : 'Denegado',
                         event.access_point_name || event.reader_id || 'N/A',
                         event.departamento || 'N/A'
                     ];
@@ -9143,7 +9143,7 @@
                     row.fill = {
                         type: 'pattern',
                         pattern: 'solid',
-                        fgColor: { argb: index % 2 === 0  'F5FFFFFF' : 'F5F0F9FF' }
+                        fgColor: { argb: index % 2 === 0 ? 'F5FFFFFF' : 'F5F0F9FF' }
                     };
                     
                     // Agregar bordes para mejorar legibilidad
@@ -9217,9 +9217,9 @@
             const headers = ['Fecha/Hora', 'Tag ID', 'Usuario', 'Estado', 'Punto de Acceso', 'Departamento'];
             const data = accessEvents.slice(0, 100).map(event => [
                 formatTimestamp(event.timestamp),
-                event.tag_id  event.tag_id.slice(-8) : 'N/A',
+                event.tag_id ? event.tag_id.slice(-8) : 'N/A',
                 event.user_name || 'Desconocido',
-                event.status === 'granted'  'Permitido' : 'Denegado',
+                event.status === 'granted' ? 'Permitido' : 'Denegado',
                 event.access_point_name || event.reader_id || 'N/A',
                 event.departamento || 'N/A'
             ]);
@@ -9277,8 +9277,8 @@
             
             doc.setFontSize(14);
             doc.setTextColor(0, 0, 0);
-            const subtitle = type === 'Residentes'  'LISTADO DE RESIDENTES REGISTRADOS' : 
-                            type === 'Veh�culos'  'LISTADO DE VEH�CULOS REGISTRADOS' : 
+            const subtitle = type === 'Residentes' ? 'LISTADO DE RESIDENTES REGISTRADOS' : 
+                            type === 'Vehículos' ? 'LISTADO DE VEHÍCULOS REGISTRADOS' : 
                             'REGISTRO DE EVENTOS DE ACCESO';
             doc.text(subtitle, pageWidth / 2, 23, { align: 'center' });
             
@@ -9287,9 +9287,9 @@
             doc.text(`Fecha de generaci�n: ${currentDate}`, pageWidth / 2, 30, { align: 'center' });
             
             // Tabla - anchos más grandes para mejor visualización centrada
-            const columnWidths = type === 'Residentes'  
+            const columnWidths = type === 'Residentes' ? 
                 { 0: { cellWidth: 60 }, 1: { cellWidth: 42 }, 2: { cellWidth: 36 }, 3: { cellWidth: 30 }, 4: { cellWidth: 72 }, 5: { cellWidth: 24 } } :
-                type === 'Veh�culos' 
+                type === 'Vehículos' ? 
                 { 0: { cellWidth: 30 }, 1: { cellWidth: 60 }, 2: { cellWidth: 42 }, 3: { cellWidth: 36 }, 4: { cellWidth: 72 }, 5: { cellWidth: 24 } } :
                 { 0: { cellWidth: 42 }, 1: { cellWidth: 30 }, 2: { cellWidth: 60 }, 3: { cellWidth: 30 }, 4: { cellWidth: 60 }, 5: { cellWidth: 42 } };
             
@@ -9334,15 +9334,15 @@
             
             doc.setFontSize(7);
             doc.setTextColor(80, 80, 80);
-            const legalText = isEvents  [
-                'Este documento contiene información confidencial y de uso exclusivo para fines de auditor�a de acceso.',
-                'La divulgaci�n, reproducci�n o uso no autorizado de este documento está� prohibido por ley.',
-                'Datos protegidos seg�n Ley N� 19.628 sobre Protecci�n de Datos Personales de Chile.',
+            const legalText = isEvents ? [
+                'Este documento contiene información confidencial y de uso exclusivo para fines de auditoría de acceso.',
+                'La divulgación, reproducción o uso no autorizado de este documento está prohibido por ley.',
+                'Datos protegidos según Ley Nº 19.628 sobre Protección de Datos Personales de Chile.',
                 `Total de eventos: ${accessEvents.length} (mostrando primeros 100) | Generado por: ${currentUser || 'Sistema'}`
             ] : [
                 'Este documento contiene información confidencial y de uso exclusivo para fines de control de acceso.',
-                'La divulgaci�n, reproducci�n o uso no autorizado de este documento está� prohibido por ley.',
-                'Datos protegidos seg�n Ley N� 19.628 sobre Protecci�n de Datos Personales de Chile.',
+                'La divulgación, reproducción o uso no autorizado de este documento está prohibido por ley.',
+                'Datos protegidos según Ley Nº 19.628 sobre Protección de Datos Personales de Chile.',
                 `Total de registros: ${data.length} | Generado por: ${currentUser || 'Sistema'} | Página 1 de 1`
             ];
             
@@ -9350,8 +9350,8 @@
                 doc.text(line, 14, finalY + 15 + (i * 4));
             });
             
-            const fileName = type === 'Residentes'  'NeosTech_Residentes' : 
-                           type === 'Veh�culos'  'NeosTech_Vehiculos' : 'NeosTech_Eventos';
+            const fileName = type === 'Residentes' ? 'NeosTech_Residentes' : 
+                           type === 'Vehículos' ? 'NeosTech_Vehiculos' : 'NeosTech_Eventos';
             doc.save(`${fileName}_${new Date().toISOString().slice(0,10)}.pdf`);
         }
 
@@ -9406,7 +9406,7 @@
                     logsSnapshot.forEach(doc => {
                         const data = doc.data();
                         // Filtrar por fecha manualmente
-                        const timestamp = data.timestamp.toDate  data.timestamp.toDate() : new Date(data.timestamp);
+                        const timestamp = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
                         if (timestamp >= sevenDaysAgo) {
                             logs.push({ id: doc.id, ...data });
                         }
@@ -9423,7 +9423,7 @@
                         
                         tagsSnapshot.forEach(doc => {
                             const data = doc.data();
-                            const timestamp = data.timestamp.toDate  data.timestamp.toDate() : new Date(data.timestamp);
+                            const timestamp = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
                             if (timestamp >= sevenDaysAgo) {
                                 logs.push({ id: doc.id, ...data });
                             }
@@ -9443,8 +9443,8 @@
                 
                 // Ordenar logs por timestamp (del más reciente al más antiguo)
                 logs.sort((a, b) => {
-                    const timeA = a.timestamp.toDate  a.timestamp.toDate() : new Date(a.timestamp);
-                    const timeB = b.timestamp.toDate  b.timestamp.toDate() : new Date(b.timestamp);
+                    const timeA = a.timestamp.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+                    const timeB = b.timestamp.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
                     return timeB - timeA;
                 });
                 
@@ -9475,7 +9475,7 @@
                 logs.forEach(log => {
                     if (log.timestamp) {
                         try {
-                            const date = log.timestamp.toDate  log.timestamp.toDate() : new Date(log.timestamp);
+                            const date = log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
                             const hour = date.getHours();
                             if (hour >= 0 && hour < 24) {
                                 hourlyData[hour]++;
@@ -9554,7 +9554,7 @@
                 logs.forEach(log => {
                     if (log.timestamp) {
                         try {
-                            const date = log.timestamp.toDate  log.timestamp.toDate() : new Date(log.timestamp);
+                            const date = log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
                             const day = date.getDay();
                             if (day >= 0 && day < 7) {
                                 weeklyData[day]++;
@@ -10019,7 +10019,7 @@
                         }
                         
                         // Si el valor es undefined o null, usar el valor por defecto
-                        const finalValue = (value !== undefined && value !== null)  String(value) : String(defaultValue);
+                        const finalValue = (value !== undefined && value !== null) ? String(value) : String(defaultValue);
                         
                         if (el.tagName === 'SELECT') {
                             // Para selects, intentar seleccionar la opci�n que coincida
@@ -10057,12 +10057,12 @@
                     console.log(` Power: ${power} dBm`);
                     
                     // WorkMode (modo de trabajo: 0=Respuesta, 1=Activo)
-                    const workMode = config.WorkMode !== undefined  config.WorkMode : (config.workMode !== undefined  config.workMode : 0);
+                    const workMode = config.WorkMode !== undefined ? config.WorkMode : (config.workMode !== undefined ? config.workMode : 0);
                     setValue('readerWorkMode', workMode, '0');
-                    console.log(` WorkMode: ${workMode} (${workMode === 0  'Respuesta' : 'Activo'})`);
+                    console.log(` WorkMode: ${workMode} (${workMode === 0 ? 'Respuesta' : 'Activo'})`);
                     
                     // Session (sesión EPC)
-                    const session = config.Session !== undefined  config.Session : (config.session !== undefined  config.session : 0);
+                    const session = config.Session !== undefined ? config.Session : (config.session !== undefined ? config.session : 0);
                     setValue('readerSession', session, '0');
                     console.log(` Session: ${session}`);
                     
@@ -10074,13 +10074,13 @@
                     // Beep (sonido al leer)
                     const beepEl = document.getElementById('readerBeep');
                     if (beepEl) {
-                        const beepValue = config.Beep !== undefined  config.Beep : (config.beep !== undefined  config.beep : 1);
+                        const beepValue = config.Beep !== undefined ? config.Beep : (config.beep !== undefined ? config.beep : 1);
                         beepEl.checked = beepValue === 1 || beepValue === true;
                         console.log(` Beep: ${beepEl.checked}`);
                     }
                     
                     // RelayMode (modo de rel�)
-                    const relayMode = config.RelayMode !== undefined  config.RelayMode : (config.relayMode !== undefined  config.relayMode : 0);
+                    const relayMode = config.RelayMode !== undefined ? config.RelayMode : (config.relayMode !== undefined ? config.relayMode : 0);
                     setValue('readerRelayMode', relayMode, '0');
                     console.log(` RelayMode: ${relayMode}`);
                     
@@ -10090,7 +10090,7 @@
                     console.log(` RelayDelay: ${relayDelay} ms`);
                     
                     // WiegandMode (modo Wiegand)
-                    const wiegandMode = config.WiegandMode !== undefined  config.WiegandMode : (config.wiegandMode !== undefined  config.wiegandMode : 0);
+                    const wiegandMode = config.WiegandMode !== undefined ? config.WiegandMode : (config.wiegandMode !== undefined ? config.wiegandMode : 0);
                     setValue('readerWiegandMode', wiegandMode, '0');
                     console.log(` WiegandMode: ${wiegandMode}`);
                     
@@ -10392,23 +10392,23 @@
                     minute: '2-digit',
                     second: '2-digit'
                 });
-                const statusIcon = isGranted  
+                const statusIcon = isGranted ? 
                     '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : 
                     '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-                const statusText = isGranted  'PERMITIDO' : 'DENEGADO';
-                const statusClass = isGranted  'granted' : 'denied';
+                const statusText = isGranted ? 'PERMITIDO' : 'DENEGADO';
+                const statusClass = isGranted ? 'granted' : 'denied';
                 const accessPointName = tagData.access_point_name || tagData.accessPointName || tagData.location || tagData.reader_id || tagData.reader || tagData.access_point || tagData.lector || 'Punto de Acceso';
-                const registerButton = (isUnknown && !tagAlreadyRegistered)  
+                const registerButton = (isUnknown && !tagAlreadyRegistered) ? 
                     `<button class="btn btn-sm btn-primary register-tag-btn" data-tag-id="${tagId}" data-access-point="${accessPointName}" 
                              style="padding: 4px 12px; font-size: 11px; margin-left: 10px;">
                          Registrar Usuario
-                    </button>` : (tagAlreadyRegistered  
+                    </button>` : (tagAlreadyRegistered ? 
                     `<span style="color: #10b981; font-size: 11px; margin-left: 10px; font-weight: 600;"> Ya registrado</span>` : '');
                 
                 const tagElement = document.createElement('div');
                 tagElement.className = 'live-tag-item';
                 tagElement.innerHTML = `
-                    <div class="live-tag-header ${statusClass}" style="background: ${isGranted  'linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95))' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95))'}; padding: 10px 12px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px);">
+                    <div class="live-tag-header ${statusClass}" style="background: ${isGranted ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95))' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95))'}; padding: 10px 12px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px);">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <div style="background: rgba(255,255,255,0.2); width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">${statusIcon.replace('width="28" height="28"', 'width="18" height="18"')}</div>
                             <div>
@@ -10425,11 +10425,11 @@
                             <div style="background: rgba(255,255,255,0.05); padding: 6px 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
                                 <div style="flex: 1;">
                                     <div style="font-size: 10px; color: #94a3b8; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;"> Usuario</div>
-                                    <div style="color: ${isUnknown  '#fbbf24' : '#86efac'}; font-weight: 700; font-size: 13px;">${isUnknown  ' Sin Asignar' : userName}</div>
+                                    <div style="color: ${isUnknown ? '#fbbf24' : '#86efac'}; font-weight: 700; font-size: 13px;">${isUnknown ? ' Sin Asignar' : userName}</div>
                                 </div>
                                 <div style="text-align: right; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 8px; margin-left: 8px;">
                                     <div style="font-size: 10px; color: #94a3b8; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;"> Depto</div>
-                                    <div style="color: ${department  '#e2e8f0' : '#94a3b8'}; font-weight: 700; font-size: 13px;">${department || 'N/A'}</div>
+                                    <div style="color: ${department ? '#e2e8f0' : '#94a3b8'}; font-weight: 700; font-size: 13px;">${department || 'N/A'}</div>
                                 </div>
                             </div>
                             <div style="background: rgba(255,255,255,0.05); padding: 6px 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08);">
@@ -10494,10 +10494,10 @@
             
             // Notificación con tag ID (solo si hay usuario logueado)
             if (currentUser) {
-                const notifMessage = isUnknown  
+                const notifMessage = isUnknown ? 
                     `🏷️ Tag desconocido: ${tagId.slice(-8)}` : 
                     ` Tag detectado: ${userName}`;
-                showNotification(notifMessage, isGranted  'success' : 'warning');
+                showNotification(notifMessage, isGranted ? 'success' : 'warning');
             }
         }
 
@@ -10695,7 +10695,7 @@
         async function saveTagAssignment() {
             const modal = document.getElementById('registerTagModal');
             const tagId = modal.getAttribute('data-tag-id');
-            const activeTab = document.getElementById('tabAssignUser').classList.contains('active')  'assign' : 'new';
+            const activeTab = document.getElementById('tabAssignUser').classList.contains('active') ? 'assign' : 'new';
             
             if (activeTab === 'assign') {
                 // Asignar a usuario existente
@@ -11000,8 +11000,8 @@
                 
                 // Ordenar por timestamp descendente (más recientes primero)
                 events.sort((a, b) => {
-                    const timeA = a.timestamp.toDate.() || a.timestamp || new Date(0);
-                    const timeB = b.timestamp.toDate.() || b.timestamp || new Date(0);
+                    const timeA = a.timestamp.toDate() || a.timestamp || new Date(0);
+                    const timeB = b.timestamp.toDate() || b.timestamp || new Date(0);
                     return timeB - timeA;
                 });
                 
@@ -11013,7 +11013,7 @@
                 
                 // Agregar cada evento al contenedor
                 recentEvents.forEach(event => {
-                    const timestamp = event.timestamp.toDate.() || event.timestamp || new Date();
+                    const timestamp = event.timestamp.toDate() || event.timestamp || new Date();
                     const timeStr = timestamp.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
                     const doorName = event.access_point_name || event.location || 'Desconocido';
                     const userName = event.user_name || 'Manual';
@@ -11099,7 +11099,7 @@
         // FUNCI�N DE FILTRADO
         // ============================================
         function filterTags(filter, containerType) {
-            const containerId = containerType === 'Control'  'liveTagsContainerControl' : 'liveTagsContainer';
+            const containerId = containerType === 'Control' ? 'liveTagsContainerControl' : 'liveTagsContainer';
             const container = document.getElementById(containerId);
             
             if (!container) {
@@ -11153,9 +11153,9 @@
                     if (filter === 'all') {
                         item.style.display = 'block';
                     } else if (filter === 'granted') {
-                        item.style.display = header.classList.contains('granted')  'block' : 'none';
+                        item.style.display = header.classList.contains('granted') ? 'block' : 'none';
                     } else if (filter === 'denied') {
-                        item.style.display = header.classList.contains('denied')  'block' : 'none';
+                        item.style.display = header.classList.contains('denied') ? 'block' : 'none';
                     }
                 });
                 console.log(`🔍 Filtro aplicado: ${filter} en ${containerType}`);
@@ -11256,10 +11256,10 @@
                         <div style="color: #94a3b8; text-align: center; padding: 60px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
                             <div style="font-size: 48px; margin-bottom: 20px;">📡</div>
                             <div style="font-size: 20px; margin-bottom: 10px; color: #64748b; font-weight: 600;">
-                                ${filteredTags.length === 0  'Esperando lectura de tags del lector RFID...' : 'No hay tags en esta página'}
+                                ${filteredTags.length === 0 ? 'Esperando lectura de tags del lector RFID...' : 'No hay tags en esta página'}
                             </div>
                             <small style="font-size: 14px; display: block; color: #94a3b8;">
-                                ${filteredTags.length === 0  'Los tags detectados aparecerán aquí� automáticamente cuando el lector está� activo' : 'Navega a otra página para ver más tags'}
+                                ${filteredTags.length === 0 ? 'Los tags detectados aparecerán aquí� automáticamente cuando el lector está� activo' : 'Navega a otra página para ver más tags'}
                             </small>
                         </div>
                     `;
@@ -11297,11 +11297,11 @@
             const isGranted = tagObj.isGranted;
             const accessPointName = tagData.access_point_name || tagData.accessPointName || tagData.location || tagData.reader_id || tagData.reader || tagData.access_point || tagData.lector || 'Punto de Acceso';
             
-            const statusIcon = isGranted  
+            const statusIcon = isGranted ? 
                 '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : 
                 '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-            const statusText = isGranted  'PERMITIDO' : 'DENEGADO';
-            const statusClass = isGranted  'granted' : 'denied';
+            const statusText = isGranted ? 'PERMITIDO' : 'DENEGADO';
+            const statusClass = isGranted ? 'granted' : 'denied';
             
             const timestamp = tagObj.timestamp;
             const timeStr = timestamp.toLocaleString('es-ES', {
@@ -11312,17 +11312,17 @@
                 second: '2-digit'
             });
             
-            const registerButton = (isUnknown && !tagObj.tagAlreadyRegistered)  
+            const registerButton = (isUnknown && !tagObj.tagAlreadyRegistered) ? 
                 `<button class="btn btn-sm btn-primary register-tag-btn" data-tag-id="${tagId}" data-access-point="${accessPointName}" 
                          style="padding: 4px 12px; font-size: 11px; margin-left: 10px;">
                      Registrar Usuario
-                </button>` : (tagObj.tagAlreadyRegistered  
+                </button>` : (tagObj.tagAlreadyRegistered ? 
                 `<span style="color: #10b981; font-size: 11px; margin-left: 10px; font-weight: 600;"> Ya registrado</span>` : '');
             
             const tagElement = document.createElement('div');
             tagElement.className = 'live-tag-item';
             tagElement.innerHTML = `
-                <div class="live-tag-header ${statusClass}" style="background: ${isGranted  'linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95))' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95))'}; padding: 10px 12px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px);">
+                <div class="live-tag-header ${statusClass}" style="background: ${isGranted ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95))' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95))'}; padding: 10px 12px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px);">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <div style="background: rgba(255,255,255,0.2); width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">${statusIcon.replace('width="28" height="28"', 'width="18" height="18"')}</div>
                         <div>
@@ -11339,11 +11339,11 @@
                         <div style="background: rgba(255,255,255,0.05); padding: 6px 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
                             <div style="flex: 1;">
                                 <div style="font-size: 10px; color: #94a3b8; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;"> Usuario</div>
-                                <div style="color: ${isUnknown  '#fbbf24' : '#86efac'}; font-weight: 700; font-size: 13px;">${isUnknown  ' Sin Asignar' : userName}</div>
+                                <div style="color: ${isUnknown ? '#fbbf24' : '#86efac'}; font-weight: 700; font-size: 13px;">${isUnknown ? ' Sin Asignar' : userName}</div>
                             </div>
                             <div style="text-align: right; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 8px; margin-left: 8px;">
                                 <div style="font-size: 10px; color: #94a3b8; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;"> Depto</div>
-                                <div style="color: ${department  '#e2e8f0' : '#94a3b8'}; font-weight: 700; font-size: 13px;">${department || 'N/A'}</div>
+                                <div style="color: ${department ? '#e2e8f0' : '#94a3b8'}; font-weight: 700; font-size: 13px;">${department || 'N/A'}</div>
                             </div>
                         </div>
                         <div style="background: rgba(255,255,255,0.05); padding: 6px 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08);">
@@ -11575,7 +11575,7 @@
                 document.getElementById('lectoraReadTime').value = config.ReadTime || 0;
                 
                 // Metadata
-                const lastSync = config.LastSync  new Date(config.LastSync).toLocaleString('es-CL') : 'Nunca';
+                const lastSync = config.LastSync ? new Date(config.LastSync).toLocaleString('es-CL') : 'Nunca';
                 document.getElementById('lectoraLastSync').textContent = lastSync;
                 document.getElementById('lectoraSource').textContent = config.Source || 'manual';
                 
@@ -12007,7 +12007,7 @@ Se actualizar� información en breve.`,
                     const isCritical = document.querySelector('input[name="severity"]:checked').value === 'CRITICAL';
                     const warning = document.getElementById('doubleAuthWarning');
                     if (warning) {
-                        warning.style.display = isCritical  'block' : 'none';
+                        warning.style.display = isCritical ? 'block' : 'none';
                     }
                 });
             });
@@ -12131,22 +12131,22 @@ Se actualizar� información en breve.`,
             container.innerHTML = '';
             
             activeAlerts.forEach(alert => {
-                const severityClass = alert.severity  alert.severity.toLowerCase() : 'medium';
+                const severityClass = alert.severity ? alert.severity.toLowerCase() : 'medium';
                 const typeIcon = getAlertIcon(alert.type);
-                const confirmationPercent = (alert.total_recipients || 0) > 0 
+                const confirmationPercent = (alert.total_recipients || 0) > 0 ?
                      Math.round(((alert.confirmed_safe_count || 0) / alert.total_recipients) * 100)
                     : 0;
                 
-                const issuedTime = alert.issued_at  
+                const issuedTime = alert.issued_at ?
                     new Date(alert.issued_at.seconds * 1000).toLocaleTimeString('es-CL', {hour: '2-digit', minute: '2-digit'}) 
                     : 'Reci�n';
                 
                 // Formatear bloques
                 const blocksDisplay = alert.blocks_display || alert.building_zone || 'Sin especificar';
                 const affectedBlocks = alert.affected_blocks || [];
-                const blocksDetail = affectedBlocks.length > 0  
-                    (affectedBlocks.length === 19  'Todos los bloques (1-19)' : 
-                     affectedBlocks.length > 8  `Bloques: ${affectedBlocks.slice(0, 8).join(', ')}...` :
+                const blocksDetail = affectedBlocks.length > 0 ? 
+                    (affectedBlocks.length === 19 ? 'Todos los bloques (1-19)' : 
+                     affectedBlocks.length > 8 ? `Bloques: ${affectedBlocks.slice(0, 8).join(', ')}...` :
                      `Bloques: ${affectedBlocks.join(', ')}`) : blocksDisplay;
                 
                 const typeDisplay = {
@@ -12161,7 +12161,7 @@ Se actualizar� información en breve.`,
                 }[alert.type] || alert.type;
                 
                 const cardHTML = `
-                    <div class="alert-card ${severityClass}" style="background: #FFFFFF; border-left: 5px solid ${severityClass === 'critical'  '#DC2626' : '#F59E0B'}; padding: 24px; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
+                    <div class="alert-card ${severityClass}" style="background: #FFFFFF; border-left: 5px solid ${severityClass === 'critical' ? '#DC2626' : '#F59E0B'}; padding: 24px; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
                             <div style="flex: 1;">
                                 <span class="alert-type-badge ${alert.type.toLowerCase().replace('_', '-')}" style="display: inline-block; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; margin-bottom: 12px; letter-spacing: 0.5px;">
@@ -12188,7 +12188,7 @@ Se actualizar� información en breve.`,
                         </div>
                         
                         <div style="color: #374151; line-height: 1.7; margin-bottom: 16px; padding: 18px; background: linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%); border-radius: 10px; border-left: 3px solid #E5E7EB; font-size: 14px;">
-                            ${(alert.message || 'Sin mensaje').substring(0, 250)}${(alert.message || '').length > 250  '...' : ''}
+                            ${(alert.message || 'Sin mensaje').substring(0, 250)}${(alert.message || '').length > 250 ? '...' : ''}
                         </div>
                         
                         <div style="margin: 16px 0;">
@@ -12294,7 +12294,7 @@ Se actualizar� información en breve.`,
                             }
                             // Ocultar error si hay al menos un bloque seleccionado
                             const anyChecked = document.querySelectorAll('.block-item:checked').length > 0;
-                            document.getElementById('blocksError').style.display = anyChecked  'none' : 'none';
+                            document.getElementById('blocksError').style.display = anyChecked ? 'none' : 'none';
                         });
                     }
                 }
@@ -12399,10 +12399,10 @@ Se actualizar� información en breve.`,
                 if (!type || !severity || !title || !message) {
                     console.warn('[Alertas]  Campos requeridos faltantes');
                     alert('Por favor complete todos los campos requeridos:\n\n' + 
-                          (!type  '- Tipo de Alerta\n' : '') +
-                          (!severity  '- Severidad\n' : '') +
-                          (!title  '- T�tulo\n' : '') +
-                          (!message  '- Mensaje\n' : ''));
+                          (!type ? '- Tipo de Alerta\n' : '') +
+                          (!severity ? '- Severidad\n' : '') +
+                          (!title ? '- T�tulo\n' : '') +
+                          (!message ? '- Mensaje\n' : ''));
                     return;
                 }
                 
@@ -12411,16 +12411,16 @@ Se actualizar� información en breve.`,
                 
                 // Mostrar loading en el botón
                 const emitButton = event.target || document.querySelector('[onclick*="emitAlert"]');
-                const originalButtonText = emitButton  emitButton.innerHTML : '';
+                const originalButtonText = emitButton ? emitButton.innerHTML : '';
                 if (emitButton) {
                     emitButton.disabled = true;
                     emitButton.innerHTML = ' Emitiendo alerta...';
                 }
                 
                 // Formatear bloques para mostrar
-                const blocksDisplay = affectedBlocks.length === 19  'Todos los bloques' : 
-                                     affectedBlocks.length > 5  `Bloques ${affectedBlocks.slice(0, 3).join(', ')} y ${affectedBlocks.length - 3} más` :
-                                     `Bloque${affectedBlocks.length > 1  's' : ''} ${affectedBlocks.join(', ')}`;
+                const blocksDisplay = affectedBlocks.length === 19 ? 'Todos los bloques' : 
+                                     affectedBlocks.length > 5 ? `Bloques ${affectedBlocks.slice(0, 3).join(', ')} y ${affectedBlocks.length - 3} más` :
+                                     `Bloque${affectedBlocks.length > 1 ? 's' : ''} ${affectedBlocks.join(', ')}`;
                 
                 // Preparar datos
                 const alertData = {
@@ -12486,7 +12486,7 @@ Se actualizar� información en breve.`,
                         name: data.full_name,
                         apartment: data.apartment,
                         has_token: !!data.fcm_token,
-                        token_preview: data.fcm_token  data.fcm_token.substring(0, 20) + '...' : 'NO TOKEN',
+                        token_preview: data.fcm_token ? data.fcm_token.substring(0, 20) + '...' : 'NO TOKEN',
                         notifications_enabled: data.notifications_enabled
                     });
                 });
@@ -12770,9 +12770,9 @@ Se actualizar� información en breve.`,
                     console.log('  - Tel�fono:', data.phone);
                     console.log('  - Tipo dispositivo:', data.device_type);
                     console.log('  - Tiene FCM token:', !!data.fcm_token);
-                    console.log('  - FCM token preview:', data.fcm_token  data.fcm_token.substring(0, 30) + '...' : 'NO TOKEN');
+                    console.log('  - FCM token preview:', data.fcm_token ? data.fcm_token.substring(0, 30) + '...' : 'NO TOKEN');
                     console.log('  - notifications_enabled:', data.notifications_enabled);
-                    console.log('  - Registrado:', data.registered_at  new Date(data.registered_at.seconds * 1000).toLocaleString() : 'N/A');
+                    console.log('  - Registrado:', data.registered_at ? new Date(data.registered_at.seconds * 1000).toLocaleString() : 'N/A');
                     console.log('  -----');
                 });
                 
