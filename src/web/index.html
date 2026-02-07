@@ -4512,40 +4512,56 @@
         // FUNCIONES CR�TICAS - DECLARADAS AL INICIO
         // ============================================
         
+        const notificationThemes = {
+            success: { background: '#28a745', color: '#ffffff', icon: '✔', role: 'status', ariaLive: 'polite' },
+            error: { background: '#dc3545', color: '#ffffff', icon: '⚠', role: 'alert', ariaLive: 'assertive' },
+            warning: { background: '#ffc107', color: '#1f2937', icon: '!', role: 'alert', ariaLive: 'assertive' },
+            info: { background: '#0dcaf0', color: '#0f172a', icon: 'ℹ', role: 'status', ariaLive: 'polite' }
+        };
+
         function showNotification(message, type = 'info') {
-            const oldNotifications = document.querySelectorAll('.notification-toast');
-            oldNotifications.forEach(notif => notif.remove());
-            
-            const colors = {
-                'success': '#27ae60',
-                'error': '#e74c3c',
-                'warning': '#f39c12',
-                'info': '#3498db'
-            };
-            
+            document.querySelectorAll('.notification-toast').forEach(notif => notif.remove());
+
+            const theme = notificationThemes[type] || notificationThemes.info;
             const notification = document.createElement('div');
-            notification.className = 'notification-toast';
+            notification.className = `notification-toast notification-toast--${type}`;
+            notification.setAttribute('role', theme.role);
+            notification.setAttribute('aria-live', theme.ariaLive);
+            notification.setAttribute('aria-atomic', 'true');
             notification.style.cssText = `
                 position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${colors[type]};
-                color: white;
-                padding: 15px 25px;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                top: 24px;
+                right: 24px;
+                background: ${theme.background};
+                color: ${theme.color};
+                padding: 16px 20px;
+                border-radius: 12px;
+                box-shadow: 0 12px 28px rgba(15, 23, 42, 0.25);
                 z-index: 10000;
+                max-width: 420px;
+                display: inline-flex;
+                align-items: center;
+                gap: 12px;
+                font-weight: 600;
+                letter-spacing: 0.2px;
                 animation: slideIn 0.3s ease;
-                max-width: 400px;
             `;
-            notification.innerHTML = message;
-            
+
+            const icon = document.createElement('span');
+            icon.textContent = theme.icon;
+            icon.setAttribute('aria-hidden', 'true');
+            icon.style.fontSize = '1.1rem';
+
+            const text = document.createElement('span');
+            text.textContent = message;
+
+            notification.append(icon, text);
             document.body.appendChild(notification);
-            
+
             setTimeout(() => {
                 notification.style.animation = 'slideOut 0.3s ease';
                 setTimeout(() => notification.remove(), 300);
-            }, 3000);
+            }, 3200);
         }
         window.showNotification = showNotification;
 

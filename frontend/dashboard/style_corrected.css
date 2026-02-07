@@ -1,12 +1,13 @@
 /* style_corrected.css - Dashboard RFID v3.1 */
+/* Central palette aligned with design tokens */
 :root {
     /* Colores principales */
-    --primary-color: #2c3e50;
-    --secondary-color: #3498db;
-    --success-color: #27ae60;
-    --danger-color: #e74c3c;
-    --warning-color: #f39c12;
-    --info-color: #17a2b8;
+    --primary-color: #007bff;
+    --secondary-color: #17a2b8;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
     
     /* Colores neutros */
     --light-color: #ecf0f1;
@@ -399,18 +400,18 @@ body {
 }
 
 .status-badge.granted {
-    background: #d4edda;
-    color: #155724;
+    background: var(--success-color);
+    color: #ffffff;
 }
 
 .status-badge.denied {
-    background: #f8d7da;
-    color: #721c24;
+    background: var(--danger-color);
+    color: #ffffff;
 }
 
 .status-badge.unknown {
-    background: #fff3cd;
-    color: #856404;
+    background: var(--warning-color);
+    color: #1f2937;
 }
 
 .location-cell {
