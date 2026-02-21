@@ -995,6 +995,7 @@ const FirebaseStubs = {
     // Usar Firebase Auth real si está disponible
     if (typeof firebase !== 'undefined' && firebase.auth) {
       firebase.auth().onAuthStateChanged(async (user) => {
+        _log('onAuthStateChanged — user:', user ? user.email : 'null (no session)');
         if (user) {
           try {
             const token = await user.getIdTokenResult(/* forceRefresh= */ false);
@@ -1046,8 +1047,11 @@ const FirebaseStubs = {
 
     if (typeof firebase !== 'undefined' && firebase.auth) {
       try {
-        return await firebase.auth().signInWithEmailAndPassword(email, password);
+        const result = await firebase.auth().signInWithEmailAndPassword(email, password);
+        _log('signIn OK — uid:', result.user?.uid);
+        return result;
       } catch (err) {
+        _log('signIn FAILED — code:', err.code, '| msg:', err.message);
         // Re-lanzar como objeto plano para que el catch externo siempre lo capture
         throw { code: err.code, message: err.message };
       }
