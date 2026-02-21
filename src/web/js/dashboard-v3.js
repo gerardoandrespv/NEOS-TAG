@@ -296,7 +296,10 @@ const VIEW_TITLES = {
   alertas:  'Alertas',
 };
 
+let _routerInitialized = false;
 function _initRouter() {
+  if (_routerInitialized) return;
+  _routerInitialized = true;
   window.addEventListener('hashchange', _onHashChange);
   _onHashChange();
 }
@@ -491,7 +494,8 @@ function _initAuth() {
   const form    = document.getElementById('authForm');
   const errorEl = document.getElementById('authError');
 
-  if (!form) return;
+  if (!form || form.dataset.listenerAttached) return;
+  form.dataset.listenerAttached = 'true'; // guard: evitar doble registro
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1216,7 +1220,10 @@ function _demoEvents(n) {
 /* ============================================================
    PUNTO DE ENTRADA
 ============================================================ */
+let _initialized = false;
 function init() {
+  if (_initialized) return;
+  _initialized = true;
   _log('init v3');
 
   _initTopbar();
