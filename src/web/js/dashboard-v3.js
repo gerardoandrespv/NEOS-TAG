@@ -549,12 +549,32 @@ function _authErrorMsg(code) {
 }
 
 function _showApp(userData) {
+  _log('_showApp — user:', userData?.email ?? '?');
+
   const loadingScreen = document.getElementById('loadingScreen');
   const authScreen    = document.getElementById('authScreen');
   const appShell      = document.getElementById('appShell');
-  if (loadingScreen) loadingScreen.hidden = true;
-  if (authScreen)    authScreen.hidden = true;
-  if (appShell)      appShell.hidden = false;
+
+  _log('_showApp — DOM elements found:', {
+    loadingScreen: !!loadingScreen,
+    authScreen: !!authScreen,
+    appShell: !!appShell,
+  });
+
+  if (loadingScreen) {
+    loadingScreen.hidden = true;
+    loadingScreen.style.display = 'none';
+  }
+  if (authScreen) {
+    authScreen.hidden = true;
+    authScreen.style.display = 'none';
+  }
+  if (appShell) {
+    appShell.removeAttribute('hidden');
+    appShell.style.display = 'grid'; // forzar display:grid en caso de conflicto con [hidden]
+    _log('_showApp — appShell.style.display:', appShell.style.display,
+         '| computed:', window.getComputedStyle(appShell).display);
+  }
 
   // Update user UI
   const name   = userData?.displayName ?? userData?.email ?? 'Usuario';
@@ -568,15 +588,27 @@ function _showApp(userData) {
 
   STATE.user     = userData;
   STATE.userRole = role;
+
+  _log('_showApp — DONE. Dashboard visible.');
 }
 
 function _showAuth() {
+  _log('_showAuth — mostrando pantalla de login');
   const loadingScreen = document.getElementById('loadingScreen');
   const authScreen    = document.getElementById('authScreen');
   const appShell      = document.getElementById('appShell');
-  if (loadingScreen) loadingScreen.hidden = true;
-  if (authScreen)    authScreen.hidden = false;
-  if (appShell)      appShell.hidden = true;
+  if (loadingScreen) {
+    loadingScreen.hidden = true;
+    loadingScreen.style.display = 'none';
+  }
+  if (authScreen) {
+    authScreen.removeAttribute('hidden');
+    authScreen.style.display = '';  // dejar que la clase CSS lo controle
+  }
+  if (appShell) {
+    appShell.hidden = true;
+    appShell.style.display = 'none';
+  }
   _cleanupListeners();
 }
 
