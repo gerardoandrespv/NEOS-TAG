@@ -1,466 +1,492 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // ============================================
-    // FUNCIONES AUXILIARES
+    // FUNCIONES AUXILIARES — AUTENTICACIÓN BASE
     // ============================================
-    
-    // Verificar si el usuario está autenticado
+
+    // El usuario está autenticado, posee el Custom Claim clientId en el JWT,
+    // y el claim es coherente con el documento users/{uid} en Firestore.
+    // isTenantConsistent() garantiza que tokens obsoletos o mal sincronizados
+    // sean rechazados en toda operación, incluidas las auth-only.
     function isAuthenticated() {
-      return request.auth != null;
+      return request.auth != null &&
+             request.auth.token.clientId != null &&
+             request.auth.token.clientId is string &&
+             request.auth.token.clientId.size() > 0 &&
+             isTenantConsistent();
     }
-    
-    // Obtener el UID del usuario autenticado
-    function currentUserId() {
-      return request.auth.uid;
+
+    // clientId del JWT firmado por Firebase Auth (fuente de verdad de tenant).
+    function tokenClientId() {
+      return request.auth.token.clientId;
     }
-    
-    // Verificar si el usuario es administrador
+
+
+    // ============================================
+    // FUNCIONES AUXILIARES — PERFIL DE USUARIO
+    // Firebase Rules v2 cachea automáticamente get() al mismo path dentro
+    // de la misma evaluación de request, por lo que todas las funciones que
+    // llamen a userDoc() comparten un único read real contra Firestore.
+    // ============================================
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Defensa en profundidad: el clientId del documento users/{uid} debe
+    // coincidir con el Custom Claim del JWT.  Detecta tokens con claims
+    // obsoletos o inconsistencias de sincronización.
+    function isTenantConsistent() {
+      return userDoc().clientId == tokenClientId();
+    }
+
+
+    // ============================================
+    // FUNCIONES AUXILIARES — RBAC SCOPED POR TENANT
+    // ============================================
+
+    // Admin: autenticado + token válido + coherencia de tenant + cuenta activa + rol admin.
+    // status == 'active' impide que cuentas suspendidas o inactivas ejerzan privilegios.
     function isAdmin() {
-      return isAuthenticated() && 
-             get(/databases/$(database)/documents/users/$(currentUserId())).data.role == 'admin';
+      return isAuthenticated() &&
+             isTenantConsistent() &&
+             userDoc().status == 'active' &&
+             userDoc().role == 'admin';
     }
-    
-    // Verificar si el usuario es staff o admin
+
+    // Staff o admin: mismo contrato que isAdmin pero acepta rol staff.
+    // status == 'active' impide que cuentas suspendidas o inactivas ejerzan privilegios.
     function isStaffOrAdmin() {
-      return isAuthenticated() && 
-             get(/databases/$(database)/documents/users/$(currentUserId())).data.role in ['staff', 'admin'];
+      return isAuthenticated() &&
+             isTenantConsistent() &&
+             userDoc().status == 'active' &&
+             userDoc().role in ['staff', 'admin'];
     }
-    
-    // Verificar si es el propio usuario
-    function isOwner(userId) {
-      return isAuthenticated() && currentUserId() == userId;
+
+
+    // ============================================
+    // FUNCIONES AUXILIARES — AISLAMIENTO MULTI-TENANT
+    // ============================================
+
+    // El clientId del token coincide con el clientId del documento objetivo.
+    // Usar en reads/updates/deletes sobre documentos existentes (resource).
+    function isSameTenantDoc() {
+      return isAuthenticated() &&
+             tokenClientId() == resource.data.clientId;
     }
-    
-    // Validar formato de email
+
+    // El clientId del token coincide con el clientId del documento entrante.
+    // Usar en creates (request.resource).
+    function isSameTenantNew() {
+      return isAuthenticated() &&
+             tokenClientId() == request.resource.data.clientId;
+    }
+
+
+    // ============================================
+    // FUNCIONES AUXILIARES — INMUTABILIDAD
+    // ============================================
+
+    // clientId no puede modificarse después del create.
+    function clientIdUnchanged() {
+      return request.resource.data.clientId == resource.data.clientId;
+    }
+
+    // created_at no puede modificarse después del create.
+    function createdAtUnchanged() {
+      return request.resource.data.created_at == resource.data.created_at;
+    }
+
+
+    // ============================================
+    // FUNCIONES AUXILIARES — TIMESTAMPS
+    // ============================================
+
+    // created_at obligatorio en create; debe ser el timestamp del servidor.
+    function hasValidCreatedAt(data) {
+      return 'created_at' in data &&
+             data.created_at == request.time;
+    }
+
+    // updated_at obligatorio en update; debe ser el timestamp del servidor.
+    function hasValidUpdatedAt(data) {
+      return 'updated_at' in data &&
+             data.updated_at == request.time;
+    }
+
+
+    // ============================================
+    // FUNCIONES AUXILIARES — VALIDACIÓN DE DATOS
+    // ============================================
+
     function isValidEmail(email) {
-      return email.matches('^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+      return email is string &&
+             email.matches('^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
     }
-    
-    // Validar tag RFID (hexadecimal, 12-50 caracteres)
+
+    // Tag RFID: hexadecimal, entre 12 y 50 caracteres.
     function isValidTag(tag) {
-      return tag is string && 
-             tag.size() >= 12 && 
+      return tag is string &&
+             tag.size() >= 12 &&
              tag.size() <= 50 &&
              tag.matches('^[A-Fa-f0-9]+$');
     }
-    
-    // Validar datos de usuario
+
+    // Estructura mínima de un documento users/.
+    // clientId obligatorio para garantizar que el documento está asignado
+    // a un tenant desde el momento de su creación.
     function isValidUserData(data) {
-      return data.name is string && 
+      return data.name is string &&
              data.name.size() >= 3 &&
              data.name.size() <= 100 &&
              data.email is string &&
              isValidEmail(data.email) &&
              data.status in ['active', 'inactive', 'suspended'] &&
-             data.role in ['resident', 'guest', 'staff', 'admin'];
+             data.role in ['resident', 'guest', 'staff', 'admin'] &&
+             data.clientId is string &&
+             data.clientId.size() > 0;
     }
-    
-    // Validar que los timestamps sean del servidor
-    function hasValidTimestamps(data) {
-      return (!('created_at' in data) || data.created_at == request.time) &&
-             (!('updated_at' in data) || data.updated_at == request.time);
-    }
-    
-    // Validar severidad de alerta
-    function isValidSeverity(severity) {
-      return severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
-    }
-    
-    // Validar tipo de alerta
+
     function isValidAlertType(type) {
       return type in ['FIRE', 'EVACUATION', 'INTRUSION', 'MEDICAL', 'OTHER'];
     }
-    
-    
+
+    function isValidSeverity(severity) {
+      return severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+    }
+
+
     // ============================================
     // COLECCIÓN: users
     // ============================================
     match /users/{userId} {
-      // Lectura: Solo usuarios autenticados pueden ver su propia info o admins pueden ver todo
-      allow read: if isOwner(userId) || isAdmin();
-      
-      // Creación: Solo admins pueden crear usuarios
-      allow create: if isAdmin() && 
-                       isValidUserData(request.resource.data) &&
-                       hasValidTimestamps(request.resource.data);
-      
-      // Actualización: Usuario puede actualizar su propia info (excepto role)
-      //                Admins pueden actualizar todo
-      allow update: if (isOwner(userId) && 
-                        isValidUserData(request.resource.data) &&
-                        request.resource.data.role == resource.data.role &&  // No cambiar role
-                        hasValidTimestamps(request.resource.data)) ||
-                       (isAdmin() && 
-                        isValidUserData(request.resource.data) &&
-                        hasValidTimestamps(request.resource.data));
-      
-      // Eliminación: Solo admins
-      allow delete: if isAdmin();
-    }
-    
-    
+
+  // Lectura del perfil propio (bootstrap) o admin del mismo tenant
+  allow read: if (request.auth != null && request.auth.uid == userId) ||
+                 (isAdmin() && isSameTenantDoc());
+
+  // Creación: solo admin del tenant puede crear usuarios dentro de su tenant.
+  allow create: if isAdmin() &&
+                   isSameTenantNew() &&
+                   request.resource.data.keys().hasOnly(['name','email','role','status','clientId','created_at']) &&
+                   isValidUserData(request.resource.data) &&
+                   hasValidCreatedAt(request.resource.data);
+
+  // Actualización:
+  //   1. Self-update: no puede cambiar role, status ni clientId.
+  //   2. Admin update (otro usuario): puede cambiar status;
+  //      no puede cambiar clientId ni created_at;
+  //      debe respetar allow-list de campos.
+  allow update: if isSameTenantDoc() &&
+                   request.resource.data.keys().hasOnly(['name','email','role','status','clientId','created_at','updated_at']) &&
+                   resource.data.keys().hasOnly(['name','email','role','status','clientId','created_at','updated_at']) &&
+                   clientIdUnchanged() &&
+                   hasValidUpdatedAt(request.resource.data) &&
+                   (
+                     // Self-update: role, status y clientId son inmutables
+                     (request.auth != null &&
+                      request.auth.uid == userId &&
+                      isValidUserData(request.resource.data) &&
+                      request.resource.data.role == resource.data.role &&
+                      request.resource.data.status == resource.data.status &&
+                      createdAtUnchanged())
+                     ||
+                     // Admin updating another user: puede cambiar status
+                     (isAdmin() &&
+                      isSameTenantDoc() &&
+                      request.auth.uid != userId &&
+                      isValidUserData(request.resource.data))
+                   );
+
+  // Eliminación: solo admin del mismo tenant.
+  allow delete: if isAdmin() && isSameTenantDoc();
+}
+
+
     // ============================================
-    // COLECCIÓN: whitelist (Tags RFID autorizados)
+    // COLECCIÓN: whitelist  (Tags RFID autorizados)
     // ============================================
     match /whitelist/{tagId} {
-      // Lectura: Staff y admins
-      allow read: if isStaffOrAdmin();
-      
-      // Escritura: Solo admins
-      allow create: if isAdmin() && 
+
+      // Lectura: staff y admin del mismo tenant.
+      allow read: if isStaffOrAdmin() && isSameTenantDoc();
+
+      // Creación: admin del tenant; tag válido + status explícito.
+      allow create: if isAdmin() &&
+                       isSameTenantNew() &&
+                       request.resource.data.keys().hasOnly(['tag_id','user_name','status','clientId','created_at']) &&
                        isValidTag(request.resource.data.tag_id) &&
                        request.resource.data.user_name is string &&
                        request.resource.data.user_name.size() >= 3 &&
-                       hasValidTimestamps(request.resource.data);
-      
-      allow update: if isAdmin() && 
+                       request.resource.data.status in ['active', 'inactive'] &&
+                       hasValidCreatedAt(request.resource.data);
+
+      // Actualización: admin del tenant; clientId y created_at inmutables.
+      // user_name obligatorio — impide eliminación implícita vía set() sin merge.
+      allow update: if isAdmin() &&
+                       isSameTenantDoc() &&
+                       request.resource.data.keys().hasOnly(['tag_id','user_name','status','clientId','created_at','updated_at']) &&
+                       request.resource.data.keys().hasAll(['tag_id','user_name','status','clientId','created_at','updated_at']) &&
+                       resource.data.keys().hasOnly(['tag_id','user_name','status','clientId','created_at','updated_at']) &&
+                       request.resource.data.diff(resource.data).affectedKeys().size() > 1 &&
+                       clientIdUnchanged() &&
+                       createdAtUnchanged() &&
                        isValidTag(request.resource.data.tag_id) &&
-                       hasValidTimestamps(request.resource.data);
-      
-      allow delete: if isAdmin();
+                       request.resource.data.user_name is string &&
+                       request.resource.data.user_name.size() >= 3 &&
+                       request.resource.data.status in ['active', 'inactive'] &&
+                       hasValidUpdatedAt(request.resource.data);
+
+      allow delete: if isAdmin() && isSameTenantDoc();
     }
-    
-    
+
+
     // ============================================
-    // COLECCIÓN: blacklist (Tags bloqueados)
+    // COLECCIÓN: blacklist  (Tags bloqueados)
     // ============================================
     match /blacklist/{tagId} {
-      // Lectura: Staff y admins
-      allow read: if isStaffOrAdmin();
-      
-      // Escritura: Solo admins
-      allow create: if isAdmin() && 
+
+      // Lectura: staff y admin del mismo tenant.
+      allow read: if isStaffOrAdmin() && isSameTenantDoc();
+
+      // Creación: admin del tenant; reason obligatorio.
+      allow create: if isAdmin() &&
+                       isSameTenantNew() &&
+                       request.resource.data.keys().hasOnly(['tag_id','reason','clientId','created_at']) &&
                        isValidTag(request.resource.data.tag_id) &&
-                       hasValidTimestamps(request.resource.data);
-      
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+                       request.resource.data.reason is string &&
+                       request.resource.data.reason.size() >= 3 &&
+                       hasValidCreatedAt(request.resource.data);
+
+      // Actualización: admin del tenant; clientId y created_at inmutables.
+      // reason obligatorio — impide eliminación del motivo de bloqueo vía set() sin merge.
+      allow update: if isAdmin() &&
+                       isSameTenantDoc() &&
+                       request.resource.data.keys().hasOnly(['tag_id','reason','clientId','created_at','updated_at']) &&
+                       request.resource.data.keys().hasAll(['tag_id','reason','clientId','created_at','updated_at']) &&
+                       resource.data.keys().hasOnly(['tag_id','reason','clientId','created_at','updated_at']) &&
+                       request.resource.data.diff(resource.data).affectedKeys().size() > 1 &&
+                       clientIdUnchanged() &&
+                       createdAtUnchanged() &&
+                       isValidTag(request.resource.data.tag_id) &&
+                       request.resource.data.reason is string &&
+                       request.resource.data.reason.size() >= 3 &&
+                       hasValidUpdatedAt(request.resource.data);
+
+      allow delete: if isAdmin() && isSameTenantDoc();
     }
-    
-    
+
+
     // ============================================
-    // COLECCIÓN: access_logs (Registro de accesos)
+    // COLECCIÓN: access_logs  (Registro histórico de accesos)
     // ============================================
     match /access_logs/{logId} {
-      // Lectura: Staff y admins pueden ver todos los logs
-      //          Usuarios pueden ver solo sus propios logs
-      allow read: if isStaffOrAdmin() || 
-                     (isAuthenticated() && resource.data.user_id == currentUserId());
-      
-      // Escritura: Solo el sistema (Cloud Functions con service account)
-      //            Los clientes NO pueden escribir logs
-      allow create: if false;  // Solo Cloud Functions
+
+      // Lectura: staff/admin del tenant (historial completo) o el propio
+      // residente autenticado del tenant (solo sus propios registros).
+      allow read: if (isStaffOrAdmin() && isSameTenantDoc()) ||
+                     (isAuthenticated() &&
+                      isSameTenantDoc() &&
+                      resource.data.user_id == request.auth.uid);
+
+      // Escritura exclusiva de Cloud Functions con service account.
+      // Los clientes nunca escriben ni modifican logs.
+      allow create: if false;
       allow update: if false;
-      allow delete: if isAdmin();  // Solo admin puede eliminar logs antiguos
+
+      // Prohibido eliminar registros históricos de auditoría.
+      allow delete: if false;
     }
-    
-    
+
+
     // ============================================
     // COLECCIÓN: emergency_alerts
     // ============================================
     match /emergency_alerts/{alertId} {
-      // Lectura: Todos los usuarios autenticados
-      allow read: if isAuthenticated();
-      
-      // Creación: Solo admins y staff
-      allow create: if isStaffOrAdmin() && 
+
+      // Lectura: cualquier usuario autenticado del mismo tenant.
+      allow read: if isAuthenticated() && isSameTenantDoc();
+
+      // Creación: staff o admin del tenant.
+      // Las alertas nacen siempre en estado ACTIVE.
+      // type y severity no pueden cambiarse tras la creación (ver update).
+      allow create: if isStaffOrAdmin() &&
+                       isSameTenantNew() &&
+                       request.resource.data.keys().hasOnly(['type','severity','status','message','clientId','created_at']) &&
                        isValidAlertType(request.resource.data.type) &&
                        isValidSeverity(request.resource.data.severity) &&
-                       request.resource.data.status in ['ACTIVE', 'CANCELLED', 'RESOLVED'] &&
+                       request.resource.data.status == 'ACTIVE' &&
                        request.resource.data.message is string &&
                        request.resource.data.message.size() >= 10 &&
                        request.resource.data.message.size() <= 500 &&
-                       hasValidTimestamps(request.resource.data);
-      
-      // Actualización: Solo admins y staff (para cancelar/resolver)
-      allow update: if isStaffOrAdmin() && 
-                       request.resource.data.status in ['ACTIVE', 'CANCELLED', 'RESOLVED'] &&
-                       hasValidTimestamps(request.resource.data);
-      
-      // Eliminación: Solo admins (para limpieza de alertas antiguas)
-      allow delete: if isAdmin();
+                       hasValidCreatedAt(request.resource.data);
+
+      // Actualización:
+      //   · type, severity, clientId y created_at son inmutables.
+      //   · Solo admin puede transicionar a CANCELLED o RESOLVED.
+      //   · Staff puede actualizar message mientras el estado sea ACTIVE.
+      allow update: if isStaffOrAdmin() &&
+                       isSameTenantDoc() &&
+                       request.resource.data.keys().hasOnly(['type','severity','status','message','clientId','created_at','updated_at']) &&
+                       resource.data.keys().hasOnly(['type','severity','status','message','clientId','created_at','updated_at']) &&
+                       request.resource.data.type == resource.data.type &&
+                       request.resource.data.severity == resource.data.severity &&
+                       clientIdUnchanged() &&
+                       createdAtUnchanged() &&
+                       request.resource.data.message is string &&
+                       request.resource.data.message.size() >= 10 &&
+                       request.resource.data.message.size() <= 500 &&
+                       hasValidUpdatedAt(request.resource.data) &&
+                       (
+                         request.resource.data.status == 'ACTIVE' ||
+                         (isAdmin() &&
+                          request.resource.data.status in ['CANCELLED', 'RESOLVED'])
+                       );
+
+      // Eliminación: solo admin (limpieza de alertas antiguas).
+      allow delete: if isAdmin() && isSameTenantDoc();
     }
-    
-    
+
+
     // ============================================
-    // COLECCIÓN: alert_subscribers (Suscriptores de notificaciones push)
+    // COLECCIÓN: alert_subscribers  (FCM tokens de notificaciones push)
+    // subscriberId DEBE ser igual a request.auth.uid.
+    // Esto garantiza exactamente un documento por usuario por tenant.
     // ============================================
     match /alert_subscribers/{subscriberId} {
-      // Lectura: Solo admins (contiene FCM tokens sensibles)
-      allow read: if isAdmin();
-      
-      // Creación: Usuarios autenticados pueden registrarse
-      allow create: if isAuthenticated() && 
-                       request.resource.data.user_id == currentUserId() &&
-                       request.resource.data.fcm_token is string &&
-                       request.resource.data.fcm_token.size() > 0 &&
-                       hasValidTimestamps(request.resource.data);
-      
-      // Actualización: Usuario puede actualizar su propia suscripción
-      allow update: if isAuthenticated() && 
-                       resource.data.user_id == currentUserId() &&
-                       hasValidTimestamps(request.resource.data);
-      
-      // Eliminación: Usuario puede eliminar su propia suscripción o admin
-      allow delete: if (isAuthenticated() && resource.data.user_id == currentUserId()) || 
-                       isAdmin();
+
+      // Lectura: solo admin del tenant (los FCM tokens son datos sensibles).
+      allow read: if isAdmin() && isSameTenantDoc();
+
+      // Creación: el UID del documento coincide con el solicitante.
+      // Esto impide que un usuario cree suscripciones para otros.
+      // subscriberId == request.auth.uid garantiza propiedad sin necesidad de campo user_id.
+      allow create: if isAuthenticated() &&
+                       subscriberId == request.auth.uid &&
+                       isSameTenantNew() &&
+                       request.resource.data.keys().hasOnly(['subscriberId','platform','fcmToken','clientId','created_at']) &&
+                       request.resource.data.subscriberId == request.auth.uid &&
+                       request.resource.data.fcmToken is string &&
+                       request.resource.data.fcmToken.size() > 0 &&
+                       request.resource.data.platform in ['web', 'android', 'ios'] &&
+                       hasValidCreatedAt(request.resource.data);
+
+      // Actualización: el propio usuario puede rotar su FCM token.
+      // clientId, subscriberId, platform y created_at son inmutables.
+      // platform revalidado — impide eliminación o cambio de plataforma.
+      allow update: if isAuthenticated() &&
+                       subscriberId == request.auth.uid &&
+                       isSameTenantDoc() &&
+                       request.resource.data.keys().hasOnly(['subscriberId','platform','fcmToken','clientId','created_at','updated_at']) &&
+                       resource.data.keys().hasOnly(['subscriberId','platform','fcmToken','clientId','created_at','updated_at']) &&
+                       request.resource.data.subscriberId == resource.data.subscriberId &&
+                       clientIdUnchanged() &&
+                       createdAtUnchanged() &&
+                       request.resource.data.fcmToken is string &&
+                       request.resource.data.fcmToken.size() > 0 &&
+                       request.resource.data.platform in ['web', 'android', 'ios'] &&
+                       hasValidUpdatedAt(request.resource.data);
+
+      // Eliminación: el propio usuario revoca su suscripción, o admin del tenant.
+      allow delete: if (isAuthenticated() &&
+                        subscriberId == request.auth.uid &&
+                        isSameTenantDoc()) ||
+                       (isAdmin() && isSameTenantDoc());
     }
-    
-    
+
+
     // ============================================
-    // COLECCIÓN: access_points (Puertas/puntos de acceso)
+    // COLECCIÓN: access_points  (Puertas y puntos de control físico)
+    // Los residentes NUNCA pueden leer esta colección.
     // ============================================
     match /access_points/{pointId} {
-      // Lectura: Usuarios autenticados
-      allow read: if isAuthenticated();
-      
-      // Escritura: Solo admins
-      allow create: if isAdmin() && 
+
+      // Lectura: exclusiva de staff y admin del mismo tenant.
+      allow read: if isStaffOrAdmin() && isSameTenantDoc();
+
+      // Creación: solo admin del tenant.
+      allow create: if isAdmin() &&
+                       isSameTenantNew() &&
+                       request.resource.data.keys().hasOnly(['name','location','status','clientId','created_at']) &&
                        request.resource.data.name is string &&
                        request.resource.data.name.size() >= 3 &&
                        request.resource.data.status in ['online', 'offline', 'error'] &&
-                       hasValidTimestamps(request.resource.data);
-      
-      allow update: if isAdmin() && hasValidTimestamps(request.resource.data);
-      allow delete: if isAdmin();
+                       hasValidCreatedAt(request.resource.data);
+
+      // Actualización: solo admin; clientId y created_at inmutables.
+      // name y status revalidados — impide eliminación o valores fuera de enum.
+      allow update: if isAdmin() &&
+                       isSameTenantDoc() &&
+                       request.resource.data.keys().hasOnly(['name','location','status','clientId','created_at','updated_at']) &&
+                       request.resource.data.keys().hasAll(['name','location','status','clientId','created_at','updated_at']) &&
+                       resource.data.keys().hasOnly(['name','location','status','clientId','created_at','updated_at']) &&
+                       request.resource.data.diff(resource.data).affectedKeys().size() > 1 &&
+                       clientIdUnchanged() &&
+                       createdAtUnchanged() &&
+                       request.resource.data.name is string &&
+                       request.resource.data.name.size() >= 3 &&
+                       request.resource.data.status in ['online', 'offline', 'error'] &&
+                       hasValidUpdatedAt(request.resource.data);
+
+      allow delete: if isAdmin() && isSameTenantDoc();
     }
-    
-    
+
+
     // ============================================
-    // COLECCIÓN: system_config (Configuración del sistema)
+    // COLECCIÓN: system_config  (Parámetros operativos por tenant)
     // ============================================
     match /system_config/{configId} {
-      // Lectura: Staff y admins
-      allow read: if isStaffOrAdmin();
-      
-      // Escritura: Solo admins
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+
+      // Lectura: staff y admin del mismo tenant.
+      allow read: if isStaffOrAdmin() && isSameTenantDoc();
+
+      // Creación: solo admin del tenant; estructura mínima obligatoria.
+      allow create: if isAdmin() &&
+                       isSameTenantNew() &&
+                       request.resource.data.keys().hasOnly(['name','value','clientId','created_at']) &&
+                       request.resource.data.name is string &&
+                       request.resource.data.name.size() >= 1 &&
+                       request.resource.data.value is string &&
+                       hasValidCreatedAt(request.resource.data);
+
+      // Actualización: solo admin; clientId, name y created_at inmutables.
+      allow update: if isAdmin() &&
+                       isSameTenantDoc() &&
+                       request.resource.data.keys().hasOnly(['name','value','clientId','created_at','updated_at']) &&
+                       resource.data.keys().hasOnly(['name','value','clientId','created_at','updated_at']) &&
+                       clientIdUnchanged() &&
+                       createdAtUnchanged() &&
+                       request.resource.data.name == resource.data.name &&
+                       request.resource.data.value is string &&
+                       hasValidUpdatedAt(request.resource.data);
+
+      allow delete: if isAdmin() && isSameTenantDoc();
     }
-    
-    
+
+
     // ============================================
-    // COLECCIÓN: rfid_events (Eventos RFID en tiempo real)
+    // COLECCIÓN: rfid_events  (Eventos RFID en tiempo real)
     // ============================================
     match /rfid_events/{eventId} {
-      // Lectura: Staff y admins
-      allow read: if isStaffOrAdmin();
-      
-      // Escritura: Solo Cloud Functions (service account)
-      allow create: if false;  // Solo sistema
+
+      // Lectura: staff y admin del mismo tenant.
+      allow read: if isStaffOrAdmin() && isSameTenantDoc();
+
+      // Escritura exclusiva de Cloud Functions con service account.
+      allow create: if false;
       allow update: if false;
-      allow delete: if isAdmin();  // Limpieza de eventos antiguos
+
+      // Prohibido eliminar eventos históricos de auditoría RFID.
+      allow delete: if false;
     }
-    
-    
+
+
     // ============================================
     // DENEGACIÓN POR DEFECTO
+    // Cualquier colección no especificada está completamente bloqueada.
     // ============================================
-    // Cualquier colección no especificada está completamente bloqueada
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-    
-    // ============================================
-    // COLECCIÓN: audit_log
-    // ============================================
-    match /audit_log/{logId} {
-      // Solo lectura para auditoría
-      allow read: if true; // En producción: solo admins
-      
-      // Solo escritura con timestamp server
-      allow create: if request.resource.data.timestamp == request.time;
-      
-      // No modificar ni eliminar logs
-      allow update, delete: if false;
-    }
-    
-    // ============================================
-    // COLECCIÓN: clients (multi-tenant)
-    // ============================================
-    match /clients/{clientId} {
-      allow read: if true;
-      allow write: if true; // En producción: validar clientId
-      
-      // Subcolecci ones
-      match /rfid_tags/{tagId} {
-        allow read, write: if true;
-      }
-      
-      match /gate_logs/{logId} {
-        allow read, write: if true;
-      }
-    }
-    
-    // ============================================
-    // COLECCIÓN: blocks
-    // ============================================
-    match /blocks/{blockId} {
-      // Lectura: Permitir para mostrar en dashboard
-      allow read: if true;
-      
-      // Escritura: Permitir para desarrollo
-      // TODO: Restringir en producción a solo admins
-      allow write: if true;
-    }
-    
-    // ============================================
-    // COLECCIÓN: departments
-    // ============================================
-    match /departments/{deptId} {
-      // Lectura: Permitir para mostrar en dashboard
-      allow read: if true;
-      
-      // Escritura: Permitir para desarrollo
-      // TODO: Restringir en producción a solo admins
-      allow write: if true;
-    }
-    
-    // ============================================
-    // COLECCIÓN: whitelist
-    // ============================================
-    match /whitelist/{whitelistId} {
-      // Lectura: Permitir (necesario para validación de acceso)
-      allow read: if true;
-      
-      // Escritura: Permitir para desarrollo
-      allow write: if true;
-    }
-    
-    // ============================================
-    // COLECCIÓN: login_logs
-    // ============================================
-    match /login_logs/{logId} {
-      // Lectura: Permitir para auditoría
-      allow read: if true;
-      
-      // Escritura: Solo crear logs
-      allow create: if request.resource.data.timestamp == request.time;
-      
-      // No modificar ni eliminar logs
-      allow update, delete: if false;
-    }
-    
-    // ============================================
-    // COLECCIÓN: alerts
-    // ============================================
-    match /alerts/{alertId} {
-      // Lectura: Permitir para mostrar notificaciones
-      allow read: if true;
-      
-      // Escritura: Permitir para crear y actualizar alertas
-      allow write: if true;
-    }
-    
-    // ============================================
-    // COLECCIÓN: access_points
-    // ============================================
-    match /access_points/{pointId} {
-      // Lectura: Permitir para configuración
-      allow read: if true;
-      
-      // Escritura: Permitir para desarrollo
-      allow write: if true;
-    }
-    
-    // ============================================
-    // SISTEMA DE ALERTAS DE EMERGENCIA
-    // ============================================
-    
-    // Función auxiliar: Validar severidad de alerta
-    function isValidSeverity(severity) {
-      return severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
-    }
-    
-    // Función auxiliar: Validar tipo de alerta
-    function isValidAlertType(type) {
-      return type in ['FIRE', 'EVACUATION', 'FLOOD', 'POWER_OUTAGE', 'SYSTEM_FAILURE', 'GENERAL'];
-    }
-    
-    // Función auxiliar: Validar estado de alerta
-    function isValidAlertStatus(status) {
-      return status in ['ACTIVE', 'CANCELLED', 'EXPIRED'];
-    }
-    
-    // Función auxiliar: Usuario es admin o guardia
-    function isAdminOrGuard() {
-      return request.auth != null && 
-             (request.auth.token.role == 'admin' || request.auth.token.role == 'guard');
-    }
-    
-    // COLECCIÓN: emergency_alerts
-    match /emergency_alerts/{alertId} {
-      // Lectura: Todos pueden leer alertas activas
-      allow read: if true;
-      
-      // Creación: Solo admins y guardias
-      allow create: if isAdminOrGuard() &&
-                       isValidAlertType(request.resource.data.type) &&
-                       isValidSeverity(request.resource.data.severity) &&
-                       isValidAlertStatus(request.resource.data.status) &&
-                       request.resource.data.issued_at == request.time &&
-                       request.resource.data.created_at == request.time &&
-                       request.resource.data.updated_at == request.time;
-      
-      // Actualización: Solo admin puede actualizar o cancelar
-      allow update: if isAdminOrGuard() &&
-                       request.resource.data.created_at == resource.data.created_at &&
-                       request.resource.data.updated_at == request.time;
-      
-      // Eliminación: No permitida (mantener histórico)
-      allow delete: if false;
-    }
-    
-    // COLECCIÓN: alert_recipients
-    match /alert_recipients/{recipientId} {
-      // Lectura: Admins pueden ver todos, usuarios solo sus propias confirmaciones
-      allow read: if isAdminOrGuard() || 
-                     (request.auth != null && resource.data.user_id == request.auth.uid);
-      
-      // Creación: Solo sistema (Cloud Function)
-      allow create: if request.resource.data.created_at == request.time;
-      
-      // Actualización: Usuario puede confirmar su estado
-      allow update: if (request.auth != null && resource.data.user_id == request.auth.uid) ||
-                       isAdminOrGuard();
-      
-      // Eliminación: No permitida
-      allow delete: if false;
-    }
-    
-    // COLECCIÓN: alert_templates
-    match /alert_templates/{templateId} {
-      // Lectura: Todos pueden leer plantillas
-      allow read: if true;
-      
-      // Escritura: Solo admins
-      allow write: if isAdminOrGuard();
-    }
-    
-    // COLECCIÓN: alert_logs
-    match /alert_logs/{logId} {
-      // Lectura: Solo admins (auditoría)
-      allow read: if isAdminOrGuard();
-      
-      // Creación: Sistema automático con timestamp server
-      allow create: if request.resource.data.timestamp == request.time;
-      
-      // No modificar ni eliminar logs de auditoría
-      allow update, delete: if false;
-    }
-    
-    // COLECCIÓN: alert_subscribers (Registro público - v2)
-    match /alert_subscribers/{subscriberId} {
-      // REGLAS COMPLETAMENTE ABIERTAS PARA REGISTRO PÚBLICO
-      allow read, write: if true;
-    }
-    
-    // Denegar acceso a cualquier otra colección no especificada
     match /{document=**} {
       allow read, write: if false;
     }

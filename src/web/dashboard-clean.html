@@ -33,7 +33,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     
     <!-- Dashboard Styles -->
-    <link rel="stylesheet" href="css/dashboard-clean.css">
+    <link rel="stylesheet" href="css/dashboard-clean.css?v=20260209-0630">
 </head>
 <body>
     <div class="container">
@@ -657,7 +657,546 @@
         </div>
     </div>
 
+    <!-- ================================================
+         MODALES ADICIONALES (FASES 3 Y 4)
+         ================================================ -->
+
+    <!-- NEW ALERT MODAL -->
+    <div class="alert-modal" id="newAlertModal">
+        <div class="alert-modal-content">
+            <div class="alert-modal-header">
+                <h2 style="margin: 0; font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Emitir Nueva Alerta de Emergencia
+                </h2>
+            </div>
+
+            <div class="modal-body">
+                <form id="newAlertForm">
+                    <!-- Tipo de Alerta -->
+                    <div class="form-group" style="margin-bottom: 24px;">
+                        <label style="display: block; font-weight: 600; color: #1F2937; margin-bottom: 10px; font-size: 15px;">
+                            Tipo de Alerta <span style="color: #DC2626;">*</span>
+                        </label>
+                        <select id="alertType" required style="width: 100%; padding: 14px 18px; border: 2px solid #E5E7EB; border-radius: 10px; font-size: 15px; transition: all 0.2s; background: #FFFFFF; color: #1F2937; cursor: pointer; font-weight: 500;" onchange="loadAlertTemplate()">
+                            <option value="">Seleccione un tipo de alerta...</option>
+                            <option value="FIRE">🔥 Incendio</option>
+                            <option value="FIGHT">🥊 Pelea Detectada</option>
+                            <option value="ROBBERY">🚨 Robo Detectado</option>
+                            <option value="EVACUATION">🚪 Evacuación</option>
+                            <option value="FLOOD">💧 Inundación/Fuga</option>
+                            <option value="POWER_OUTAGE">⚡ Corte de Energía</option>
+                            <option value="SYSTEM_FAILURE">⚙️ Falla de Sistemas</option>
+                            <option value="GENERAL">📢 Anuncio General</option>
+                        </select>
+                    </div>
+
+                    <!-- Severidad -->
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 500; color: var(--text-primary); margin-bottom: 8px; font-size: 14px;">
+                            Severidad <span style="color: var(--color-danger);">*</span>
+                        </label>
+                        <div class="severity-options">
+                            <div class="severity-option">
+                                <input type="radio" name="severity" id="severityCritical" value="CRITICAL" required>
+                                <label for="severityCritical" style="cursor: pointer; margin: 0; font-weight: 600; font-size: 12px;">CRÍTICA</label>
+                            </div>
+                            <div class="severity-option">
+                                <input type="radio" name="severity" id="severityHigh" value="HIGH">
+                                <label for="severityHigh" style="cursor: pointer; margin: 0; font-weight: 600; font-size: 12px;">ALTA</label>
+                            </div>
+                            <div class="severity-option">
+                                <input type="radio" name="severity" id="severityMedium" value="MEDIUM">
+                                <label for="severityMedium" style="cursor: pointer; margin: 0; font-weight: 600; font-size: 12px;">MEDIA</label>
+                            </div>
+                            <div class="severity-option">
+                                <input type="radio" name="severity" id="severityLow" value="LOW">
+                                <label for="severityLow" style="cursor: pointer; margin: 0; font-weight: 600; font-size: 12px;">BAJA</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bloques Afectados -->
+                    <div class="form-group" style="margin-bottom: 24px;">
+                        <label style="display: block; font-weight: 600; color: #1F2937; margin-bottom: 10px; font-size: 15px;">
+                            Bloques Afectados <span style="color: #DC2626;">*</span>
+                        </label>
+                        <div style="background: #F9FAFB; border: 2px solid #E5E7EB; border-radius: 10px; padding: 16px;">
+                            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                                <button type="button" onclick="selectAllBlocks()" class="btn btn-secondary" style="font-size: 13px; padding: 8px 16px;">Seleccionar Todos</button>
+                                <button type="button" onclick="clearAllBlocks()" class="btn btn-secondary" style="font-size: 13px; padding: 8px 16px;">Limpiar</button>
+                            </div>
+                            <div id="blocksGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px;">
+                                <!-- Se genera dinámicamente 1-19 -->
+                            </div>
+                            <div id="blocksError" style="color: #DC2626; font-size: 13px; margin-top: 8px; font-weight: 600; display: none;">
+                                <i class="fas fa-exclamation-circle"></i> Debe seleccionar al menos 1 bloque
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Zona Adicional (opcional) -->
+                    <div class="form-group" style="margin-bottom: 24px;">
+                        <label style="display: block; font-weight: 600; color: #1F2937; margin-bottom: 10px; font-size: 15px;">
+                            Descripción de Zona (opcional)
+                        </label>
+                        <input type="text" id="buildingZone" placeholder="Ej: Entrada principal, área común, etc." style="width: 100%; padding: 14px 18px; border: 2px solid #E5E7EB; border-radius: 10px; font-size: 15px; transition: all 0.2s; background: #FFFFFF; color: #1F2937;">
+                    </div>
+
+                    <!-- Título -->
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 500; color: var(--text-primary); margin-bottom: 8px; font-size: 14px;">
+                            Título de la Alerta <span style="color: var(--color-danger);">*</span>
+                        </label>
+                        <input type="text" id="alertTitle" placeholder="Ej: Incendio detectado - Piso 3" required style="width: 100%; padding: 12px 16px; border: 2px solid rgba(148, 163, 184, 0.2); border-radius: var(--radius); font-size: 14px; transition: var(--transition); background: var(--bg-card); color: var(--text-primary);">
+                    </div>
+
+                    <!-- Mensaje -->
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 500; color: var(--text-primary); margin-bottom: 8px; font-size: 14px;">
+                            Mensaje <span style="color: var(--color-danger);">*</span>
+                        </label>
+                        <textarea id="alertMessage" placeholder="Instrucciones detalladas para los residentes..." required style="width: 100%; padding: 12px 16px; border: 2px solid rgba(148, 163, 184, 0.2); border-radius: var(--radius); font-size: 14px; min-height: 120px; resize: vertical; font-family: inherit; transition: var(--transition); background: var(--bg-card); color: var(--text-primary);"></textarea>
+                    </div>
+
+                    <!-- Punto de Encuentro -->
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 500; color: var(--text-primary); margin-bottom: 8px; font-size: 14px;">
+                            Punto de Encuentro
+                        </label>
+                        <input type="text" id="meetingPoint" placeholder="Ej: Plaza principal - Calle Los Aromos" style="width: 100%; padding: 12px 16px; border: 2px solid rgba(148, 163, 184, 0.2); border-radius: var(--radius); font-size: 14px; transition: var(--transition); background: var(--bg-card); color: var(--text-primary);">
+                    </div>
+
+                    <!-- Canales de Envío -->
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 500; color: var(--text-primary); margin-bottom: 8px; font-size: 14px;">
+                            Canales de Envío
+                        </label>
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="sendPush" checked>
+                                <label for="sendPush" style="color: var(--text-secondary); font-size: 14px; margin: 0; cursor: pointer;">📱 Notificación Push</label>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="sendSMS">
+                                <label for="sendSMS" style="color: var(--text-secondary); font-size: 14px; margin: 0; cursor: pointer;">💬 SMS</label>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="sendEmail">
+                                <label for="sendEmail" style="color: var(--text-secondary); font-size: 14px; margin: 0; cursor: pointer;">📧 Email</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <div style="color: var(--text-secondary); font-size: 13px;">
+                    Destinatarios: <strong id="recipientsCount" style="color: var(--text-primary);">Todos los residentes</strong>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" onclick="closeNewAlertModal()" class="btn btn-secondary">
+                        Cancelar
+                    </button>
+                    <button type="button" onclick="previewAlert()" class="btn" style="background: linear-gradient(135deg, var(--color-info), var(--color-primary)); color: white; border: none;">
+                        Vista Previa
+                    </button>
+                    <button type="button" onclick="emitAlert()" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-danger), var(--color-danger-dark)); border: none; font-weight: 600;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Emitir Alerta
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR MODAL -->
+    <div class="alert-modal" id="qrModal">
+        <div class="alert-modal-content" style="max-width: 500px;">
+            <div class="alert-modal-header" style="background: linear-gradient(135deg, #10B981, #059669);">
+                <h2 style="margin: 0; font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-qrcode"></i>
+                    Registro de Suscriptores
+                </h2>
+                <button onclick="closeQRModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); border: none; color: white; font-size: 24px; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    ✕
+                </button>
+            </div>
+
+            <div style="padding: 32px; text-align: center;">
+                <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 15px;">
+                    Los residentes pueden escanear este código QR para registrar sus dispositivos y recibir alertas de emergencia
+                </p>
+
+                <!-- QR Code Container -->
+                <div id="qrCodeContainer" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); display: inline-block; margin-bottom: 24px;">
+                    <canvas id="qrCanvas"></canvas>
+                </div>
+
+                <!-- Link -->
+                <div style="background: var(--bg-card); padding: 16px; border-radius: 12px; margin-bottom: 16px;">
+                    <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 8px; font-weight: 600;">O comparte este enlace:</p>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="registrationLink" readonly value="https://neos-tech.web.app/register-alerts.html" style="flex: 1; padding: 10px; border: 2px solid rgba(148, 163, 184, 0.2); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 13px; font-family: monospace;">
+                        <button onclick="copyRegistrationLink()" class="btn btn-primary" style="padding: 10px 16px; white-space: nowrap;">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                    <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); padding: 16px; border-radius: 12px; border: 2px solid rgba(16, 185, 129, 0.2);">
+                        <div style="font-size: 28px; font-weight: 700; color: #10B981;" id="qrStatsActive">0</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Activos</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05)); padding: 16px; border-radius: 12px; border: 2px solid rgba(59, 130, 246, 0.2);">
+                        <div style="font-size: 28px; font-weight: 700; color: #3B82F6;" id="qrStatsTotal">0</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Total</div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="downloadQR()" class="btn btn-primary" style="flex: 1;">
+                        <i class="fas fa-download"></i> Descargar QR
+                    </button>
+                    <button onclick="printQR()" class="btn btn-primary" style="flex: 1; background: linear-gradient(135deg, #6366F1, #4F46E5);">
+                        <i class="fas fa-print"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CANCEL ALERT MODAL -->
+    <div class="alert-modal" id="cancelAlertModal">
+        <div class="alert-modal-content" style="max-width: 500px;">
+            <div class="alert-modal-header" style="background: linear-gradient(135deg, #DC2626, #991B1B);">
+                <h2 style="margin: 0; font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Cancelar Alerta de Emergencia
+                </h2>
+            </div>
+
+            <div class="modal-body">
+                <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05)); border: 2px solid #F59E0B; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">📡</div>
+                    <p style="margin: 5px 0; font-size: 14px; color: var(--text-primary); font-weight: 600;">Esta acción NO se puede deshacer</p>
+                    <p style="margin: 5px 0; font-size: 13px; color: var(--text-secondary);">Se notificará a todos los residentes que la alerta ya NO está activa.</p>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: block; font-weight: 500; color: var(--text-primary); margin-bottom: 8px; font-size: 14px;">
+                        Motivo de la cancelación <span style="color: var(--color-danger);">*</span>
+                    </label>
+                    <textarea id="cancelReason" placeholder="Ej: Falsa alarma, Situación controlada, Prueba del sistema..." required style="width: 100%; padding: 12px 16px; border: 2px solid rgba(148, 163, 184, 0.2); border-radius: var(--radius); font-size: 14px; min-height: 100px; resize: vertical; font-family: inherit; transition: var(--transition); background: var(--bg-card); color: var(--text-primary);"></textarea>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Mínimo 3 caracteres</p>
+                </div>
+
+                <input type="hidden" id="cancelAlertId" value="">
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" onclick="closeCancelAlertModal()" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" onclick="executeCancelAlert()" class="btn btn-danger" style="background: linear-gradient(135deg, #DC2626, #991B1B);">
+                    <i class="fas fa-ban"></i> Confirmar Cancelación
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEPARTMENT MODAL -->
+    <div id="departmentModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>🏢 Nuevo Departamento</h2>
+                <button class="close-btn" onclick="closeDepartmentModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="departmentForm" onsubmit="event.preventDefault(); saveDepartment();">
+                    <div class="form-group">
+                        <label>
+                            Block *
+                        </label>
+                    <select id="deptBlock" class="form-control" required>
+                        <option value="">Seleccionar block...</option>
+                    </select>
+                    <small>
+                        El block al que pertenece el departamento
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        Número de Departamento *
+                    </label>
+                    <input type="text" id="deptNumber" class="form-control" required 
+                           placeholder="Ej: 101, 205, 310..." 
+                           pattern="[0-9]{1,4}"
+                           title="Solo números (hasta 4 dígitos)">
+                    <small>
+                        Número único del departamento (solo números)
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center;">
+                        <input type="checkbox" id="deptOccupied" style="margin-right: 8px; width: 18px; height: 18px;">
+                        Departamento Ocupado
+                    </label>
+                    <small style="margin-left: 26px;">
+                        Marca si el departamento está ocupado actualmente
+                    </small>
+                </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeDepartmentModal()">
+                    Cancelar
+                </button>
+                <button type="submit" form="departmentForm" class="btn btn-success">
+                    <span style="margin-right: 6px;">💾</span>
+                    Guardar Departamento
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACCESS POINT CONFIG MODAL -->
+    <div id="accessPointConfigModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-cog"></i> Configuración de Puertas y Portones</h2>
+                <button class="close-btn" onclick="closeAccessPointConfigModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-success" onclick="showAddAccessPointForm()" style="width: 100%;">
+                        <i class="fas fa-plus"></i> Agregar Nuevo Punto de Acceso
+                    </button>
+                </div>
+
+                <!-- Formulario para agregar/editar punto de acceso -->
+                <div id="accessPointForm" style="display: none; background: rgba(59, 130, 246, 0.05); padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid rgba(59, 130, 246, 0.2);">
+                    <h4 style="color: #3b82f6; margin-bottom: 15px;"><i class="fas fa-edit"></i> <span id="formTitle">Nuevo Punto de Acceso</span></h4>
+                    <input type="hidden" id="editAccessPointId">
+                    
+                    <div class="form-group">
+                        <label style="color: white;">Nombre del Punto de Acceso *</label>
+                        <input type="text" id="apName" placeholder="Ej: Puerta Entrada Principal, Portón Triwe" required style="width: 100%;">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="color: white;">Tipo *</label>
+                            <select id="apType" required style="width: 100%;">
+                                <option value="">Seleccionar...</option>
+                                <option value="puerta">🚪 Puerta</option>
+                                <option value="porton">🚧 Portón Eléctrico</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label style="color: white;">Ubicación *</label>
+                            <input type="text" id="apLocation" placeholder="Ej: Lobby, Sótano, Piso 2" required style="width: 100%;">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="color: white;">ID del Lector *</label>
+                            <input type="text" id="apReaderId" placeholder="Ej: puerta_principal, porton_triwe" required style="width: 100%;">
+                            <small style="color: #94a3b8; font-size: 11px;">Identificador único del lector RFID</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label style="color: white;">Modo de Operación *</label>
+                            <select id="apMode" required style="width: 100%;">
+                                <option value="automatica">⚡ Automática</option>
+                                <option value="manual">🔧 Manual</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="color: white;">IP del Controlador</label>
+                            <input type="text" id="apIp" placeholder="Ej: 192.168.1.100" style="width: 100%;">
+                        </div>
+
+                        <div class="form-group">
+                            <label style="color: white;">Puerto</label>
+                            <input type="number" id="apPort" placeholder="Ej: 8080" style="width: 100%;">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; color: white;">
+                            <input type="checkbox" id="apActive" checked style="margin-right: 8px; width: 18px; height: 18px;">
+                            Punto de Acceso Activo
+                        </label>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button class="btn btn-success" onclick="saveAccessPoint()" style="flex: 1;">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                        <button class="btn btn-cancel" onclick="cancelAccessPointForm()" style="flex: 1;">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lista de puntos de acceso configurados -->
+                <div>
+                    <h4 style="color: #3b82f6; margin-bottom: 15px;"><i class="fas fa-list"></i> Puntos de Acceso Configurados</h4>
+                    <div id="accessPointsList" style="max-height: 400px; overflow-y: auto;">
+                        <p style="text-align: center; color: #94a3b8; padding: 20px;">Cargando puntos de acceso...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeAccessPointConfigModal()">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEVICE SETTINGS MODAL -->
+    <div id="deviceSettingsModal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-cog"></i> <span id="deviceSettingsTitle">Funciones Avanzadas</span></h2>
+                <button class="close-btn" onclick="closeDeviceSettingsModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <!-- Estado de Conexión -->
+                <div class="card" style="margin-bottom: 20px; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2);">
+                    <h4 style="color: #3b82f6; margin-bottom: 12px;"><i class="fas fa-signal"></i> Estado de Conexión</h4>
+                    <div id="deviceConnectionStatus" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                        <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; text-align: center;">
+                            <div style="color: #94a3b8; font-size: 11px; margin-bottom: 4px;">Estado</div>
+                            <div id="deviceStatus" style="color: #0ea5e9; font-size: 16px; font-weight: 600;">Verificando...</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; text-align: center;">
+                            <div style="color: #94a3b8; font-size: 11px; margin-bottom: 4px;">Última Actividad</div>
+                            <div id="deviceLastSeen" style="color: #cbd5e1; font-size: 14px; font-weight: 600;">N/A</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; text-align: center;">
+                            <div style="color: #94a3b8; font-size: 11px; margin-bottom: 4px;">Firmware</div>
+                            <div id="deviceFirmware" style="color: #cbd5e1; font-size: 14px; font-weight: 600;">v1.0.0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuración del Lector RFID -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <h4 style="color: #3b82f6; margin-bottom: 15px;"><i class="fas fa-microchip"></i> Configuración del Lector RFID</h4>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="color: white;">IP del Controlador</label>
+                            <input type="text" id="deviceIp" placeholder="192.168.1.100" style="width: 100%;">
+                        </div>
+                        <div class="form-group">
+                            <label style="color: white;">Puerto</label>
+                            <input type="number" id="devicePort" placeholder="8080" style="width: 100%;">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="color: white;">Baudrate</label>
+                            <select id="deviceBaudrate" style="width: 100%;">
+                                <option value="9600">9600</option>
+                                <option value="19200">19200</option>
+                                <option value="38400">38400</option>
+                                <option value="57600">57600</option>
+                                <option value="115200" selected>115200</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label style="color: white;">Protocolo RFID</label>
+                            <select id="deviceProtocol" style="width: 100%;">
+                                <option value="iso14443a">ISO 14443A (Mifare)</option>
+                                <option value="iso15693">ISO 15693</option>
+                                <option value="em4100">EM4100</option>
+                                <option value="wiegand">Wiegand</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="color: white;">Tiempo de Apertura (segundos)</label>
+                            <input type="number" id="deviceOpenTime" placeholder="3" min="1" max="30" value="3" style="width: 100%;">
+                        </div>
+                        <div class="form-group">
+                            <label style="color: white;">Timeout Lectura (ms)</label>
+                            <input type="number" id="deviceReadTimeout" placeholder="1000" min="100" max="5000" value="1000" style="width: 100%;">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; color: white;">
+                            <input type="checkbox" id="deviceBeep" checked style="margin-right: 8px; width: 18px; height: 18px;">
+                            Activar sonido al leer tag
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; color: white;">
+                            <input type="checkbox" id="deviceLed" checked style="margin-right: 8px; width: 18px; height: 18px;">
+                            Indicador LED al abrir
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Acciones Rápidas -->
+                <div class="card">
+                    <h4 style="color: #3b82f6; margin-bottom: 15px;"><i class="fas fa-bolt"></i>   Rápidas</h4>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <button class="btn btn-primary" onclick="testDeviceConnection()" style="font-size: 13px; padding: 10px;">
+                            <i class="fas fa-network-wired"></i> Probar Conexión
+                        </button>
+                        <button class="btn btn-primary" onclick="readDeviceInfo()" style="font-size: 13px; padding: 10px;">
+                            <i class="fas fa-info-circle"></i> Leer Info Dispositivo
+                        </button>
+                        <button class="btn btn-primary" onclick="resetDevice()" style="font-size: 13px; padding: 10px;">
+                            <i class="fas fa-redo"></i> Reiniciar Lector
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn btn-cancel" onclick="closeDeviceSettingsModal()">
+                    Cancelar
+                </button>
+                <button type="button" class="btn btn-success" onclick="saveDeviceSettings()">
+                    <i class="fas fa-save"></i> Guardar Configuración
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
-    <script src="js/dashboard-modules.js"></script>
+    <script src="js/dashboard-modules.js?v=20260209-0630"></script>
+    <script>
+        // Asegurar que solo el tab "control" esté visible al cargar
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔄 Inicializando tabs...');
+            const allTabs = document.querySelectorAll('.tab-content');
+            allTabs.forEach(tab => {
+                if (tab.id !== 'control-tab') {
+                    tab.classList.remove('active');
+                }
+            });
+            console.log('✅ Tabs inicializados');
+        });
+    </script>
 </body>
 </html>

@@ -27,7 +27,7 @@
     ]
   },
   "firestore": {
-    "rules": "config/firestore.rules",
+    "rules": "firestore.rules",
     "indexes": "config/firestore.indexes.json"
   },
   "functions": [

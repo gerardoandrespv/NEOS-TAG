@@ -1013,6 +1013,7 @@ function autoFillAlertMessage(type) {
 async function loadActiveAlerts() {
     try {
         const alertsSnapshot = await db.collection('emergency_alerts')
+            .where('clientId', '==', currentUserClientId)
             .where('status', '==', 'ACTIVE')
             .orderBy('issued_at', 'desc')
             .get();
@@ -1142,7 +1143,9 @@ function getAlertIcon(type) {
 // Cargar contador total de alertas
 async function loadTotalAlertsCount() {
     try {
-        const snapshot = await db.collection('emergency_alerts').get();
+        const snapshot = await db.collection('emergency_alerts')
+            .where('clientId', '==', currentUserClientId)
+            .get();
         document.getElementById('totalAlertsCount').textContent = snapshot.size;
     } catch (error) {
         console.error('[Alertas] Error cargando total:', error);
@@ -1152,6 +1155,7 @@ async function loadTotalAlertsCount() {
 // Escuchar cambios en tiempo real
 function listenToActiveAlerts() {
     db.collection('emergency_alerts')
+        .where('clientId', '==', currentUserClientId)
         .where('status', '==', 'ACTIVE')
         .onSnapshot(snapshot => {
             console.log('[Alertas] Actualización en tiempo real');
@@ -1275,6 +1279,7 @@ async function emitAlert() {
         // También guardar en Firestore para historial
         alertData.created_at = firebase.firestore.FieldValue.serverTimestamp();
         alertData.status = 'ACTIVE';
+        alertData.clientId = currentUserClientId;
         
         const docRef = await db.collection('emergency_alerts').add(alertData);
         
@@ -1377,6 +1382,17 @@ const firebaseConfig = {
 // Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+
+// Bootstrap multi-tenant: leer clientId desde JWT claims
+let currentUserClientId = null;
+firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+        user.getIdTokenResult().then(function(result) {
+            currentUserClientId = result.claims.clientId || null;
+            console.log('[Alertas] clientId cargado:', currentUserClientId);
+        });
+    }
+});
 
 console.log('[Firebase] Inicializado correctamente');
 </script>

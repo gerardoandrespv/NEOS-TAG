@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -54,9 +54,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    
-    <!-- Dashboard Clean Styles (Override) -->
-    <link rel="stylesheet" href="css/dashboard-clean.css?v=20260209-1430">
 
     <style>
         /* Neos Tech RFID Dashboard - Diseño Profesional 2026 */
@@ -4636,7 +4633,7 @@
             if (lastOpenEl) lastOpenEl.textContent = now.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'});
             
             try {
-                const eventDoc = await db.collection('rfid_events').add({
+                const eventDoc = await db.collection('rfid_tags').add({
                     event_type: 'manual_open',
                     access_point_id: accessPointId,
                     access_point_name: accessPointName,
@@ -4652,7 +4649,7 @@
                     reader_id: accessPointId,
                     location: accessPointName,
                     source: 'dashboard_manual',
-                    clientId: window.currentUserClientId
+                    client_id: 'condominio-neos'
                 });
                 
                 // El Gateway monitorea la colecci�n rfid_tags y ejecutar� el relay automáticamente
@@ -4662,7 +4659,7 @@
                 // Esperar un momento y verificar si el Gateway proces� el evento
                 setTimeout(async () => {
                     try {
-                        const eventSnapshot = await db.collection('rfid_events').doc(eventDoc.id).get();
+                        const eventSnapshot = await db.collection('rfid_tags').doc(eventDoc.id).get();
                         const eventData = eventSnapshot.data();
                         
                         if (eventData && eventData.relay_activated) {
@@ -4789,41 +4786,27 @@
                 currentUser = user;
                 
                 try {
-                    // DEBUG: loguear UID y claims antes de cualquier query
-                    console.log('🔍 [DEBUG] UID:', user.uid);
-                    firebase.auth().currentUser.getIdTokenResult()
-                        .then(r => console.log('🔍 [DEBUG] CLAIMS', r.claims))
-                        .catch(e => console.warn('⚠️ [DEBUG] getIdTokenResult error:', e));
-
                     // Obtener datos del usuario desde Firestore
                     const userDoc = await db.collection('users').doc(user.uid).get();
-                    console.log('🔍 [DEBUG] PROFILE', userDoc.exists ? userDoc.data() : 'DOCUMENT DOES NOT EXIST');
-
+                    
                     if (userDoc.exists) {
                         const userData = userDoc.data();
                         userRole = userData.role || 'resident';
-                        window.currentUserClientId = userData.clientId;
                         userDisplayName = userData.name || user.displayName || user.email;
                         
                         console.log('✅ Usuario autenticado:', {
                             email: user.email,
                             role: userRole,
-                            name: userDisplayName,
-                            clientId: window.currentUserClientId
+                            name: userDisplayName
                         });
                         
                         // Actualizar UI
                         updateUIForAuthenticatedUser(userDisplayName, userRole);
                         applyRoleRestrictions();
                         hideLoginModal();
-
-                        // Inicializar Firestore y datos solo cuando clientId está disponible
-                        initFirestore();
-                        loadData();
-                        initLiveTagReading();
                         
                         // Log de inicio de sesión
-                        await db.collection('access_logs').add({
+                        await db.collection('login_logs').add({
                             user: userDisplayName,
                             user_id: user.uid,
                             email: user.email,
@@ -4833,16 +4816,20 @@
                         });
                         
                     } else {
-                        console.error('❌ [DEBUG] Documento users/' + user.uid + ' NO existe en Firestore');
-                        showNotification('Error: Perfil no encontrado para UID: ' + user.uid, 'error');
-                        // ⚠️ NO hacer signOut — mantener sesión activa para debug
+                        console.error('✅ Usuario autenticado pero no existe en Firestore');
+                        showNotification('Error: Usuario no encontrado en base de datos', 'error');
+                        await firebase.auth().signOut();
                     }
                     
                 } catch (error) {
-                    console.error('❌ [DEBUG] Error obteniendo datos de usuario:', error);
-                    console.error('❌ [DEBUG] error.code:', error.code, '| error.message:', error.message);
-                    showNotification('Error al cargar perfil: ' + error.code + ' — ' + error.message, 'error');
-                    // ⚠️ NO hacer signOut — mantener sesión activa para debug
+                    console.error('❌ Error obteniendo datos de usuario:', error);
+                    showNotification('Error al cargar datos del usuario: ' + error.message, 'error');
+                    
+                    // Si es error de permisos, es probable que las reglas de seguridad bloqueen el acceso
+                    if (error.code === 'permission-denied') {
+                        showNotification(' Sin permisos. Contacta al administrador.', 'error');
+                        await firebase.auth().signOut();
+                    }
                 }
                 
             } else {
@@ -5006,7 +4993,7 @@
             try {
                 // Registrar logout antes de cerrar sesión
                 if (currentUser) {
-                    await db.collection('access_logs').add({
+                    await db.collection('login_logs').add({
                         user: userDisplayName || currentUser.email,
                         user_id: currentUser.uid,
                         email: currentUser.email,
@@ -5233,9 +5220,9 @@
             try {
                 let whitelistSnapshot;
                 try {
-                    whitelistSnapshot = await db.collection('whitelist').where('clientId', '==', window.currentUserClientId).limit(100).get();
+                    whitelistSnapshot = await db.collection('whitelist').limit(100).get();
                 } catch (err) {
-                    const usersSnapshot = await db.collection('users').where('clientId', '==', window.currentUserClientId).where('rfid_tag', '!=', '').get();
+                    const usersSnapshot = await db.collection('users').where('rfid_tag', '!=', '').get();
                     whitelistSnapshot = { empty: usersSnapshot.empty, docs: [] };
                     for (const userDoc of usersSnapshot.docs) {
                         const userData = userDoc.data();
@@ -5248,7 +5235,7 @@
                             });
                         }
                     }
-                    whitelistSnapshot = await db.collection('whitelist').where('clientId', '==', window.currentUserClientId).limit(100).get();
+                    whitelistSnapshot = await db.collection('whitelist').limit(100).get();
                 }
                 
                 let whitelistHtml = '';
@@ -5278,7 +5265,7 @@
                 }
                 whitelistContainer.innerHTML = whitelistHtml;
 
-                const blacklistSnapshot = await db.collection('blacklist').where('clientId', '==', window.currentUserClientId).limit(100).get();
+                const blacklistSnapshot = await db.collection('blacklist').limit(100).get();
                 let blacklistHtml = '';
                 if (blacklistSnapshot.empty) {
                     blacklistHtml = '<p style="text-align:center; color:#7f8c8d;">No hay tags bloqueados</p>';
@@ -6638,22 +6625,10 @@
             }
         });
 
-        /**
-         * Guard: aborta queries si clientId aún no está disponible.
-         * @returns {boolean}
-         */
-        function requireClientId() {
-            if (!window.currentUserClientId) {
-                console.error('❌ currentUserClientId no definido, abortando query Firestore');
-                return false;
-            }
-            return true;
-        }
-
         function initFirestore() {
             const statusEl = document.getElementById('connection-status');
             
-            db.collection('rfid_events').where('clientId', '==', window.currentUserClientId).limit(1).get()
+            db.collection('rfid_tags').limit(1).get()
                 .then(() => {
                     if (statusEl) {
                         statusEl.innerHTML = '<i class="fas fa-circle"></i> <span>Conectado</span>';
@@ -6683,7 +6658,7 @@
         async function updateStats() {
             try {
                 // Count users
-                const usersSnapshot = await db.collection('users').where('clientId', '==', window.currentUserClientId).get();
+                const usersSnapshot = await db.collection('users').get();
                 const residentEl = document.getElementById('residentCount');
                 if (residentEl) residentEl.textContent = usersSnapshot.size;
                 
@@ -6704,8 +6679,7 @@
                 
                 let totalAccesses = 0;
                 try {
-                    const accessSnapshot = await db.collection('rfid_events')
-                        .where('clientId', '==', window.currentUserClientId)
+                    const accessSnapshot = await db.collection('rfid_tags')
                         .where('timestamp', '>=', today)
                         .get();
                     totalAccesses += accessSnapshot.size;
@@ -6714,8 +6688,7 @@
                 }
                 
                 try {
-                    const loginSnapshot = await db.collection('access_logs')
-                        .where('clientId', '==', window.currentUserClientId)
+                    const loginSnapshot = await db.collection('login_logs')
                         .where('timestamp', '>=', today)
                         .get();
                     totalAccesses += loginSnapshot.size;
@@ -6728,8 +6701,7 @@
                 
                 // Count today's alerts
                 try {
-                    const alertSnapshot = await db.collection('emergency_alerts')
-                        .where('clientId', '==', window.currentUserClientId)
+                    const alertSnapshot = await db.collection('alerts')
                         .where('timestamp', '>=', today)
                         .get();
                     
@@ -6743,10 +6715,10 @@
                 
                 // Count whitelist and blacklist
                 try {
-                    const whitelistSnapshot = await db.collection('whitelist').where('clientId', '==', window.currentUserClientId).get();
+                    const whitelistSnapshot = await db.collection('whitelist').get();
                     console.log(`📝 Whitelist: ${whitelistSnapshot.size} tags`);
                     
-                    const blacklistSnapshot = await db.collection('blacklist').where('clientId', '==', window.currentUserClientId).get();
+                    const blacklistSnapshot = await db.collection('blacklist').get();
                     console.log(`🚫 Blacklist: ${blacklistSnapshot.size} tags bloqueados`);
                 } catch (err) {
                     console.log('list counts error:', err.message);
@@ -6818,8 +6790,7 @@
             console.log('🚀 Iniciando listener de eventos...');
             
             // Escuchar eventos en tiempo real
-            eventsListener = db.collection('rfid_events')
-                .where('clientId', '==', window.currentUserClientId)
+            eventsListener = db.collection('rfid_tags')
                 .orderBy('timestamp', 'desc')
                 .limit(100)
                 .onSnapshot(snapshot => {
@@ -7005,9 +6976,7 @@
             tbody.innerHTML = '<tr><td colspan="8" class="loading"><div class="spinner"></div>Cargando...</td></tr>';
             
             try {
-                const snapshot = await db.collection('users')
-                    .where('clientId', '==', window.currentUserClientId)
-                    .orderBy('name').get();
+                const snapshot = await db.collection('users').orderBy('name').get();
                 users = [];
                 snapshot.forEach(doc => {
                     users.push({ id: doc.id, ...doc.data() });
@@ -7406,7 +7375,6 @@
             try {
                 const currentUserId = document.getElementById('userId').value;
                 const snapshot = await db.collection('users')
-                    .where('clientId', '==', window.currentUserClientId)
                     .where('tags', 'array-contains', tagId)
                     .get();
                 
@@ -7588,7 +7556,7 @@
                 console.log('🚀 Iniciando eliminaci�n masiva de usuarios');
 
                 // Obtener todos los usuarios
-                const snapshot = await db.collection('users').where('clientId', '==', window.currentUserClientId).get();
+                const snapshot = await db.collection('users').get();
                 console.log(` Total de usuarios a eliminar: ${snapshot.size}`);
 
                 if (snapshot.empty) {
@@ -7806,12 +7774,12 @@
                         reader_id: randomReader,
                         access_point_name: randomReader.replace('_', ' ').toUpperCase(),
                         timestamp: firebase.firestore.Timestamp.fromDate(eventTime), //  FIRESTORE TIMESTAMP
-                        clientId: window.currentUserClientId,
+                        client_id: 'condominio-neos',
                         source: 'testing_script',
                         status: randomTag.granted ? 'whitelist' : 'not_registered'
                     };
 
-                    await db.collection('rfid_events').add(eventData);
+                    await db.collection('rfid_tags').add(eventData);
                     console.log(`   Evento ${i + 1}/20: ${randomTag.name} - ${eventTime.toLocaleString('es-ES')}`);
                 }
 
@@ -8024,7 +7992,6 @@
                 try {
                     for (const tagId of tags) {
                         const snapshot = await db.collection('users')
-                            .where('clientId', '==', window.currentUserClientId)
                             .where('tags', 'array-contains', tagId)
                             .get();
                         
@@ -8058,8 +8025,7 @@
                     tags: tags,
                     active: active,
                     updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-                    updated_by: currentUser || 'dashboard',
-                    clientId: window.currentUserClientId
+                    updated_by: currentUser || 'dashboard'
                 };
                 
                 if (userId) {
@@ -8087,7 +8053,6 @@
                             departamento: departamento,
                             added_at: firebase.firestore.FieldValue.serverTimestamp(),
                             added_by: currentUser || 'dashboard',
-                            clientId: window.currentUserClientId,
                             active: active
                         })
                     ));
@@ -8374,7 +8339,7 @@
                 // Obtener logs de tags desconocidos (�ltimos 7 días)
                 const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
                 const snapshot = await db.collection('access_logs')
-                    .where('clientId', '==', window.currentUserClientId).where('status', '==', 'unknown')
+                    .where('status', '==', 'unknown')
                     .where('timestamp', '>=', sevenDaysAgo)
                     .orderBy('timestamp', 'desc')
                     .limit(100)
@@ -8450,8 +8415,7 @@
                 await db.collection('blacklist').doc(tagId).set({
                     added_at: firebase.firestore.FieldValue.serverTimestamp(),
                     added_by: currentUser || 'Sistema',
-                    reason: 'Bloqueado manualmente',
-                    clientId: window.currentUserClientId
+                    reason: 'Bloqueado manualmente'
                 });
                 
                 showNotification(' Tag agregado a la blacklist', 'success');
@@ -8762,7 +8726,6 @@
                     
                     // Buscar �ltima lectura de este reader_id en access_logs
                     const lastActivitySnapshot = await db.collection('access_logs')
-                        .where('clientId', '==', window.currentUserClientId)
                         .where('reader_id', '==', readerId)
                         .orderBy('timestamp', 'desc')
                         .limit(1)
@@ -8800,7 +8763,7 @@
                 // 2. Alertas de tags desconocidos (�ltimas 24 horas)
                 const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
                 const unknownTagsSnapshot = await db.collection('access_logs')
-                    .where('clientId', '==', window.currentUserClientId).where('status', '==', 'unknown')
+                    .where('status', '==', 'unknown')
                     .where('timestamp', '>=', oneDayAgo)
                     .orderBy('timestamp', 'desc')
                     .limit(10)
@@ -8820,7 +8783,6 @@
                 
                 // 3. Alertas de accesos denegados (�ltimas 24 horas)
                 const deniedAccessSnapshot = await db.collection('access_logs')
-                    .where('clientId', '==', window.currentUserClientId)
                     .where('status', '==', 'denied')
                     .where('timestamp', '>=', oneDayAgo)
                     .orderBy('timestamp', 'desc')
@@ -8919,8 +8881,7 @@
                 
                 // Cargar desde login_logs (aperturas manuales y eventos del sistema)
                 try {
-                    const loginSnapshot = await db.collection('access_logs')
-                        .where('clientId', '==', window.currentUserClientId)
+                    const loginSnapshot = await db.collection('login_logs')
                         .where('timestamp', '>=', date)
                         .where('timestamp', '<=', endDate)
                         .orderBy('timestamp', 'desc')
@@ -8936,8 +8897,7 @@
                 
                 // Cargar desde rfid_tags (lecturas de tags)
                 try {
-                    const tagSnapshot = await db.collection('rfid_events')
-                        .where('clientId', '==', window.currentUserClientId)
+                    const tagSnapshot = await db.collection('rfid_tags')
                         .where('timestamp', '>=', date)
                         .where('timestamp', '<=', endDate)
                         .orderBy('timestamp', 'desc')
@@ -9502,7 +9462,6 @@
                 // Estrategia 1: Intentar access_logs sin orderBy
                 try {
                     const logsSnapshot = await db.collection('access_logs')
-                        .where('clientId', '==', window.currentUserClientId)
                         .limit(500)
                         .get();
                     
@@ -9520,8 +9479,7 @@
                     
                     // Estrategia 2: Intentar rfid_tags sin orderBy
                     try {
-                        const tagsSnapshot = await db.collection('rfid_events')
-                            .where('clientId', '==', window.currentUserClientId)
+                        const tagsSnapshot = await db.collection('rfid_tags')
                             .limit(500)
                             .get();
                         
@@ -10341,8 +10299,7 @@
             // Escuchar colecci�n rfid_tags en tiempo real
             // Intentar sin orderBy primero para evitar problemas de �ndice
             try {
-                db.collection('rfid_events')
-                    .where('clientId', '==', window.currentUserClientId)
+                db.collection('rfid_tags')
                     .limit(50)
                     .onSnapshot(snapshot => {
                         console.log(`📦 Snapshot recibido: ${snapshot.size} documentos`);
@@ -10611,7 +10568,7 @@
             
             try {
                 // Cargar lista de usuarios para el selector (sin orderBy para evitar �ndice compuesto)
-                const usersSnapshot = await db.collection('users').where('clientId', '==', window.currentUserClientId).where('active', '==', true).get();
+                const usersSnapshot = await db.collection('users').where('active', '==', true).get();
                 const usersList = [];
                 usersSnapshot.forEach(doc => {
                     const user = doc.data();
@@ -10835,7 +10792,6 @@
                         departamento: userData.departamento,
                         added_at: firebase.firestore.FieldValue.serverTimestamp(),
                         added_by: currentUser || 'dashboard',
-                        clientId: window.currentUserClientId,
                         active: true
                     });
                     
@@ -10916,8 +10872,7 @@
                         tags: [tagId],
                         active: active,
                         created_at: firebase.firestore.FieldValue.serverTimestamp(),
-                        created_by: currentUser || 'dashboard',
-                        clientId: window.currentUserClientId
+                        created_by: currentUser || 'dashboard'
                     };
                     
                     await db.collection('users').add(userData);
@@ -10929,7 +10884,6 @@
                         departamento: departamento,
                         added_at: firebase.firestore.FieldValue.serverTimestamp(),
                         added_by: currentUser || 'dashboard',
-                        clientId: window.currentUserClientId,
                         active: true
                     });
                     
@@ -11032,7 +10986,7 @@
                 }
                 
                 // 2. REGISTRAR EVENTO en Firestore
-                const eventDoc = await db.collection('rfid_events').add({
+                const eventDoc = await db.collection('rfid_tags').add({
                     event_type: 'manual_door_open',
                     access_point_id: doorId,
                     access_point_name: doorName,
@@ -11045,7 +10999,7 @@
                     reader_id: doorId,
                     location: doorName,
                     source: 'dashboard_manual',
-                    clientId: window.currentUserClientId
+                    client_id: 'condominio-neos'
                 });
                 
                 showNotification(` ${doorName} abierta exitosamente`, 'success');
@@ -11089,8 +11043,7 @@
                 console.log('⏳ Cargando historial de acciones de control...');
                 
                 // Consultar eventos manuales (sin orderBy para evitar �ndice compuesto)
-                const manualEventsSnapshot = await db.collection('rfid_events')
-                    .where('clientId', '==', window.currentUserClientId)
+                const manualEventsSnapshot = await db.collection('rfid_tags')
                     .where('event_type', '==', 'manual_open')
                     .limit(50)
                     .get();
@@ -11624,7 +11577,7 @@
             if (!confirm('�Eliminar todos los registros de access_logs')) return;
             
             try {
-                const snapshot = await db.collection('access_logs').where('clientId', '==', window.currentUserClientId).limit(500).get();
+                const snapshot = await db.collection('access_logs').limit(500).get();
                 const batch = db.batch();
                 
                 snapshot.forEach(doc => {
@@ -11916,14 +11869,17 @@
             console.log('🚀 Iniciando aplicaci�n NeosTech RFID System Pro v2.4.14-OPTIMIZED');
             
             try {
-                // initFirestore(), loadData() e initLiveTagReading() se llaman desde
-                // onAuthStateChanged, una vez que window.currentUserClientId está disponible.
+                initFirestore();
+                loadData();
                 if (typeof initCharts === 'function') {
                     initCharts();
                 }
                 
                 // Inicializar sistema de paginación de live tags
                 initializeLiveTagsPagination();
+                
+                // Inicializar listener en tiempo real para tags RFID
+                initLiveTagReading();
             } catch (error) {
                 console.warn('❌ Error durante inicializaci�n:', error.message);
             }
@@ -12192,7 +12148,6 @@ Se actualizar� información en breve.`,
         async function loadActiveAlerts() {
             try {
                 const alertsSnapshot = await db.collection('emergency_alerts')
-                    .where('clientId', '==', window.currentUserClientId)
                     .where('status', '==', 'ACTIVE')
                     .orderBy('issued_at', 'desc')
                     .get();
@@ -12341,7 +12296,7 @@ Se actualizar� información en breve.`,
         // Cargar contador total
         async function loadTotalAlertsCount() {
             try {
-                const snapshot = await db.collection('emergency_alerts').where('clientId', '==', window.currentUserClientId).get();
+                const snapshot = await db.collection('emergency_alerts').get();
                 const counter = document.getElementById('totalAlertsCount');
                 if (counter) {
                     counter.textContent = snapshot.size;
@@ -12354,7 +12309,6 @@ Se actualizar� información en breve.`,
         // Escuchar cambios en tiempo real
         function listenToActiveAlerts() {
             db.collection('emergency_alerts')
-                .where('clientId', '==', window.currentUserClientId)
                 .where('status', '==', 'ACTIVE')
                 .onSnapshot(snapshot => {
                     console.log('[Alertas] Actualizaci�n en tiempo real');
@@ -12548,8 +12502,7 @@ Se actualizar� información en breve.`,
                     issued_by: currentUser.uid || 'admin',
                     created_at: firebase.firestore.FieldValue.serverTimestamp(),
                     confirmed_safe_count: 0,
-                    total_recipients: 0,
-                    clientId: window.currentUserClientId
+                    total_recipients: 0
                 };
                 
                 console.log('[Alertas]  Datos de alerta preparados:', alertData);
@@ -12564,7 +12517,7 @@ Se actualizar� información en breve.`,
                 console.log('[Alertas]  Consultando suscriptores...');
                 
                 // Primero ver TODOS los suscriptores (sin filtro)
-                const allSubscribersSnapshot = await db.collection('alert_subscribers').where('clientId', '==', window.currentUserClientId).get();
+                const allSubscribersSnapshot = await db.collection('alert_subscribers').get();
                 console.log(`[Alertas]  Total de registros en DB: ${allSubscribersSnapshot.size}`);
                 
                 allSubscribersSnapshot.forEach(doc => {
@@ -12581,7 +12534,7 @@ Se actualizar� información en breve.`,
                 
                 // Ahora filtrar solo los activos
                 const subscribersSnapshot = await db.collection('alert_subscribers')
-                    .where('clientId', '==', window.currentUserClientId).where('notifications_enabled', '==', true)
+                    .where('notifications_enabled', '==', true)
                     .get();
                 const subscribersCount = subscribersSnapshot.size;
                 
@@ -12826,7 +12779,7 @@ Se actualizar� información en breve.`,
                 console.log('[Alertas]  Activando todos los suscriptores...');
                 
                 const snapshot = await db.collection('alert_subscribers')
-                    .where('clientId', '==', window.currentUserClientId).where('notifications_enabled', '==', false)
+                    .where('notifications_enabled', '==', false)
                     .get();
                 
                 console.log(`[Alertas]  Encontrados ${snapshot.size} suscriptores inactivos`);
@@ -12858,7 +12811,7 @@ Se actualizar� información en breve.`,
             try {
                 console.log('[DEBUG]  Analizando base de datos de suscriptores...');
                 
-                const allDocs = await db.collection('alert_subscribers').where('clientId', '==', window.currentUserClientId).get();
+                const allDocs = await db.collection('alert_subscribers').get();
                 
                 console.log(`[DEBUG]  TOTAL DE DOCUMENTOS: ${allDocs.size}`);
                 console.log('[DEBUG] =====================================');
@@ -12908,7 +12861,7 @@ Se actualizar� información en breve.`,
             console.log('[CLEAN] 🚀 Iniciando limpieza de suscriptores sin token...');
             
             try {
-                const snapshot = await db.collection('alert_subscribers').where('clientId', '==', window.currentUserClientId).get();
+                const snapshot = await db.collection('alert_subscribers').get();
                 console.log(`[CLEAN]  Total documentos: ${snapshot.size}`);
                 
                 let deleted = 0;
@@ -12949,7 +12902,7 @@ Se actualizar� información en breve.`,
         async function loadSubscribersCount() {
             try {
                 const snapshot = await db.collection('alert_subscribers')
-                    .where('clientId', '==', window.currentUserClientId).where('notifications_enabled', '==', true)
+                    .where('notifications_enabled', '==', true)
                     .get();
                 
                 const count = snapshot.size;
@@ -13026,11 +12979,11 @@ Se actualizar� información en breve.`,
 
         async function loadQRStats() {
             try {
-                const snapshot = await db.collection('alert_subscribers').where('clientId', '==', window.currentUserClientId).get();
+                const snapshot = await db.collection('alert_subscribers').get();
                 const total = snapshot.size;
                 
                 const activeSnapshot = await db.collection('alert_subscribers')
-                    .where('clientId', '==', window.currentUserClientId).where('notifications_enabled', '==', true)
+                    .where('notifications_enabled', '==', true)
                     .get();
                 const active = activeSnapshot.size;
 

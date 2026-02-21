@@ -310,6 +310,17 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // Bootstrap multi-tenant: leer clientId desde JWT claims
+        let currentUserClientId = null;
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                user.getIdTokenResult().then(function(result) {
+                    currentUserClientId = result.claims.clientId || null;
+                    console.log('[Register] clientId cargado:', currentUserClientId);
+                });
+            }
+        });
+
         // Registrar Service Worker PRIMERO
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/firebase-messaging-sw.js')
@@ -352,7 +363,8 @@
                     device_type: /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'iOS' : 'Android',
                     last_seen: firebase.firestore.FieldValue.serverTimestamp(),
                     platform: navigator.platform,
-                    user_agent: navigator.userAgent
+                    user_agent: navigator.userAgent,
+                    clientId: currentUserClientId
                 };
 
                 // Guardar en Firestore

@@ -127,6 +127,11 @@
                 <input type="text" id="displayName" value="Administrador Sistema" required>
             </div>
 
+            <div class="form-group">
+                <label for="clientId">🏢 Client ID (tenant):</label>
+                <input type="text" id="clientId" value="tenant-A" required>
+            </div>
+
             <button type="submit" id="submitBtn">Crear Usuario Admin</button>
         </form>
 
@@ -159,6 +164,7 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const displayName = document.getElementById('displayName').value;
+            const clientId = document.getElementById('clientId').value.trim();
             const submitBtn = document.getElementById('submitBtn');
             const resultDiv = document.getElementById('result');
             
@@ -183,6 +189,7 @@
                 await db.collection('users').doc(user.uid).set({
                     email: email,
                     displayName: displayName,
+                    clientId: clientId,
                     role: 'admin',
                     permissions: {
                         manage_users: true,
@@ -210,7 +217,8 @@
                     📧 Email: ${email}<br>
                     🔑 Contraseña: ${password}<br>
                     👤 Nombre: ${displayName}<br>
-                    🆔 UID: ${user.uid}<br><br>
+                    🆔 UID: ${user.uid}<br>
+                    🏢 Client ID: ${clientId}<br><br>
                     <strong>✅ Ahora puedes hacer login en:</strong><br>
                     <a href="https://neos-tech.web.app" style="color: #667eea; font-weight: bold;">
                         https://neos-tech.web.app

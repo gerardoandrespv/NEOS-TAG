@@ -370,6 +370,17 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // Bootstrap multi-tenant: leer clientId desde JWT claims
+        let currentUserClientId = null;
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                user.getIdTokenResult().then(function(result) {
+                    currentUserClientId = result.claims.clientId || null;
+                    console.log('[Mobile] clientId cargado:', currentUserClientId);
+                });
+            }
+        });
+
         let activeAlerts = [];
         let previousAlertIds = new Set();
         let confirmedAlerts = JSON.parse(localStorage.getItem('confirmedAlerts') || '{}');
@@ -659,7 +670,8 @@
                         notifications_enabled: true,
                         created_at: firebase.firestore.FieldValue.serverTimestamp(),
                         last_updated: firebase.firestore.FieldValue.serverTimestamp(),
-                        app_version: 'mobile-alerts-v1.0'
+                        app_version: 'mobile-alerts-v1.0',
+                        clientId: currentUserClientId
                     }, { merge: true });
                     
                     console.log('[Mobile] ✅ Token guardado en alert_subscribers');
@@ -1084,6 +1096,7 @@
                 console.log('[Mobile] 🔍 Cargando alertas activas...');
                 
                 const snapshot = await db.collection('emergency_alerts')
+                    .where('clientId', '==', currentUserClientId)
                     .where('status', '==', 'ACTIVE')
                     .orderBy('issued_at', 'desc')
                     .get();
@@ -1116,6 +1129,7 @@
                     console.log('[Mobile] 🔄 Reintentando sin orderBy...');
                     try {
                         const snapshot = await db.collection('emergency_alerts')
+                            .where('clientId', '==', currentUserClientId)
                             .where('status', '==', 'ACTIVE')
                             .get();
                         
@@ -1460,6 +1474,7 @@
 
         // Listen to real-time updates
         db.collection('emergency_alerts')
+            .where('clientId', '==', currentUserClientId)
             .where('status', '==', 'ACTIVE')
             .onSnapshot(snapshot => {
                 console.log('[Mobile] 🔄 ========== ACTUALIZACIÓN EN TIEMPO REAL ==========');

@@ -1,0 +1,299 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurar Usuario en Firestore - NeosTech</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #0d47a1;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Restaurar Usuario en Firestore</h1>
+        <p class="subtitle">Crea el documento de Firestore para un usuario que ya existe en Authentication</p>
+
+        <div class="info-box">
+            ℹ️ Este formulario solo crea el documento en Firestore. El usuario debe existir previamente en Firebase Authentication.
+        </div>
+
+        <form id="restoreUserForm">
+            <div class="form-group">
+                <label for="uid">🆔 UID del Usuario:</label>
+                <input type="text" id="uid" placeholder="Ej: xK2mN9pQ8rS..." required>
+                <small style="color: #666; font-size: 12px;">El UID se encuentra en Firebase Console → Authentication</small>
+            </div>
+
+            <div class="form-group">
+                <label for="email">📧 Email:</label>
+                <input type="email" id="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="displayName">👤 Nombre completo:</label>
+                <input type="text" id="displayName" required>
+            </div>
+
+            <div class="form-group">
+                <label for="role">🎭 Rol:</label>
+                <select id="role" required>
+                    <option value="admin">Admin (acceso completo)</option>
+                    <option value="staff">Staff (gestión operativa)</option>
+                    <option value="resident">Resident (usuario final)</option>
+                    <option value="guest">Guest (acceso temporal)</option>
+                </select>
+            </div>
+
+            <button type="submit" id="submitBtn">Crear Documento en Firestore</button>
+            <button type="button" class="btn-secondary" id="autoFillBtn">Autocompletar desde usuario actual</button>
+        </form>
+
+        <div id="result" class="result"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <script>
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZ-XRSRgC2gz9E6zdYpes7yv5nLZtKmSw",
+            authDomain: "neos-tech.firebaseapp.com",
+            projectId: "neos-tech",
+            storageBucket: "neos-tech.firebasestorage.app",
+            messagingSenderId: "738411977369",
+            appId: "1:738411977369:web:7facc71cea4c271d217608",
+            measurementId: "G-DL4X5MX5JL"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Autocompletar con usuario actual si está autenticado
+        document.getElementById('autoFillBtn').addEventListener('click', () => {
+            const user = auth.currentUser;
+            if (user) {
+                document.getElementById('uid').value = user.uid;
+                document.getElementById('email').value = user.email || '';
+                document.getElementById('displayName').value = user.displayName || '';
+                showResult('Datos autocompletados desde usuario actual', 'success');
+            } else {
+                showResult('No hay usuario autenticado. Haz login primero en otra pestaña.', 'error');
+            }
+        });
+
+        document.getElementById('restoreUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const uid = document.getElementById('uid').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const displayName = document.getElementById('displayName').value.trim();
+            const role = document.getElementById('role').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const resultDiv = document.getElementById('result');
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creando documento...';
+            resultDiv.style.display = 'none';
+            
+            try {
+                // Crear documento en Firestore
+                const userData = {
+                    email: email,
+                    name: displayName,
+                    displayName: displayName,
+                    role: role,
+                    status: 'active',
+                    permissions: role === 'admin' ? {
+                        manage_users: true,
+                        manage_tags: true,
+                        send_alerts: true,
+                        view_logs: true,
+                        manage_buildings: true
+                    } : {
+                        manage_users: false,
+                        manage_tags: role === 'staff',
+                        send_alerts: role === 'staff',
+                        view_logs: role === 'staff',
+                        manage_buildings: false
+                    },
+                    notifications_enabled: true,
+                    created_at: firebase.firestore.FieldValue.serverTimestamp(),
+                    updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+                    building_access: ['all'],
+                    floor_access: ['all']
+                };
+
+                await db.collection('users').doc(uid).set(userData);
+                
+                console.log('✅ Documento creado en Firestore para UID:', uid);
+                
+                showResult(`
+                    <strong>🎉 ¡Documento creado exitosamente!</strong><br><br>
+                    🆔 UID: ${uid}<br>
+                    📧 Email: ${email}<br>
+                    👤 Nombre: ${displayName}<br>
+                    🎭 Rol: ${role}<br><br>
+                    <strong>✅ El usuario ahora puede hacer login en:</strong><br>
+                    <a href="/" style="color: #667eea; font-weight: bold;">Dashboard Principal</a>
+                `, 'success');
+                
+                // Limpiar formulario
+                setTimeout(() => {
+                    document.getElementById('restoreUserForm').reset();
+                }, 3000);
+                
+            } catch (error) {
+                console.error('❌ Error creando documento:', error);
+                showResult(`
+                    <strong>❌ Error al crear documento</strong><br><br>
+                    ${error.message}<br><br>
+                    Verifica que:
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>El UID sea correcto</li>
+                        <li>Tengas permisos de escritura en Firestore</li>
+                        <li>Las reglas de seguridad lo permitan</li>
+                    </ul>
+                `, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Crear Documento en Firestore';
+            }
+        });
+
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+            resultDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
