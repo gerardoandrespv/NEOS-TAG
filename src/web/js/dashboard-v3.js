@@ -504,8 +504,13 @@ function _initAuth() {
     if (btn) { btn.disabled = true; btn.textContent = 'Verificando…'; }
 
     try {
-      await FirebaseStubs.signIn(email, password);
-      // FirebaseStubs llama a _onAuthSuccess()
+      const result = await FirebaseStubs.signIn(email, password);
+      // Con Firebase real, onAuthStateChanged se dispara automáticamente
+      // y llama a _showApp(). Si usamos el stub, necesitamos llamarlo manualmente.
+      if (result && result.user && typeof firebase === 'undefined') {
+        _showApp({ ...result.user, role: 'admin', clientId: null });
+        _initRouter();
+      }
     } catch (err) {
       _log('auth error', err);
       if (errorEl) {
@@ -538,10 +543,12 @@ function _authErrorMsg(code) {
 }
 
 function _showApp(userData) {
-  const authScreen = document.getElementById('authScreen');
-  const appShell   = document.getElementById('appShell');
-  if (authScreen) authScreen.hidden = true;
-  if (appShell)   appShell.hidden = false;
+  const loadingScreen = document.getElementById('loadingScreen');
+  const authScreen    = document.getElementById('authScreen');
+  const appShell      = document.getElementById('appShell');
+  if (loadingScreen) loadingScreen.hidden = true;
+  if (authScreen)    authScreen.hidden = true;
+  if (appShell)      appShell.hidden = false;
 
   // Update user UI
   const name   = userData?.displayName ?? userData?.email ?? 'Usuario';
@@ -558,10 +565,12 @@ function _showApp(userData) {
 }
 
 function _showAuth() {
-  const authScreen = document.getElementById('authScreen');
-  const appShell   = document.getElementById('appShell');
-  if (authScreen) authScreen.hidden = false;
-  if (appShell)   appShell.hidden = true;
+  const loadingScreen = document.getElementById('loadingScreen');
+  const authScreen    = document.getElementById('authScreen');
+  const appShell      = document.getElementById('appShell');
+  if (loadingScreen) loadingScreen.hidden = true;
+  if (authScreen)    authScreen.hidden = false;
+  if (appShell)      appShell.hidden = true;
   _cleanupListeners();
 }
 
