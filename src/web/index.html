@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -4510,9 +4510,7 @@
     <script>
         // VERSION DEL DASHBOARD - VERIFICAR CACHE
         console.clear();
-        console.log('%c NeosTech RFID Dashboard v2.5.0-QR-REGISTER', 'background: #10b981; color: white; padding: 8px 15px; border-radius: 5px; font-weight: bold; font-size: 14px;');
-        console.log('%c Cargado:', new Date().toLocaleString('es-ES'), 'color: #64748b;');
-        console.log('%c✅ Sistema de registro por QR activado', 'color: #10b981; font-weight: bold;');
+        console.log('[NeosTech] Dashboard ready — ' + new Date().toLocaleString('es-ES'));
         
         // Firebase Configuration
         const firebaseConfig = {
@@ -4789,20 +4787,24 @@
                 currentUser = user;
                 
                 try {
-                    // DEBUG: loguear UID y claims antes de cualquier query
-                    console.log('🔍 [DEBUG] UID:', user.uid);
-                    firebase.auth().currentUser.getIdTokenResult()
-                        .then(r => console.log('🔍 [DEBUG] CLAIMS', r.claims))
-                        .catch(e => console.warn('⚠️ [DEBUG] getIdTokenResult error:', e));
+                    // Obtener datos del usuario — clientId del JWT, luego query multi-tenant
+                    const tokenResult = await user.getIdTokenResult();
+                    const tenantClientId = tokenResult.claims.clientId || null;
+                    if (!tenantClientId) {
+                        console.error('❌ clientId faltante en JWT claims para UID: ' + user.uid);
+                        showNotification('Error: clientId no configurado. Contactar al administrador.', 'error');
+                        return;
+                    }
+                    window.currentUserClientId = tenantClientId;
+                    const userSnap = await db.collection('users')
+                        .where('clientId', '==', tenantClientId)
+                        .where(firebase.firestore.FieldPath.documentId(), '==', user.uid)
+                        .limit(1)
+                        .get();
 
-                    // Obtener datos del usuario desde Firestore
-                    const userDoc = await db.collection('users').doc(user.uid).get();
-                    console.log('🔍 [DEBUG] PROFILE', userDoc.exists ? userDoc.data() : 'DOCUMENT DOES NOT EXIST');
-
-                    if (userDoc.exists) {
-                        const userData = userDoc.data();
+                    if (!userSnap.empty) {
+                        const userData = userSnap.docs[0].data();
                         userRole = userData.role || 'resident';
-                        window.currentUserClientId = userData.clientId;
                         userDisplayName = userData.name || user.displayName || user.email;
                         
                         console.log('✅ Usuario autenticado:', {
@@ -4817,32 +4819,29 @@
                         applyRoleRestrictions();
                         hideLoginModal();
 
-                        // Inicializar Firestore y datos solo cuando clientId está disponible
-                        initFirestore();
-                        loadData();
-                        initLiveTagReading();
-                        
-                        // Log de inicio de sesión
+                        // Log de inicio de sesión (antes de redirigir)
                         await db.collection('access_logs').add({
                             user: userDisplayName,
                             user_id: user.uid,
                             email: user.email,
                             role: userRole,
+                            clientId: window.currentUserClientId,
                             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                             action: 'login'
                         });
+
+                        // index.html es solo login — redirigir al dashboard Pro
+                        window.location.replace('/dashboard-pro.html');
+                        return;
                         
                     } else {
-                        console.error('❌ [DEBUG] Documento users/' + user.uid + ' NO existe en Firestore');
-                        showNotification('Error: Perfil no encontrado para UID: ' + user.uid, 'error');
-                        // ⚠️ NO hacer signOut — mantener sesión activa para debug
+                        console.error('❌ Perfil no encontrado para UID: ' + user.uid + ' (clientId: ' + tenantClientId + ')');
+                        showNotification('Error: Perfil no encontrado en Firestore', 'error');
                     }
                     
                 } catch (error) {
-                    console.error('❌ [DEBUG] Error obteniendo datos de usuario:', error);
-                    console.error('❌ [DEBUG] error.code:', error.code, '| error.message:', error.message);
+                    console.error('❌ Error obteniendo datos de usuario:', error.code, error.message);
                     showNotification('Error al cargar perfil: ' + error.code + ' — ' + error.message, 'error');
-                    // ⚠️ NO hacer signOut — mantener sesión activa para debug
                 }
                 
             } else {
@@ -5011,6 +5010,7 @@
                         user_id: currentUser.uid,
                         email: currentUser.email,
                         role: userRole,
+                        clientId: window.currentUserClientId,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                         action: 'logout'
                     });
@@ -7483,13 +7483,17 @@
         async function editUser(userId) {
             try {
                 console.log('📋 Editando usuario:', userId);
-                const userDoc = await db.collection('users').doc(userId).get();
-                if (!userDoc.exists) {
+                const userSnap = await db.collection('users')
+                    .where('clientId', '==', window.currentUserClientId)
+                    .where(firebase.firestore.FieldPath.documentId(), '==', userId)
+                    .limit(1)
+                    .get();
+                if (userSnap.empty) {
                     showNotification(' Usuario no encontrado', 'error');
                     return;
                 }
                 
-                const user = userDoc.data();
+                const user = userSnap.docs[0].data();
                 console.log('📋 Datos del usuario:', user);
                 
                 const modal = document.getElementById('userModal');
@@ -7546,9 +7550,13 @@
                 showNotification(' Eliminando usuario...', 'info');
                 
                 // Obtener usuario para eliminar sus tags de whitelist
-                const userDoc = await db.collection('users').doc(userId).get();
-                if (userDoc.exists) {
-                    const user = userDoc.data();
+                const userSnap = await db.collection('users')
+                    .where('clientId', '==', window.currentUserClientId)
+                    .where(firebase.firestore.FieldPath.documentId(), '==', userId)
+                    .limit(1)
+                    .get();
+                if (!userSnap.empty) {
+                    const user = userSnap.docs[0].data();
                     const tags = user.tags || [];
                     
                     // Eliminar tags de whitelist
@@ -11802,8 +11810,6 @@
         console.log('   - generateSampleChartData()  📊 Gráficos con datos de ejemplo');
         console.log('   - loadLectoraConfig()  ⚙️ Cargar config lectora THY');
         console.log('   - saveLectoraConfig()  💾 Guardar config lectora THY');
-        console.log('   - debugSubscribers()  👀 Ver todos los suscriptores de alertas');
-        console.log('   - activateAllSubscribers()  ✅ Activar todos los suscriptores');
         console.log('   - checkServiceWorker()  🔍 Diagnosticar estado del Service Worker');
         console.log('   - testDirectPush()  📤 Enviar notificación de prueba directa');
         
@@ -11944,9 +11950,7 @@
                     if (e.key === 'Enter') performLogin();
                 });
             }
-            
-            console.log(' Sistema inicializado correctamente');
-            
+
             // Global keyboard shortcuts
             document.addEventListener('keydown', (e) => {
                 // Ctrl+K o Cmd+K para b�squeda global
@@ -11966,8 +11970,6 @@
             // if (globalSearchInput) {
             //     globalSearchInput.addEventListener('input', handleGlobalSearch);
             // }
-            
-            console.log(' Aplicaci�n inicializada correctamente');
         });
 
         // ============================================
@@ -13409,16 +13411,6 @@ Se actualizar� información en breve.`,
             }, 5000);
         }
 
-        // Initialize push notifications after user logs in
-        if (firebase.apps.length > 0) {
-            firebase.auth().onAuthStateChanged((user) => {
-                if (user) {
-                    setTimeout(() => {
-                        initPushNotifications();
-                    }, 2000); // Wait 2 seconds after login
-                }
-            });
-        }
     </script>
 
     <style>

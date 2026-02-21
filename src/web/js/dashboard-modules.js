@@ -17,21 +17,17 @@ const firebaseConfig = {
 };
 
 // Inicializar Firebase
-console.log('🔧 [FIREBASE] Iniciando Firebase...');
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
-    console.log('✅ [FIREBASE] Firebase inicializado correctamente');
 } else {
-    console.log('⚠️ [FIREBASE] Firebase ya estaba inicializado');
+    // already initialized (hot reload / multi-script)
 }
 
 const db = firebase.firestore();
 const auth = firebase.auth();
 const messaging = firebase.messaging.isSupported() ? firebase.messaging() : null;
 
-console.log('✅ [FIREBASE] Firestore conectado');
-console.log('✅ [FIREBASE] Auth inicializado');
-console.log('📱 [FIREBASE] Messaging soportado:', !!messaging);
+console.log('[NeosTech] Firebase ready | Messaging:', !!messaging);
 
 /* ========================================
    VARIABLES GLOBALES
@@ -79,29 +75,23 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 ========================================');
     
     // Verificar autenticación
-    console.log('🔐 [AUTH] Configurando listener de autenticación...');
     auth.onAuthStateChanged(user => {
-        console.log('🔐 [AUTH] Estado de autenticación cambió');
         if (user) {
-            console.log('✅ [AUTH] Usuario autenticado:', user.email);
-            console.log('✅ [AUTH] UID:', user.uid);
+            console.log('[Auth] Autenticado:', user.email);
             currentUser = user;
             
             const modal = document.getElementById('loginModal');
-            console.log('🔐 [AUTH] Ocultando loginModal...');
             modal.style.display = 'none';
             
-            console.log('🔐 [AUTH] Llamando initDashboard()...');
             initDashboard();
         } else {
-            console.log('⚠️ [AUTH] Usuario NO autenticado - mostrando login');
+            console.log('[Auth] Sin sesión — mostrando login');
             const modal = document.getElementById('loginModal');
             modal.style.display = 'flex';
         }
     });
     
     // Actualizar reloj
-    console.log('⏰ [CLOCK] Iniciando reloj...');
     updateClock();
     setInterval(updateClock, 1000);
 });
@@ -110,35 +100,27 @@ document.addEventListener('DOMContentLoaded', function() {
  * Autenticación - Login
  */
 function performLogin() {
-    console.log('🔐 [AUTH] performLogin iniciado');
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     
-    console.log('🔐 [AUTH] Intentando login con email:', email);
-    
     if (!email || !password) {
         showNotification('Por favor ingresa email y contraseña', 'warning');
-        console.warn('⚠️ [AUTH] Email o password vacío');
         return;
     }
     
     auth.signInWithEmailAndPassword(email, password)
         .then((userCredential) => {
-            console.log('✅ [AUTH] Login exitoso:', userCredential.user.email);
+            console.log('[Auth] Login exitoso:', userCredential.user.email);
             showNotification('¡Bienvenido a Neos Tech!', 'success');
             currentUser = userCredential.user;
             
             const modal = document.getElementById('loginModal');
-            console.log('🔐 [AUTH] Ocultando modal de login...');
             modal.style.display = 'none';
             
-            console.log('🔐 [AUTH] Llamando initDashboard()...');
             initDashboard();
         })
         .catch((error) => {
-            console.error('❌ [AUTH] Error de autenticación:', error);
-            console.error('❌ [AUTH] Error code:', error.code);
-            console.error('❌ [AUTH] Error message:', error.message);
+            console.error('[Auth] Error de autenticación:', error.code, error.message);
             showNotification('Error: ' + error.message, 'danger');
         });
 }
@@ -157,10 +139,7 @@ function logout() {
  * Inicialización del dashboard después del login
  */
 function initDashboard() {
-    console.log('🚀 ========================================');
-    console.log('🚀 [INIT] initDashboard() INICIADO');
-    console.log('🚀 ========================================');
-    console.log('✅ Dashboard inicializado para:', currentUser.email);
+    console.log('[NeosTech] initDashboard —', currentUser.email);
     
     // Mostrar email del usuario
     const userInfoEl = document.getElementById('user-info');
@@ -170,22 +149,37 @@ function initDashboard() {
         if (nameEl) nameEl.textContent = currentUser.email;
     }
     
-    // GATE: leer users/{uid} para obtener clientId ANTES de cualquier query multi-tenant
-    console.log('📂 [INIT] Leyendo perfil de usuario (clientId + role)...');
-    db.collection('users').doc(currentUser.uid).get().then((userDoc) => {
-        if (!userDoc.exists) {
-            console.error('❌ [INIT] Perfil no encontrado en users/' + currentUser.uid);
+    // GATE: obtener clientId del JWT, luego confirmar perfil con query multi-tenant
+    currentUser.getIdTokenResult().then((tokenResult) => {
+        const tenantClientId = tokenResult.claims.clientId || null;
+        if (!tenantClientId) {
+            console.error('[NeosTech] clientId no encontrado en JWT claims para UID: ' + currentUser.uid);
+            showNotification('Error: clientId no configurado. Contactar al administrador.', 'danger');
+            return Promise.reject(new Error('Missing clientId in token claims'));
+        }
+        window.currentUserClientId = tenantClientId;
+        return db.collection('users')
+            .where('clientId', '==', tenantClientId)
+            .where(firebase.firestore.FieldPath.documentId(), '==', currentUser.uid)
+            .limit(1)
+            .get();
+    }).then((snapshot) => {
+        if (!snapshot) return;
+        if (snapshot.empty) {
+            console.error('[NeosTech] Perfil no encontrado en users/' + currentUser.uid);
             showNotification('Perfil de usuario no encontrado en Firestore', 'danger');
             return;
         }
-        const userData = userDoc.data();
+        const userData = snapshot.docs[0].data();
         userRole = userData.role || 'resident';
-        window.currentUserClientId = userData.clientId;
-        console.log('✅ [INIT] clientId:', window.currentUserClientId, '| role:', userRole);
+        console.log('[NeosTech] clientId:', window.currentUserClientId, '| role:', userRole);
         applyRoleRestrictions();
 
+        // Inicializar plantillas de alerta y grid de bloques
+        initAlertTemplates();
+        generateFloorsGrid(3);
+
         // Cargar datos iniciales Y ESPERAR a que terminen
-        console.log('📂 [INIT] Iniciando carga de datos desde Firebase...');
         Promise.all([
             loadUsers(),
             loadAlerts(),
@@ -193,55 +187,28 @@ function initDashboard() {
             loadWhitelist(),
             loadBlacklist()
         ]).then(() => {
-            console.log('');
-            console.log('✅ ========================================');
-            console.log('✅ DATOS CARGADOS EXITOSAMENTE');
-            console.log('✅ ========================================');
-            console.log(`📊 Usuarios: ${users.length}`);
-            console.log(`📊 Alertas: ${alerts.length}`);
-            console.log(`📊 Logs: ${logs.length}`);
-            console.log(`📊 Whitelist: ${whitelist.length}`);
-            console.log(`📊 Blacklist: ${blacklist.length}`);
-            console.log('✅ ========================================');
-            console.log('');
+            console.log(`[NeosTech] Datos cargados — users:${users.length} alerts:${alerts.length} logs:${logs.length} wl:${whitelist.length} bl:${blacklist.length}`);
 
             // Actualizar estadísticas después de cargar
-            console.log('📈 [INIT] Actualizando estadísticas del dashboard...');
             updateDashboardStats();
 
             // Marcar datos como cargados
             dataLoaded = true;
-            console.log('✅ [INIT] dataLoaded = true');
 
             // Activar tab inicial DESPUÉS de cargar datos
-            console.log('🔄 [INIT] Activando tab inicial (control)...');
             switchTab('control');
 
             // Si el usuario ya cambió a otro tab mientras se cargaban los datos, re-renderizarlo
             if (currentTab !== 'control') {
-                console.log('🔄 [INIT] Usuario ya estaba en tab:', currentTab, '- Re-renderizando...');
                 loadTabContent(currentTab);
             }
 
             // Cargar tags RFID
-            console.log('🏷️ [INIT] Cargando tags RFID...');
             loadRFIDTags();
 
-            console.log('');
-            console.log('✅ ========================================');
-            console.log('✅ DASHBOARD COMPLETAMENTE INICIALIZADO');
-            console.log('✅ ========================================');
-            console.log('');
+            console.log('[NeosTech] Dashboard listo');
         }).catch(error => {
-            console.log('');
-            console.error('❌ ========================================');
-            console.error('❌ ERROR CARGANDO DATOS INICIALES');
-            console.error('❌ ========================================');
-            console.error('❌ Error:', error);
-            console.error('❌ Error code:', error.code);
-            console.error('❌ Error message:', error.message);
-            console.error('❌ ========================================');
-            console.log('');
+            console.error('[NeosTech] Error cargando datos iniciales:', error.code, error.message);
             showNotification('Error cargando datos desde Firebase', 'danger');
         });
     }).catch((error) => {
@@ -262,8 +229,6 @@ function initDashboard() {
  * Sistema de navegación entre tabs
  */
 function switchTab(tabName) {
-    console.log('🔄 [NAV] switchTab llamado con:', tabName);
-    
     // Actualizar tab actual
     currentTab = tabName;
     
@@ -292,64 +257,43 @@ function switchTab(tabName) {
     }
     
     // Cargar contenido específico del tab
-    console.log('🔄 [NAV] Llamando loadTabContent para:', tabName);
     loadTabContent(tabName);
-    console.log('✅ [NAV] switchTab completado');
 }
 
 /**
  * Cargar contenido específico de cada tab
  */
 function loadTabContent(tabName) {
-    console.log('📄 [TAB] loadTabContent iniciado para:', tabName);
-    
     switch(tabName) {
         case 'control':
-            console.log('🎯 [TAB] Ejecutando updateDashboardStats...');
             updateDashboardStats();
-            console.log('✅ [TAB] control tab completado');
             break;
         case 'users':
-            console.log('🎯 [TAB] Ejecutando renderUsersTable...');
             renderUsersTable();
-            console.log('✅ [TAB] users tab completado');
             break;
         case 'lists':
-            console.log('🎯 [TAB] Ejecutando renderWhitelistTable y renderBlacklistTable...');
             renderWhitelistTable();
             renderBlacklistTable();
-            console.log('✅ [TAB] lists tab completado');
             break;
         case 'alerts':
-            console.log('🎯 [TAB] Ejecutando renderAlertsTable...');
             renderAlertsTable();
-            console.log('✅ [TAB] alerts tab completado');
             break;
         case 'logs':
-            console.log('🎯 [TAB] Ejecutando renderLogsTable...');
             renderLogsTable();
-            console.log('✅ [TAB] logs tab completado');
             break;
         case 'charts':
-            console.log('🎯 [TAB] Ejecutando initCharts...');
             initCharts();
-            console.log('✅ [TAB] charts tab completado');
             break;
         case 'reader':
-            console.log('🎯 [TAB] reader tab (sin implementación)');
             // Configuración del lector RFID
             break;
         case 'access':
-            console.log('🎯 [TAB] Ejecutando loadAccessHistory...');
             loadAccessHistory();
-            console.log('✅ [TAB] access tab completado');
             break;
         case 'config':
-            console.log('🎯 [TAB] config tab (sin implementación)');
             // Configuración del sistema
             break;
     }
-    console.log('✅ [TAB] loadTabContent completado para:', tabName);
 }
 
 /**
@@ -379,13 +323,29 @@ function updateClock() {
  * Sistema de notificaciones
  */
 function showNotification(message, type = 'info') {
-    // TODO: Implementar sistema de notificaciones toast
     console.log(`[${type.toUpperCase()}] ${message}`);
-    
-    // Fallback alert
-    if (type === 'danger' || type === 'warning') {
-        alert(message);
+
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:360px;';
+        document.body.appendChild(container);
     }
+
+    const palette = { success:'#00c853', danger:'#f44336', error:'#f44336', warning:'#ff9800', info:'#1a237e' };
+    const icons   = { success:'✅', danger:'❌', error:'❌', warning:'⚠️', info:'ℹ️' };
+    const color   = palette[type] || palette.info;
+
+    const toast = document.createElement('div');
+    toast.style.cssText = `background:#fff;border-left:4px solid ${color};padding:12px 16px;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);font-size:14px;color:#333;pointer-events:all;transition:opacity .3s;`;
+    toast.textContent = `${icons[type] || 'ℹ️'} ${message}`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
 }
 
 /**
@@ -424,6 +384,7 @@ function saveNotificationToken(token) {
         token: token,
         userId: currentUser.uid,
         email: currentUser.email,
+        clientId: window.currentUserClientId,
         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
     });
 }
@@ -448,21 +409,18 @@ function requireClientId() {
  * Cargar usuarios desde Firestore
  */
 function loadUsers() {
-    console.log('📂 [LOAD] Iniciando loadUsers...');
     return db.collection('users')
         .where('clientId', '==', window.currentUserClientId)
         .get()
         .then((querySnapshot) => {
-            console.log('📊 [LOAD] Documentos users recibidos:', querySnapshot.size);
             users = [];
             querySnapshot.forEach((doc) => {
                 users.push({ id: doc.id, ...doc.data() });
             });
-            console.log(`✅ [LOAD] ${users.length} usuarios cargados en array`);
             updateUserCount();
         })
         .catch((error) => {
-            console.error('Error cargando usuarios:', error);
+            console.error('[NeosTech] Error cargando usuarios:', error.code);
             throw error;
         });
 }
@@ -471,21 +429,18 @@ function loadUsers() {
  * Cargar alertas
  */
 function loadAlerts() {
-    console.log('📂 [LOAD] Iniciando loadAlerts...');
     return db.collection('emergency_alerts')
         .where('clientId', '==', window.currentUserClientId)
         .orderBy('timestamp', 'desc').limit(100).get()
         .then((querySnapshot) => {
-            console.log('📊 [LOAD] Documentos alerts recibidos:', querySnapshot.size);
             alerts = [];
             querySnapshot.forEach((doc) => {
                 alerts.push({ id: doc.id, ...doc.data() });
             });
-            console.log(`✅ [LOAD] ${alerts.length} alertas cargadas en array`);
             updateAlertCount();
         })
         .catch((error) => {
-            console.error('❌ [LOAD] Error cargando alertas:', error);
+            console.error('[NeosTech] Error cargando alertas:', error.code);
             throw error;
         });
 }
@@ -494,21 +449,18 @@ function loadAlerts() {
  * Cargar logs de eventos
  */
 function loadLogs() {
-    console.log('📂 [LOAD] Iniciando loadLogs...');
     return db.collection('access_logs')
         .where('clientId', '==', window.currentUserClientId)
         .orderBy('timestamp', 'desc').limit(500).get()
         .then((querySnapshot) => {
-            console.log('📊 [LOAD] Documentos logs recibidos:', querySnapshot.size);
             logs = [];
             querySnapshot.forEach((doc) => {
                 logs.push({ id: doc.id, ...doc.data() });
             });
-            console.log(`✅ [LOAD] ${logs.length} logs cargados en array`);
             updateAccessCount();
         })
         .catch((error) => {
-            console.error('❌ [LOAD] Error cargando logs:', error);
+            console.error('[NeosTech] Error cargando logs:', error.code);
             throw error;
         });
 }
@@ -517,20 +469,17 @@ function loadLogs() {
  * Cargar whitelist
  */
 function loadWhitelist() {
-    console.log('📂 [LOAD] Iniciando loadWhitelist...');
     return db.collection('whitelist')
         .where('clientId', '==', window.currentUserClientId)
         .get()
         .then((querySnapshot) => {
-            console.log('📊 [LOAD] Documentos whitelist recibidos:', querySnapshot.size);
             whitelist = [];
             querySnapshot.forEach((doc) => {
                 whitelist.push({ id: doc.id, ...doc.data() });
             });
-            console.log(`✅ [LOAD] ${whitelist.length} tags en whitelist cargados en array`);
         })
         .catch((error) => {
-            console.error('❌ [LOAD] Error cargando whitelist:', error);
+            console.error('[NeosTech] Error cargando whitelist:', error.code);
             throw error;
         });
 }
@@ -539,20 +488,17 @@ function loadWhitelist() {
  * Cargar blacklist
  */
 function loadBlacklist() {
-    console.log('📂 [LOAD] Iniciando loadBlacklist...');
     return db.collection('blacklist')
         .where('clientId', '==', window.currentUserClientId)
         .get()
         .then((querySnapshot) => {
-            console.log('📊 [LOAD] Documentos blacklist recibidos:', querySnapshot.size);
             blacklist = [];
             querySnapshot.forEach((doc) => {
                 blacklist.push({ id: doc.id, ...doc.data() });
             });
-            console.log(`✅ [LOAD] ${blacklist.length} tags en blacklist cargados en array`);
         })
         .catch((error) => {
-            console.error('❌ [LOAD] Error cargando blacklist:', error);
+            console.error('[NeosTech] Error cargando blacklist:', error.code);
             throw error;
         });
 }
@@ -607,24 +553,28 @@ function addTagToLiveFeed(tag) {
     const feedContainer = document.getElementById('liveTagsFeed');
     if (!feedContainer) return;
 
+    // Excluir eventos de apertura manual — solo lecturas RFID reales
+    if (tag.event_type === 'manual_open' || tag.event_type === 'manual_door_open') return;
+
+    const status = (tag.access_granted || tag.granted || tag.status === 'granted') ? 'granted' : 'denied';
+    const ts = tag.timestamp?.toDate ? tag.timestamp.toDate() : new Date();
+    const statusColor = status === 'granted' ? '#00c853' : '#f44336';
+    const statusLabel = status === 'granted' ? '✅ Permitido' : '❌ Denegado';
+
     const card = document.createElement('div');
     card.className = 'detail-item';
     card.setAttribute('data-timestamp', tag.timestamp?.seconds || Date.now() / 1000);
-    const ts = tag.timestamp?.toDate ? tag.timestamp.toDate() : new Date();
-
+    card.setAttribute('data-status', status);
     card.innerHTML = `
-        <span>${tag.epc || 'Tag desconocido'}</span>
-        <span>${ts.toLocaleTimeString('es-MX')}</span>
+        <span style="font-weight:500">${tag.epc || tag.tag_id || 'Tag desconocido'}</span>
+        <span style="font-size:12px;color:${statusColor};font-weight:600">${statusLabel}</span>
+        <span style="font-size:12px;color:#94a3b8">${ts.toLocaleTimeString('es-MX')}</span>
     `;
 
     feedContainer.prepend(card);
-
-    // Limitar a 50 items
     while (feedContainer.children.length > 50) {
         feedContainer.removeChild(feedContainer.lastChild);
     }
-    
-    // Actualizar contador
     updateLiveTagsCount();
 }
 
@@ -744,10 +694,18 @@ function updateAccessCount() {
    FILTROS RFID FEED
    ======================================== */
 function filterTags(event, filter) {
-    console.log('Filtro aplicado:', filter);
-    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+    currentLiveTagsFilter = filter;
+    document.querySelectorAll('[data-filter]').forEach(btn => btn.classList.remove('active'));
     if (event?.currentTarget) event.currentTarget.classList.add('active');
-    // TODO: Filtrar feed según estado
+
+    const feedContainer = document.getElementById('liveTagsFeed');
+    if (!feedContainer) return;
+
+    feedContainer.querySelectorAll('.detail-item').forEach(item => {
+        const status = item.getAttribute('data-status') || 'granted';
+        item.style.display = (filter === 'all' || status === filter) ? '' : 'none';
+    });
+    updateLiveTagsCount();
 }
 
 /* ========================================
@@ -836,166 +794,15 @@ function renderUsersTable() {
     `;
     
     container.innerHTML = table;
-    console.log('✅ [RENDER] Tabla usuarios renderizada, longitud HTML:', container.innerHTML.length);
-    console.log('🔍 [DEBUG] Primeros 500 caracteres del HTML:', container.innerHTML.substring(0, 500));
-    
-    // NUCLEAR: Forzar estilos inline para bypassear CSS (!important no funciona en cssText)
-    container.style.cssText = 'min-height: 400px; display: block; background: #f5f7fa; padding: 1.5rem; border-radius: 12px; border: 3px solid #ff9800; overflow-y: auto; max-height: 600px; visibility: visible;';
-    
-    // Forzar estilos al panel padre
-    const panel = container.closest('.panel');
-    if (panel) {
-        panel.style.cssText = 'min-height: 400px; display: block; height: auto; background: white; border-radius: 16px; padding: 1.5rem; visibility: visible;';
-    }
-    
-    // Forzar estilos al tab
-    const tabContent = container.closest('.tab-content');
-    if (tabContent) {
-        tabContent.style.cssText = 'display: block; min-height: 500px; padding: 1.5rem; visibility: visible;';
-    }
-    
-    // Forzar reflow ANTES de medir
-    void document.body.offsetHeight;
-    
-    // Logging de estilos computados
-    const containerComputed = window.getComputedStyle(container);
-    console.log('🔍 [COMPUTED] Container:', {
-        display: containerComputed.display,
-        minHeight: containerComputed.minHeight,
-        height: containerComputed.height,
-        visibility: containerComputed.visibility,
-        position: containerComputed.position,
-        overflow: containerComputed.overflow,
-        float: containerComputed.float
-    });
-    
-    if (panel) {
-        const panelComputed = window.getComputedStyle(panel);
-        console.log('🔍 [COMPUTED] Panel:', {
-            display: panelComputed.display,
-            minHeight: panelComputed.minHeight,
-            height: panelComputed.height,
-            visibility: panelComputed.visibility
-        });
-    }
-    
-    // CRÍTICO: Verificar estilos de los elementos INTERNOS que deberían expandir el container
-    const tableWrapper = container.querySelector('.table-wrapper');
-    const usersTable = container.querySelector('.users-table');
-    
-    if (tableWrapper) {
-        const wrapperComputed = window.getComputedStyle(tableWrapper);
-        console.log('🔍 [COMPUTED] .table-wrapper:', {
-            display: wrapperComputed.display,
-            position: wrapperComputed.position,
-            float: wrapperComputed.float,
-            height: wrapperComputed.height,
-            minHeight: wrapperComputed.minHeight
-        });
-    } else {
-        console.error('❌ .table-wrapper NO ENCONTRADO en el DOM');
-    }
-    
-    if (usersTable) {
-        const tableComputed = window.getComputedStyle(usersTable);
-        console.log('🔍 [COMPUTED] .users-table:', {
-            display: tableComputed.display,
-            position: tableComputed.position,
-            tableLayout: tableComputed.tableLayout,
-            height: tableComputed.height
-        });
-        
-        // CRÍTICO: Verificar estructura interna de la tabla
-        const tbody = usersTable.querySelector('tbody');
-        const thead = usersTable.querySelector('thead');
-        const allRows = usersTable.querySelectorAll('tbody tr');
-        const allCells = usersTable.querySelectorAll('tbody td');
-        
-        console.log('🔍 [STRUCTURE] Elementos de tabla:', {
-            tbody: tbody ? 'EXISTE' : 'NO EXISTE',
-            thead: thead ? 'EXISTE' : 'NO EXISTE',
-            totalRows: allRows.length,
-            totalCells: allCells.length
-        });
-        
-        if (tbody) {
-            const tbodyComputed = window.getComputedStyle(tbody);
-            console.log('🔍 [COMPUTED] <tbody>:', {
-                display: tbodyComputed.display,
-                height: tbody.offsetHeight,
-                childCount: tbody.children.length,
-                // ⚠️ CRÍTICO: Verificar si estilo INLINE fue aplicado
-                inlineHeight: tbody.style.height,
-                computedHeight: tbodyComputed.height
-            });
-        }
-        
-        if (allRows.length > 0) {
-            const firstRow = allRows[0];
-            const firstRowComputed = window.getComputedStyle(firstRow);
-            console.log('🔍 [COMPUTED] Primera <tr>:', {
-                display: firstRowComputed.display,
-                height: firstRow.offsetHeight,
-                cellCount: firstRow.children.length,
-                className: firstRow.className,
-                // ⚠️ CRÍTICO: Verificar si estilo INLINE fue aplicado
-                inlineHeight: firstRow.style.height,
-                computedHeight: firstRowComputed.height
-            });
-            
-            // Verificar primera celda
-            const firstCell = firstRow.querySelector('td');
-            if (firstCell) {
-                const cellComputed = window.getComputedStyle(firstCell);
-                console.log('🔍 [COMPUTED] Primera <td>:', {
-                    display: cellComputed.display,
-                    height: firstCell.offsetHeight,
-                    fontSize: cellComputed.fontSize,
-                    lineHeight: cellComputed.lineHeight,  // ✅ CRÍTICO: Ver si line-height se aplicó
-                    minHeight: cellComputed.minHeight,    // ✅ CRÍTICO: Ver si min-height se aplicó
-                    color: cellComputed.color,
-                    padding: cellComputed.padding,
-                    textContent: firstCell.textContent.substring(0, 30),
-                    // ⚠️ CRÍTICO: Verificar si estilo INLINE fue aplicado
-                    inlineHeight: firstCell.style.height,
-                    computedHeight: cellComputed.height,
-                    // 🔍 Ver atributo style completo en el HTML
-                    styleAttr: firstCell.getAttribute('style')
-                });
-                
-                // 🚨 CRÍTICO: Verificar si hay algo SOBRESCRIBIENDO los estilos
-                console.warn('🔍 [VERIFY] Contenido HTML de la primera celda:');
-                console.warn(firstCell.outerHTML.substring(0, 200));
-            }
-        }
-    } else {
-        console.error('❌ .users-table NO ENCONTRADA en el DOM');
-    }
-    
-    console.log('🔍 [DEBUG] Elemento container visible:', container.offsetHeight > 0, 'Altura:', container.offsetHeight);
-    console.log('🔍 [DEBUG] Panel altura:', panel ? panel.offsetHeight : 'NO EXISTE');
-    console.log('🔍 [DEBUG] Tab activo:', tabContent ? tabContent.classList.contains('active') : 'NO EXISTE');
-    console.log('🔍 [DEBUG] Tab display:', tabContent ? window.getComputedStyle(tabContent).display : 'NO EXISTE');
-    
-    // Forzar múltiples reflows
-    void container.offsetHeight;
-    if (panel) void panel.offsetHeight;
-    document.body.offsetHeight;
-    requestAnimationFrame(() => {
-        container.style.opacity = '0.99';
-        setTimeout(() => { container.style.opacity = '1'; }, 10);
-    });
-    
-    console.log('🔍 [DEBUG] Después de forzar repaint, altura:', container.offsetHeight);
 
     const totalEl = document.getElementById('usersTotal');
     if (totalEl) totalEl.innerText = regularUsers.length;
     const residentEl = document.getElementById('usersResidents');
-    if (residentEl) residentEl.innerText = regularUsers.filter(u => u.type === 'resident').length;
+    if (residentEl) residentEl.innerText = regularUsers.filter(u => !u.vehicle || u.vehicle.trim() === '').length;
     const vehicleEl = document.getElementById('usersVehicles');
-    if (vehicleEl) vehicleEl.innerText = regularUsers.filter(u => u.type === 'vehicle').length;
-    
-    console.log('✅ [RENDER] renderUsersTable completado exitosamente');
+    if (vehicleEl) vehicleEl.innerText = regularUsers.filter(u => u.vehicle && u.vehicle.trim() !== '').length;
+
+    console.log('✅ [RENDER] renderUsersTable:', regularUsers.length, 'usuarios');
 }
 
 function renderWhitelistTable() {
@@ -1545,7 +1352,8 @@ async function openGate(accessPointId) {
             gate_name: accessPointName,
             action: 'open',
             user: currentUser ? currentUser.email : 'Dashboard',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            clientId: window.currentUserClientId
         });
         
         showNotification(`✅ ${accessPointName} - Comando enviado al Gateway`, 'success');
@@ -2010,13 +1818,17 @@ async function cleanEmptyUsers() {
 
 async function editUser(userId) {
     try {
-        const userDoc = await db.collection('users').doc(userId).get();
-        if (!userDoc.exists) {
+        const userSnap = await db.collection('users')
+            .where('clientId', '==', window.currentUserClientId)
+            .where(firebase.firestore.FieldPath.documentId(), '==', userId)
+            .limit(1)
+            .get();
+        if (userSnap.empty) {
             showNotification('❌ Usuario no encontrado', 'danger');
             return;
         }
         
-        const user = userDoc.data();
+        const user = userSnap.docs[0].data();
         const modal = document.getElementById('userModal');
         const title = document.getElementById('modalTitle');
         
@@ -2771,13 +2583,16 @@ async function testNotification() {
     }
     
     try {
-        const userDoc = await db.collection('users').doc(currentUser.uid).get().then((userDoc) => {
-            const userData = userDoc.data();
-            userRole = userData.role || 'resident';
-            currentUserClientId = userData.clientId;   // ← AÑADIR ESTA LÍNEA
-            console.log('✅ Tenant cargado:', currentUserClientId);
-        });;
-        const userData = userDoc.data();
+        const userSnap = await db.collection('users')
+            .where('clientId', '==', window.currentUserClientId)
+            .where(firebase.firestore.FieldPath.documentId(), '==', currentUser.uid)
+            .limit(1)
+            .get();
+        if (userSnap.empty) {
+            showNotification('⚠️ Perfil de usuario no encontrado', 'warning');
+            return;
+        }
+        const userData = userSnap.docs[0].data();
         
         if (!userData || !userData.fcm_token) {
             showNotification('⚠️ Token FCM no encontrado. Activa notificaciones primero.', 'warning');
@@ -4947,7 +4762,10 @@ async function loadBlocks() {
     blocksList.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #7f8c8d;">Cargando bloques...</div>';
     
     try {
-        const snapshot = await db.collection('blocks').orderBy('block_number').get();
+        const snapshot = await db.collection('blocks')
+            .where('clientId', '==', window.currentUserClientId)
+            .orderBy('block_number')
+            .get();
         
         if (snapshot.empty) {
             // Crear bloques por defecto (1-20)
@@ -4958,6 +4776,7 @@ async function loadBlocks() {
                     block_number: i,
                     name: `Block ${i}`,
                     enabled: true,
+                    clientId: window.currentUserClientId,
                     created_at: firebase.firestore.FieldValue.serverTimestamp()
                 });
             }
@@ -5027,7 +4846,11 @@ async function toggleBlock(blockId, newState) {
 async function addBlock() {
     try {
         // Obtener el número más alto de block actual
-        const snapshot = await db.collection('blocks').orderBy('block_number', 'desc').limit(1).get();
+        const snapshot = await db.collection('blocks')
+            .where('clientId', '==', window.currentUserClientId)
+            .orderBy('block_number', 'desc')
+            .limit(1)
+            .get();
         let nextBlockNumber = 1;
         
         if (!snapshot.empty) {
@@ -5051,6 +4874,7 @@ async function addBlock() {
         
         // Verificar si ya existe un block con ese número
         const existingBlock = await db.collection('blocks')
+            .where('clientId', '==', window.currentUserClientId)
             .where('block_number', '==', blockNum)
             .get();
         
@@ -5064,6 +4888,7 @@ async function addBlock() {
             block_number: blockNum,
             name: `Block ${blockNum}`,
             enabled: true,
+            clientId: window.currentUserClientId,
             created_at: firebase.firestore.FieldValue.serverTimestamp()
         });
         
@@ -5083,7 +4908,8 @@ async function loadDepartments(blockFilter = '') {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #7f8c8d;">Cargando departamentos...</td></tr>';
     
     try {
-        let query = db.collection('departments');
+        let query = db.collection('departments')
+            .where('clientId', '==', window.currentUserClientId);
         
         if (blockFilter) {
             query = query.where('block', '==', blockFilter);
@@ -5141,7 +4967,10 @@ async function addDepartment() {
     
     // Cargar lista de blocks disponibles
     try {
-        const snapshot = await db.collection('blocks').orderBy('block_number').get();
+        const snapshot = await db.collection('blocks')
+            .where('clientId', '==', window.currentUserClientId)
+            .orderBy('block_number')
+            .get();
         blockSelect.innerHTML = '<option value="">Seleccionar block...</option>';
         
         snapshot.forEach(doc => {
@@ -5194,6 +5023,7 @@ async function saveDepartment() {
     try {
         // Verificar si ya existe
         const exists = await db.collection('departments')
+            .where('clientId', '==', window.currentUserClientId)
             .where('block', '==', block.toString())
             .where('number', '==', number.toString())
             .get();
@@ -5209,6 +5039,7 @@ async function saveDepartment() {
             number: number.toString(),
             full_code: `${block}-${number}`,
             occupied: occupied,
+            clientId: window.currentUserClientId,
             created_at: firebase.firestore.FieldValue.serverTimestamp()
         });
         
@@ -5265,7 +5096,10 @@ async function loadAccessPoints() {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #7f8c8d;"><div class="spinner"></div>Cargando...</td></tr>';
     
     try {
-        const snapshot = await db.collection('access_points').orderBy('name').get();
+        const snapshot = await db.collection('access_points')
+            .where('clientId', '==', window.currentUserClientId)
+            .orderBy('name')
+            .get();
         
         if (snapshot.empty) {
             // Crear punto de acceso por defecto
@@ -5278,6 +5112,7 @@ async function loadAccessPoints() {
                 auto_open: true,
                 relay_delay: 1000,
                 description: 'Portón principal de acceso',
+                clientId: window.currentUserClientId,
                 created_at: firebase.firestore.FieldValue.serverTimestamp()
             });
             loadAccessPoints();
@@ -5418,6 +5253,7 @@ async function saveAccessPoint(apId = null) {
         // Verificar si el reader_id ya existe (solo si es nuevo)
         if (!apId) {
             const existing = await db.collection('access_points')
+                .where('clientId', '==', window.currentUserClientId)
                 .where('reader_id', '==', readerId)
                 .get();
             
@@ -5436,6 +5272,7 @@ async function saveAccessPoint(apId = null) {
             relay_delay: relayDelay,
             enabled: enabled,
             auto_open: autoOpen,
+            clientId: window.currentUserClientId,
             updated_at: firebase.firestore.FieldValue.serverTimestamp()
         };
         
@@ -5611,7 +5448,10 @@ async function loadAccessPointsList() {
     try {
         container.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px;">Cargando...</p>';
 
-        const snapshot = await db.collection('access_points').orderBy('name').get();
+        const snapshot = await db.collection('access_points')
+            .where('clientId', '==', window.currentUserClientId)
+            .orderBy('name')
+            .get();
         
         if (snapshot.empty) {
             container.innerHTML = '<p style="text-align: center; color: #94a3b8; padding: 20px;">No hay puntos de acceso configurados</p>';
@@ -5699,6 +5539,7 @@ async function loadDeviceConfig(deviceId) {
     try {
         // Intentar cargar configuración desde la base de datos
         const snapshot = await db.collection('access_points')
+            .where('clientId', '==', window.currentUserClientId)
             .where('reader_id', '==', deviceId)
             .limit(1)
             .get();
@@ -5762,6 +5603,7 @@ async function saveDeviceSettings() {
     try {
         // Buscar el documento del punto de acceso
         const snapshot = await db.collection('access_points')
+            .where('clientId', '==', window.currentUserClientId)
             .where('reader_id', '==', currentDeviceId)
             .limit(1)
             .get();
@@ -6284,7 +6126,6 @@ function listenToActiveAlerts() {
     db.collection('emergency_alerts')
         .where('clientId', '==', window.currentUserClientId).where('status', '==', 'ACTIVE')
         .onSnapshot(snapshot => {
-            console.log('[Alertas] Actualización en tiempo real');
             loadActiveAlerts();
         }, error => {
             console.error('[Alertas] Error en listener:', error);
