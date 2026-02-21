@@ -533,13 +533,15 @@ function _initAuth() {
 
 function _authErrorMsg(code) {
   const map = {
-    'auth/user-not-found':    'No existe ninguna cuenta con ese correo.',
-    'auth/wrong-password':    'Contraseña incorrecta.',
-    'auth/invalid-email':     'El correo no tiene un formato válido.',
-    'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos.',
+    'auth/user-not-found':         'No existe ninguna cuenta con ese correo.',
+    'auth/wrong-password':         'Contraseña incorrecta. Verifica e intenta de nuevo.',
+    'auth/invalid-credential':     'Correo o contraseña incorrectos.',
+    'auth/invalid-email':          'El correo no tiene un formato válido.',
+    'auth/too-many-requests':      'Demasiados intentos fallidos. Espera unos minutos.',
     'auth/network-request-failed': 'Error de conexión. Verifica tu red.',
+    'auth/user-disabled':          'Esta cuenta ha sido deshabilitada.',
   };
-  return map[code] ?? 'Error al iniciar sesión. Intenta de nuevo.';
+  return map[code] ?? `Error al iniciar sesión (${code}). Intenta de nuevo.`;
 }
 
 function _showApp(userData) {
@@ -1028,15 +1030,27 @@ const FirebaseStubs = {
   },
 
   async signIn(email, password) {
-    _log('signIn', email);
+    _log('signIn', email, password.length, 'chars');
+
+    // Validación básica antes de llamar a Firebase (evita errores Uncaught)
+    if (!email || !email.includes('@')) {
+      throw { code: 'auth/invalid-email', message: 'El correo no tiene un formato válido.' };
+    }
+    if (!password || password.length < 6) {
+      throw { code: 'auth/wrong-password', message: 'La contraseña debe tener al menos 6 caracteres.' };
+    }
 
     if (typeof firebase !== 'undefined' && firebase.auth) {
-      return firebase.auth().signInWithEmailAndPassword(email, password);
+      try {
+        return await firebase.auth().signInWithEmailAndPassword(email, password);
+      } catch (err) {
+        // Re-lanzar como objeto plano para que el catch externo siempre lo capture
+        throw { code: err.code, message: err.message };
+      }
     }
 
     // Fallback demo
     await _delay(800);
-    if (!email || !password) throw { code: 'auth/invalid-email' };
     return { user: { email, displayName: email.split('@')[0] } };
   },
 
