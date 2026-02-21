@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="NeosTech RFID System Pro – Panel de control de accesos" />
+  <title>NeosTech Pro</title>
+  <link rel="icon" type="image/svg+xml" href="assets/neostech-logo.svg" />
+  <link rel="stylesheet" href="css/dashboard-v3.css" />
+</head>
+
+<body>
+
+<!-- ============================================================
+     AUTH SCREEN
+     Mostrado por JS si no hay sesión activa.
+============================================================ -->
+<div id="authScreen" class="auth-screen" role="dialog" aria-modal="true" aria-labelledby="authHeading" hidden>
+  <div class="auth-card">
+    <div class="auth-brand">
+      <img src="assets/neostech-logo.svg" alt="NeosTech" class="auth-logo" width="40" height="40" />
+      <span class="auth-brand-name">NeosTech Pro</span>
+    </div>
+    <h1 class="auth-heading" id="authHeading">Iniciar sesión</h1>
+    <p class="auth-sub">Panel de control de accesos RFID</p>
+
+    <form id="authForm" class="auth-form" novalidate>
+      <div class="field">
+        <label class="field-label" for="authEmail">Correo electrónico</label>
+        <input
+          class="field-input"
+          type="email"
+          id="authEmail"
+          name="email"
+          autocomplete="email"
+          placeholder="usuario@empresa.com"
+          required
+        />
+      </div>
+      <div class="field">
+        <label class="field-label" for="authPassword">Contraseña</label>
+        <input
+          class="field-input"
+          type="password"
+          id="authPassword"
+          name="password"
+          autocomplete="current-password"
+          placeholder="••••••••"
+          required
+        />
+      </div>
+      <div id="authError" class="auth-error" role="alert" aria-live="assertive" hidden></div>
+      <button class="btn btn--primary btn--block" type="submit" id="authSubmit">
+        Entrar
+      </button>
+    </form>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     APP SHELL
+     Visible después de autenticación exitosa.
+============================================================ -->
+<div id="appShell" class="app-shell" hidden>
+
+  <!-- ── SIDEBAR ──────────────────────────────────────────── -->
+  <aside id="sidebar" class="sidebar" aria-label="Navegación principal">
+
+    <div class="sidebar-header">
+      <a class="sidebar-brand" href="#resumen" aria-label="NeosTech Pro – ir al resumen">
+        <img src="assets/neostech-logo.svg" alt="" class="sidebar-logo" width="28" height="28" aria-hidden="true" />
+        <span class="sidebar-brand-name">NeosTech<span class="sidebar-brand-pro">Pro</span></span>
+      </a>
+      <button
+        id="sidebarToggle"
+        class="sidebar-toggle"
+        type="button"
+        aria-label="Colapsar barra lateral"
+        aria-expanded="true"
+        aria-controls="sidebar"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav" aria-label="Secciones del panel">
+      <ul class="nav-list" role="list">
+
+        <li>
+          <a class="nav-link" href="#resumen" data-view="resumen" aria-current="false">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            <span class="nav-label">Resumen</span>
+          </a>
+        </li>
+
+        <li>
+          <a class="nav-link" href="#tags" data-view="tags" aria-current="false">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+              <line x1="7" y1="7" x2="7.01" y2="7"/>
+            </svg>
+            <span class="nav-label">Tags en vivo</span>
+            <span class="nav-badge" id="navBadgeTags" aria-label="eventos recientes">0</span>
+          </a>
+        </li>
+
+        <li>
+          <a class="nav-link" href="#usuarios" data-view="usuarios" aria-current="false">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span class="nav-label">Usuarios</span>
+          </a>
+        </li>
+
+        <li>
+          <a class="nav-link" href="#alertas" data-view="alertas" aria-current="false">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span class="nav-label">Alertas</span>
+            <span class="nav-badge nav-badge--danger" id="navBadgeAlertas" aria-label="alertas activas" hidden>0</span>
+          </a>
+        </li>
+
+      </ul>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user" id="sidebarUser">
+        <div class="user-avatar" id="userAvatar" aria-hidden="true">NT</div>
+        <div class="user-info">
+          <span class="user-name" id="userName">Cargando…</span>
+          <span class="user-role" id="userRole">–</span>
+        </div>
+      </div>
+      <button class="signout-btn" id="signOutBtn" type="button" aria-label="Cerrar sesión" title="Cerrar sesión">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+    </div>
+
+  </aside><!-- /sidebar -->
+
+
+  <!-- ── MAIN AREA (topbar + content) ─────────────────────── -->
+  <div class="main-area">
+
+    <!-- Topbar -->
+    <header class="topbar" role="banner">
+      <button
+        id="mobileMenuBtn"
+        class="mobile-menu-btn"
+        type="button"
+        aria-label="Abrir menú"
+        aria-expanded="false"
+        aria-controls="sidebar"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+
+      <div class="topbar-title-group">
+        <h2 class="topbar-title" id="topbarTitle" aria-live="polite">Resumen</h2>
+        <span class="topbar-date" id="topbarDate" aria-hidden="true"></span>
+      </div>
+
+      <div class="topbar-indicators" role="status" aria-label="Estado del sistema">
+        <span class="indicator" id="indicatorDB" data-state="loading" title="Base de datos Firestore">
+          <span class="indicator-dot" aria-hidden="true"></span>
+          <span class="indicator-label">DB</span>
+        </span>
+        <span class="indicator" id="indicatorReader" data-state="unknown" title="Lector RFID">
+          <span class="indicator-dot" aria-hidden="true"></span>
+          <span class="indicator-label">Lector</span>
+        </span>
+      </div>
+
+      <div class="topbar-user-chip">
+        <span class="topbar-user-name" id="topbarUserName">–</span>
+      </div>
+    </header>
+
+
+    <!-- Content -->
+    <main class="content" id="mainContent" role="main">
+
+      <!-- Backdrop for mobile sidebar -->
+      <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+
+
+      <!-- ==================================================
+           VIEW: RESUMEN
+      ================================================== -->
+      <section
+        id="viewResumen"
+        class="view view--active"
+        data-view="resumen"
+        aria-labelledby="headResumen"
+      >
+        <h2 class="view-title sr-only" id="headResumen">Resumen del sistema</h2>
+
+        <!-- KPIs -->
+        <div class="kpi-grid" role="list" aria-label="Métricas clave del día">
+
+          <article class="kpi-card" role="listitem">
+            <div class="kpi-icon-wrap kpi-icon-wrap--blue" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                <line x1="7" y1="7" x2="7.01" y2="7"/>
+              </svg>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Lecturas hoy</span>
+              <span class="kpi-value" id="kpiLecturas" aria-live="polite">–</span>
+              <span class="kpi-sub" id="kpiLecturasSub"></span>
+            </div>
+          </article>
+
+          <article class="kpi-card" role="listitem">
+            <div class="kpi-icon-wrap kpi-icon-wrap--green" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Permitidos</span>
+              <span class="kpi-value kpi-value--green" id="kpiPermitidos" aria-live="polite">–</span>
+              <span class="kpi-sub" id="kpiPermitidosSub"></span>
+            </div>
+          </article>
+
+          <article class="kpi-card" role="listitem">
+            <div class="kpi-icon-wrap kpi-icon-wrap--red" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Denegados</span>
+              <span class="kpi-value kpi-value--red" id="kpiDenegados" aria-live="polite">–</span>
+              <span class="kpi-sub" id="kpiDenegadosSub"></span>
+            </div>
+          </article>
+
+          <article class="kpi-card" role="listitem">
+            <div class="kpi-icon-wrap kpi-icon-wrap--yellow" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+            </div>
+            <div class="kpi-body">
+              <span class="kpi-label">Alertas activas</span>
+              <span class="kpi-value kpi-value--yellow" id="kpiAlertas" aria-live="polite">–</span>
+              <span class="kpi-sub" id="kpiAlertasSub"></span>
+            </div>
+          </article>
+
+        </div><!-- /kpi-grid -->
+
+        <!-- Bottom panels -->
+        <div class="dual-panel">
+
+          <!-- Actividad reciente -->
+          <div class="panel">
+            <div class="panel-header">
+              <h3 class="panel-title">Eventos recientes</h3>
+              <button class="btn-icon" id="btnRefreshResumen" type="button" aria-label="Actualizar eventos recientes" title="Actualizar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+              </button>
+            </div>
+            <div class="panel-body panel-body--flush">
+              <table class="data-table" aria-label="Últimos eventos de acceso">
+                <thead>
+                  <tr>
+                    <th scope="col" class="col-time">Hora</th>
+                    <th scope="col" class="col-uid">UID / Tag</th>
+                    <th scope="col" class="col-point col-hide-sm">Punto</th>
+                    <th scope="col" class="col-status">Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="resumenEventsBody">
+                  <tr class="row-skeleton"><td colspan="4"><span class="skeleton"></span></td></tr>
+                  <tr class="row-skeleton"><td colspan="4"><span class="skeleton"></span></td></tr>
+                  <tr class="row-skeleton"><td colspan="4"><span class="skeleton"></span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Estado de dispositivos -->
+          <div class="panel">
+            <div class="panel-header">
+              <h3 class="panel-title">Estado de lectores</h3>
+            </div>
+            <div class="panel-body" id="deviceStatusList">
+              <div class="device-row skeleton-device" aria-busy="true"></div>
+              <div class="device-row skeleton-device" aria-busy="true"></div>
+              <div class="device-row skeleton-device" aria-busy="true"></div>
+            </div>
+          </div>
+
+        </div><!-- /dual-panel -->
+      </section><!-- /view:resumen -->
+
+
+      <!-- ==================================================
+           VIEW: TAGS EN VIVO
+      ================================================== -->
+      <section
+        id="viewTags"
+        class="view"
+        data-view="tags"
+        aria-labelledby="headTags"
+        hidden
+      >
+        <h2 class="view-title sr-only" id="headTags">Tags RFID en tiempo real</h2>
+
+        <div class="toolbar">
+          <div class="toolbar-search">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              class="search-input"
+              type="search"
+              id="tagsSearch"
+              placeholder="Buscar UID, usuario, punto…"
+              aria-label="Buscar en tags en vivo"
+            />
+          </div>
+
+          <div class="filter-group" role="group" aria-label="Filtrar por estado">
+            <button class="filter-btn filter-btn--active" data-filter="todos" type="button">Todos</button>
+            <button class="filter-btn" data-filter="permitido" type="button">Permitidos</button>
+            <button class="filter-btn" data-filter="denegado" type="button">Denegados</button>
+          </div>
+
+          <div class="toolbar-actions">
+            <button class="btn btn--ghost btn--sm" id="tagsPauseBtn" type="button" aria-pressed="false">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+              </svg>
+              Pausar
+            </button>
+          </div>
+        </div><!-- /toolbar -->
+
+        <div class="panel">
+          <table class="data-table" aria-label="Eventos RFID en vivo">
+            <thead>
+              <tr>
+                <th scope="col" class="col-uid">UID / Tag</th>
+                <th scope="col" class="col-hide-sm">Usuario</th>
+                <th scope="col" class="col-hide-sm">Punto de acceso</th>
+                <th scope="col" class="col-time">Hora</th>
+                <th scope="col" class="col-status">Estado</th>
+              </tr>
+            </thead>
+          </table>
+          <!-- Virtual scroll container -->
+          <div
+            class="vscroll"
+            id="tagsVScroll"
+            role="feed"
+            aria-label="Eventos RFID en tiempo real"
+            aria-live="polite"
+            aria-busy="false"
+          ></div>
+          <div class="empty-state" id="tagsEmpty" hidden>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="empty-icon">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+            </svg>
+            <p class="empty-title">Sin lecturas</p>
+            <p class="empty-text">Esperando eventos del sistema RFID…</p>
+          </div>
+        </div>
+
+      </section><!-- /view:tags -->
+
+
+      <!-- ==================================================
+           VIEW: USUARIOS
+      ================================================== -->
+      <section
+        id="viewUsuarios"
+        class="view"
+        data-view="usuarios"
+        aria-labelledby="headUsuarios"
+        hidden
+      >
+        <h2 class="view-title sr-only" id="headUsuarios">Gestión de usuarios</h2>
+
+        <div class="toolbar">
+          <div class="toolbar-search">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              class="search-input"
+              type="search"
+              id="usuariosSearch"
+              placeholder="Buscar usuario…"
+              aria-label="Buscar usuarios"
+            />
+          </div>
+        </div>
+
+        <div class="panel">
+          <table class="data-table" aria-label="Lista de usuarios del sistema">
+            <thead>
+              <tr>
+                <th scope="col">Usuario</th>
+                <th scope="col" class="col-hide-sm">Correo</th>
+                <th scope="col">Rol</th>
+                <th scope="col" class="col-hide-sm">Tags</th>
+                <th scope="col">Estado</th>
+              </tr>
+            </thead>
+            <tbody id="usuariosTableBody">
+              <tr class="row-skeleton"><td colspan="5"><span class="skeleton"></span></td></tr>
+              <tr class="row-skeleton"><td colspan="5"><span class="skeleton"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </section><!-- /view:usuarios -->
+
+
+      <!-- ==================================================
+           VIEW: ALERTAS
+      ================================================== -->
+      <section
+        id="viewAlertas"
+        class="view"
+        data-view="alertas"
+        aria-labelledby="headAlertas"
+        hidden
+      >
+        <h2 class="view-title sr-only" id="headAlertas">Alertas del sistema</h2>
+
+        <div class="toolbar">
+          <span class="toolbar-count" id="alertasCount">0 alertas activas</span>
+          <button class="btn btn--primary btn--sm" id="newAlertBtn" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Nueva alerta
+          </button>
+        </div>
+
+        <div id="alertasActiveList" class="alert-list" aria-label="Alertas activas">
+          <!-- JS renders alert cards -->
+          <div class="skeleton-alert" aria-busy="true"></div>
+          <div class="skeleton-alert" aria-busy="true"></div>
+        </div>
+
+        <details class="panel panel--collapsible" id="resolvedSection">
+          <summary class="panel-header">
+            <h3 class="panel-title">Resueltas hoy</h3>
+            <span class="panel-badge" id="resolvedCount">0</span>
+            <svg class="details-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </summary>
+          <div class="alert-list" id="alertasResolvedList" aria-label="Alertas resueltas hoy"></div>
+        </details>
+
+      </section><!-- /view:alertas -->
+
+
+    </main><!-- /content -->
+  </div><!-- /main-area -->
+
+</div><!-- /app-shell -->
+
+
+<!-- ============================================================
+     MODALS
+============================================================ -->
+
+<!-- Nueva alerta -->
+<div id="modalNuevaAlerta" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalAlertaTitle" hidden>
+  <div class="modal" role="document">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalAlertaTitle">Nueva alerta</h3>
+      <button class="modal-close" type="button" aria-label="Cerrar modal" data-modal-close="modalNuevaAlerta">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="formNuevaAlerta" novalidate>
+        <div class="field">
+          <label class="field-label" for="alertTipo">Tipo</label>
+          <select class="field-select" id="alertTipo" name="tipo">
+            <option value="critical">Crítica</option>
+            <option value="high">Alta</option>
+            <option value="medium" selected>Media</option>
+            <option value="low">Baja</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label" for="alertMensaje">Mensaje</label>
+          <textarea class="field-input field-input--textarea" id="alertMensaje" name="mensaje" rows="3" placeholder="Descripción de la alerta…" required></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label" for="alertPunto">Punto de acceso</label>
+          <select class="field-select" id="alertPunto" name="punto">
+            <option value="">— Todos los puntos —</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn--ghost" type="button" data-modal-close="modalNuevaAlerta">Cancelar</button>
+      <button class="btn btn--danger" type="submit" form="formNuevaAlerta">Crear alerta</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     TOASTS
+============================================================ -->
+<div id="toastContainer" class="toast-container" aria-live="assertive" aria-atomic="false" role="status"></div>
+
+
+<!-- ============================================================
+     SCRIPTS
+     Firebase se carga aquí cuando esté listo para integrar.
+     Por ahora solo el JS de la UI.
+============================================================ -->
+<!--
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="firebase-config.js"></script>
+-->
+<script src="js/dashboard-v3.js"></script>
+
+</body>
+</html>
