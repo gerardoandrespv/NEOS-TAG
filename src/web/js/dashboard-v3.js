@@ -1,12 +1,17 @@
 /**
- * NeosTech RFID System Pro – Dashboard v3
- * UI-only: router, sidebar, toggles, estado visual.
- * Firebase stubs incluidos pero no conectados.
+ * NeosTech RFID System Pro — Dashboard v3
+ *
+ * Arquitectura:
+ *  - STATE          — fuente única de verdad
+ *  - _log/_warn     — logger con flag DEBUG
+ *  - VirtualList    — virtual-scroll para eventos en vivo
+ *  - FirebaseStubs  — capa de datos (Firebase real + stubs de demostración)
+ *  - Módulos UI     — sidebar, topbar, router, modals, toast, confirm
+ *  - Vistas         — resumen, tags, bitácora, alertas, usuarios, dispositivos, listas, config
  *
  * Convenciones:
- *  - Funciones privadas con prefijo _
- *  - Estado centralizado en STATE
- *  - Firebase stubs en sección FIREBASE STUBS
+ *  - Funciones privadas: prefijo _
+ *  - Estado global: STATE
  *  - Sin console.log en producción (usa _log)
  */
 
@@ -14,82 +19,60 @@
 
 /* ============================================================
    DEBUG LOGGER
-   Cambiar DEBUG = true para ver logs en desarrollo.
 ============================================================ */
-const DEBUG = true; // ← desactivar en producción (cambiar a false)
-function _log(...args) {
-  if (DEBUG) {
-    // eslint-disable-next-line no-console
-    console.log('[NT]', ...args);
-  }
-}
-function _warn(...args) {
-  if (DEBUG) {
-    // eslint-disable-next-line no-console
-    console.warn('[NT]', ...args);
-  }
-}
+const DEBUG = true; // ← cambiar a false en producción
+function _log(...args)  { if (DEBUG) console.log('[NT]',  ...args); }
+function _warn(...args) { if (DEBUG) console.warn('[NT]', ...args); }
 
 
 /* ============================================================
    ESTADO GLOBAL
 ============================================================ */
 const STATE = {
-  // Autenticación
-  user:       null,    // objeto Firebase User (null = no autenticado)
-  clientId:   null,    // JWT claim: clientId (multitenancy)
-  userRole:   null,    // 'admin' | 'guard' | 'resident'
-  tenantName: null,    // nombre del cliente
+  user:        null,
+  clientId:    null,
+  userRole:    null,
+  email:       null,
 
-  // Navegación
   currentView: 'resumen',
 
   // Tags en vivo
   liveRows:    [],
-  liveFilter:  'todos',     // 'todos' | 'permitido' | 'denegado'
+  liveFilter:  'todos',
   liveQuery:   '',
   livePaused:  false,
-  liveUnsub:   null,        // función unsubscribe de Firestore
+  liveUnsub:   null,
 
-  // KPIs
-  kpi: {
-    lecturas:   null,
-    permitidos: null,
-    denegados:  null,
-    alertas:    null,
-  },
-
-  // Alertas
+  // Datos de vistas
+  logs:           [],
+  users:          [],
+  devices:        [],
   alerts:         [],
   alertsResolved: [],
+  whitelist:      [],
+  blacklist:      [],
 
-  // Usuarios / dispositivos
-  users:   [],
-  devices: [],
+  // Tags pendientes en modal de usuario
+  pendingTags: [],
 
-  // Listeners activos (para cleanup)
+  // Confirm callback
+  _confirmCb: null,
+
+  // Listeners activos
   _unsubs: [],
 };
 
 
 /* ============================================================
-   VIRTUAL SCROLLER
-   Renderiza únicamente las filas visibles + buffer.
+   VIRTUAL LIST — scroll eficiente para eventos en vivo
 ============================================================ */
 class VirtualList {
-  #container;
-  #rows = [];
-  #rowH;
-  #bufferSize;
-  #phantom;
-  #inner;
-  #rafId = null;
+  #container; #rows = []; #rowH; #buf; #phantom; #inner; #rafId = null;
 
   constructor(containerId, rowHeight = 46, bufferSize = 8) {
-    this.#container  = document.getElementById(containerId);
-    this.#rowH       = rowHeight;
-    this.#bufferSize = bufferSize;
-
+    this.#container = document.getElementById(containerId);
+    this.#rowH = rowHeight;
+    this.#buf  = bufferSize;
     if (!this.#container) return;
 
     this.#phantom = document.createElement('div');
@@ -100,105 +83,54 @@ class VirtualList {
 
     this.#phantom.appendChild(this.#inner);
     this.#container.appendChild(this.#phantom);
-    this.#container.addEventListener('scroll', () => this._scheduleRender(), { passive: true });
-  }
 
-  setRows(rows) {
-    this.#rows = rows;
-    this.#phantom.style.height = (rows.length * this.#rowH) + 'px';
-    this._scheduleRender();
-  }
-
-  appendRows(newRows) {
-    this.#rows = this.#rows.concat(newRows);
-    this.#phantom.style.height = (this.#rows.length * this.#rowH) + 'px';
-    this._scheduleRender();
-  }
-
-  get length() { return this.#rows.length; }
-
-  clear() { this.setRows([]); }
-
-  _scheduleRender() {
-    if (this.#rafId) return;
-    this.#rafId = requestAnimationFrame(() => {
-      this.#rafId = null;
-      this._render();
+    this.#container.addEventListener('scroll', () => {
+      if (this.#rafId) cancelAnimationFrame(this.#rafId);
+      this.#rafId = requestAnimationFrame(() => this.#render());
     });
   }
 
-  _render() {
-    if (!this.#container) return;
-    const scrollTop   = this.#container.scrollTop;
-    const viewH       = this.#container.clientHeight;
-    const totalRows   = this.#rows.length;
-    const firstVis    = Math.floor(scrollTop / this.#rowH);
-    const lastVis     = Math.min(totalRows - 1, Math.ceil((scrollTop + viewH) / this.#rowH));
-    const renderStart = Math.max(0, firstVis - this.#bufferSize);
-    const renderEnd   = Math.min(totalRows - 1, lastVis + this.#bufferSize);
+  setRows(rows) { this.#rows = rows; this.#render(); }
+  get length()  { return this.#rows.length; }
+
+  #render() {
+    if (!this.#container || !this.#phantom) return;
+    const total     = this.#rows.length;
+    const scrollTop = this.#container.scrollTop;
+    const viewH     = this.#container.clientHeight;
+
+    const start = Math.max(0, Math.floor(scrollTop / this.#rowH) - this.#buf);
+    const end   = Math.min(total, Math.ceil((scrollTop + viewH) / this.#rowH) + this.#buf);
+
+    this.#phantom.style.height = `${total * this.#rowH}px`;
+    this.#inner.style.top      = `${start * this.#rowH}px`;
 
     const frag = document.createDocumentFragment();
-    for (let i = renderStart; i <= renderEnd; i++) {
-      const el = this._buildRow(this.#rows[i], i);
-      el.style.position = 'absolute';
-      el.style.top      = (i * this.#rowH) + 'px';
-      el.style.left     = '0';
-      el.style.right    = '0';
-      frag.appendChild(el);
+    for (let i = start; i < end; i++) {
+      frag.appendChild(_buildLiveRow(this.#rows[i]));
     }
-
     this.#inner.innerHTML = '';
     this.#inner.appendChild(frag);
   }
-
-  /** Sobrescribir para personalizar el HTML de la fila */
-  _buildRow(row, index) {
-    const el = document.createElement('div');
-    el.className = 'vrow';
-    el.setAttribute('role', 'article');
-    el.innerHTML = `
-      <span class="vrow-uid">${_esc(row.uid ?? '–')}</span>
-      <span class="vrow-text">${_esc(row.usuario ?? '–')}</span>
-      <span class="vrow-text">${_esc(row.punto ?? '–')}</span>
-      <span class="vrow-time">${_fmtTime(row.timestamp)}</span>
-      <span>${_statusBadge(row.estado)}</span>
-    `;
-    return el;
-  }
 }
+
+let _vlist = null;
 
 
 /* ============================================================
    UTILIDADES
 ============================================================ */
-function _esc(str) {
-  if (str == null) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+
+function _esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function _fmtTime(ts) {
-  if (!ts) return '–';
-  let d;
-  if (ts.toDate) {
-    d = ts.toDate(); // Firestore Timestamp
-  } else if (typeof ts === 'number') {
-    d = new Date(ts);
-  } else {
-    d = new Date(ts);
-  }
-  if (isNaN(d)) return '–';
-  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-
-function _fmtDate(d) {
-  return d.toLocaleDateString('es-MX', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-  });
+function _set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = (val == null) ? '–' : String(val);
 }
 
 function _fmtNum(n) {
@@ -206,153 +138,175 @@ function _fmtNum(n) {
   return Number(n).toLocaleString('es-MX');
 }
 
-function _statusBadge(estado) {
-  const map = {
-    permitido:  ['badge-status--permitido',   'Permitido'],
-    denegado:   ['badge-status--denegado',    'Denegado'],
-    desconocido:['badge-status--desconocido', 'Desconocido'],
-  };
-  const [cls, label] = map[estado] ?? map.desconocido;
-  return `<span class="badge-status ${cls}">${label}</span>`;
+function _fmtTs(ts, short = false) {
+  if (!ts) return '–';
+  let d;
+  if (typeof ts.toDate === 'function') d = ts.toDate();
+  else if (ts instanceof Date)         d = ts;
+  else if (typeof ts === 'number')     d = new Date(ts);
+  else return '–';
+
+  if (short) return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString('es-MX', {
+    day: '2-digit', month: '2-digit', year: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
-function _alertPill(tipo) {
-  const labels = { critical: 'Crítica', high: 'Alta', medium: 'Media', low: 'Baja' };
-  return `<span class="alert-pill alert-pill--${tipo}">${labels[tipo] ?? tipo}</span>`;
-}
-
-function _debounce(fn, ms) {
+function _debounce(fn, delay) {
   let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), ms);
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+}
+
+function _delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function _roleLabel(role) {
+  return { admin: 'Administrador', guard: 'Guardia', resident: 'Residente' }[role] ?? role;
+}
+
+function _statusBadge(status, dotOnly = false) {
+  const map = {
+    allowed:   ['success', 'Permitido'],
+    permitido: ['success', 'Permitido'],
+    denied:    ['danger',  'Denegado'],
+    denegado:  ['danger',  'Denegado'],
+    login:     ['info',    'Ingreso'],
+    logout:    ['neutral', 'Salida'],
+    manual:    ['warning', 'Manual'],
   };
+  const [cls, label] = map[String(status || '').toLowerCase()] ?? ['neutral', status ?? '–'];
+  if (dotOnly) return `<span class="badge badge--${cls} badge--dot" aria-hidden="true"></span>`;
+  return `<span class="badge badge--${cls}">${_esc(label)}</span>`;
 }
 
-function _set(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = val;
+function _severityBadge(sev) {
+  const map = { critical: 'danger', high: 'warning', medium: 'info', low: 'neutral' };
+  const cls = map[String(sev).toLowerCase()] ?? 'neutral';
+  return `<span class="badge badge--${cls}">${_esc(String(sev).toUpperCase())}</span>`;
 }
 
-function _show(id) {
-  const el = document.getElementById(id);
-  if (el) el.hidden = false;
-}
-
-function _hide(id) {
-  const el = document.getElementById(id);
-  if (el) el.hidden = true;
+function _exportCSV(rows, filename = 'export.csv') {
+  if (!rows.length) { _toast('Sin datos para exportar.', 'warning'); return; }
+  const header = ['Usuario', 'Email', 'Tag', 'Punto de acceso', 'Estado', 'Fecha'];
+  const lines  = rows.map(l => [
+    l.user || l.userName || '',
+    l.email || '',
+    l.tagId || '',
+    l.reader || l.accessPoint || l.readerName || '',
+    l.status || l.action || '',
+    _fmtTs(l.timestamp),
+  ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+  const csv  = [header.join(','), ...lines].join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function _todayStart() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const d = new Date(); d.setHours(0, 0, 0, 0); return d;
+}
+
+function _stubTrend(n, min, max) {
+  return Array.from({ length: n }, () => Math.floor(Math.random() * (max - min + 1)) + min);
 }
 
 
 /* ============================================================
    TOAST SYSTEM
 ============================================================ */
-const Toast = (() => {
-  const DURATION = 4000;
-
-  function show(msg, type = 'info') {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-
-    const el = document.createElement('div');
-    el.className = `toast toast--${type}`;
-    el.setAttribute('role', 'status');
-    el.textContent = msg;
-
-    container.prepend(el);
-
-    setTimeout(() => {
-      el.style.opacity = '0';
-      el.style.transition = 'opacity 300ms';
-      setTimeout(() => el.remove(), 300);
-    }, DURATION);
-  }
-
-  return {
-    success: (msg) => show(msg, 'success'),
-    error:   (msg) => show(msg, 'error'),
-    warning: (msg) => show(msg, 'warning'),
-    info:    (msg) => show(msg, 'info'),
+function _toast(msg, type = 'info', duration = 4000) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const icons = {
+    success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    danger:  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    warning: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    info:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
   };
-})();
+  const toast = document.createElement('div');
+  toast.className = `toast toast--${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon" aria-hidden="true">${icons[type] ?? icons.info}</span>
+    <span class="toast-msg">${_esc(msg)}</span>
+    <button class="toast-close" aria-label="Cerrar">×</button>
+  `;
+  const close = () => {
+    toast.classList.add('toast--out');
+    setTimeout(() => toast.remove(), 300);
+  };
+  toast.querySelector('.toast-close').addEventListener('click', close);
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('toast--in'));
+  setTimeout(close, duration);
+}
 
 
 /* ============================================================
-   ROUTER (hash-based SPA)
+   CONFIRM DIALOG
 ============================================================ */
-const VIEWS = ['resumen', 'tags', 'usuarios', 'alertas'];
-
-const VIEW_TITLES = {
-  resumen:  'Resumen',
-  tags:     'Tags en vivo',
-  usuarios: 'Usuarios',
-  alertas:  'Alertas',
-};
-
-let _routerInitialized = false;
-function _initRouter() {
-  if (_routerInitialized) return;
-  _routerInitialized = true;
-  window.addEventListener('hashchange', _onHashChange);
-  _onHashChange();
+function _confirm(msg, cb) {
+  document.getElementById('modalConfirmMsg').textContent = msg;
+  STATE._confirmCb = cb;
+  _openModal('modalConfirm');
 }
 
-function _onHashChange() {
-  const hash = window.location.hash.replace('#', '') || 'resumen';
-  const view = VIEWS.includes(hash) ? hash : 'resumen';
-  _navigateTo(view, false);
-}
-
-function _navigateTo(view, pushHash = true) {
-  if (STATE.currentView === view && !pushHash) {
-    _activateView(view);
-    return;
-  }
-  STATE.currentView = view;
-  if (pushHash) {
-    history.pushState(null, '', `#${view}`);
-  }
-  _activateView(view);
-  _loadViewData(view);
-}
-
-function _activateView(view) {
-  // Views
-  document.querySelectorAll('.view').forEach(el => {
-    const isActive = el.dataset.view === view;
-    el.classList.toggle('view--active', isActive);
-    el.hidden = !isActive;
+function _initConfirm() {
+  document.getElementById('btnConfirmOk')?.addEventListener('click', () => {
+    _closeModal('modalConfirm');
+    if (typeof STATE._confirmCb === 'function') STATE._confirmCb();
+    STATE._confirmCb = null;
   });
-
-  // Nav links
-  document.querySelectorAll('.nav-link').forEach(link => {
-    const isActive = link.dataset.view === view;
-    link.setAttribute('aria-current', isActive ? 'page' : 'false');
+  document.getElementById('btnConfirmCancel')?.addEventListener('click', () => {
+    _closeModal('modalConfirm');
+    STATE._confirmCb = null;
   });
-
-  // Topbar title
-  _set('topbarTitle', VIEW_TITLES[view] ?? view);
-
-  // Mobile: close sidebar
-  const shell = document.getElementById('appShell');
-  if (shell) shell.removeAttribute('data-mobile-open');
 }
 
-function _loadViewData(view) {
-  _log('loadViewData', view);
-  switch (view) {
-    case 'resumen':  _loadResumen();  break;
-    case 'tags':     _startLiveTags(); break;
-    case 'usuarios': _loadUsuarios(); break;
-    case 'alertas':  _loadAlertas();  break;
-  }
+
+/* ============================================================
+   MODAL HELPERS
+============================================================ */
+function _openModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.removeAttribute('hidden');
+  el.style.display = '';
+  requestAnimationFrame(() => el.classList.add('modal-backdrop--open'));
+  document.body.style.overflow = 'hidden';
+}
+
+function _closeModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('modal-backdrop--open');
+  setTimeout(() => { el.hidden = true; el.style.display = 'none'; }, 200);
+  document.body.style.overflow = '';
+}
+
+function _initModals() {
+  document.querySelectorAll('[data-modal-close]').forEach(btn => {
+    btn.addEventListener('click', () => _closeModal(btn.dataset.modalClose));
+  });
+  document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) _closeModal(backdrop.id);
+    });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    document.querySelectorAll('.modal-backdrop--open').forEach(m => _closeModal(m.id));
+  });
+}
+
+
+/* ============================================================
+   INDICADORES
+============================================================ */
+function _setIndicator(id, state) {
+  const el = document.getElementById(id);
+  if (el) el.dataset.state = state;
 }
 
 
@@ -360,531 +314,556 @@ function _loadViewData(view) {
    SIDEBAR
 ============================================================ */
 function _initSidebar() {
-  const toggle  = document.getElementById('sidebarToggle');
-  const shell   = document.getElementById('appShell');
-  const backdrop= document.getElementById('sidebarBackdrop');
+  const toggle    = document.getElementById('sidebarToggle');
+  const shell     = document.getElementById('appShell');
+  const backdrop  = document.getElementById('sidebarBackdrop');
   const mobileBtn = document.getElementById('mobileMenuBtn');
-
   if (!shell) return;
 
-  // Restore collapse state from localStorage
   const collapsed = localStorage.getItem('nt_sidebar_collapsed') === 'true';
   shell.dataset.collapsed = collapsed;
   if (toggle) toggle.setAttribute('aria-expanded', String(!collapsed));
 
-  // Desktop collapse toggle
-  if (toggle) {
-    toggle.addEventListener('click', () => {
-      const isCollapsed = shell.dataset.collapsed === 'true';
-      shell.dataset.collapsed = String(!isCollapsed);
-      toggle.setAttribute('aria-expanded', String(isCollapsed));
-      toggle.setAttribute('aria-label', isCollapsed ? 'Colapsar barra lateral' : 'Expandir barra lateral');
-      localStorage.setItem('nt_sidebar_collapsed', String(!isCollapsed));
-    });
-  }
+  toggle?.addEventListener('click', () => {
+    const isCol = shell.dataset.collapsed === 'true';
+    shell.dataset.collapsed = String(!isCol);
+    toggle.setAttribute('aria-expanded', String(isCol));
+    localStorage.setItem('nt_sidebar_collapsed', String(!isCol));
+  });
 
-  // Mobile open
-  if (mobileBtn) {
-    mobileBtn.addEventListener('click', () => {
-      const isOpen = shell.dataset.mobileOpen === 'true';
-      shell.dataset.mobileOpen = String(!isOpen);
-      mobileBtn.setAttribute('aria-expanded', String(!isOpen));
-    });
-  }
+  mobileBtn?.addEventListener('click', () => {
+    const open = shell.dataset.mobileOpen === 'true';
+    shell.dataset.mobileOpen = String(!open);
+    mobileBtn.setAttribute('aria-expanded', String(!open));
+  });
 
-  // Backdrop closes sidebar on mobile
-  if (backdrop) {
-    backdrop.addEventListener('click', () => {
-      shell.removeAttribute('data-mobile-open');
-      if (mobileBtn) mobileBtn.setAttribute('aria-expanded', 'false');
-    });
-  }
-
-  // Nav link clicks
-  document.querySelectorAll('.nav-link[data-view]').forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      const view = link.dataset.view;
-      _navigateTo(view);
-    });
+  backdrop?.addEventListener('click', () => {
+    shell.dataset.mobileOpen = 'false';
+    if (mobileBtn) mobileBtn.setAttribute('aria-expanded', 'false');
   });
 }
 
 
 /* ============================================================
-   TOPBAR
+   TOPBAR — fecha
 ============================================================ */
 function _initTopbar() {
-  // Date
-  const dateEl = document.getElementById('topbarDate');
-  if (dateEl) {
-    dateEl.textContent = _fmtDate(new Date());
-  }
+  const fecha = new Date().toLocaleDateString('es-MX', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const el = document.getElementById('topbarDate');
+  if (el) el.textContent = fecha;
+  const ov = document.getElementById('overviewDate');
+  if (ov) ov.textContent = new Date().toLocaleDateString('es-MX', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
 }
 
 
 /* ============================================================
-   MODALES
+   ROUTER — hash-based SPA
 ============================================================ */
-function _initModals() {
-  // Cerrar con botón [data-modal-close]
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-modal-close]');
-    if (btn) {
-      const id = btn.dataset.modalClose;
-      _closeModal(id);
-    }
-  });
+const VIEW_TITLES = {
+  resumen:      'Resumen',
+  tags:         'RFID en vivo',
+  bitacora:     'Bitácora',
+  alertas:      'Alertas',
+  usuarios:     'Usuarios',
+  dispositivos: 'Dispositivos',
+  listas:       'Listas de acceso',
+  config:       'Configuración',
+};
 
-  // Cerrar al hacer clic en el backdrop (fuera del .modal)
-  document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
-    backdrop.addEventListener('click', (e) => {
-      if (e.target === backdrop) {
-        _closeModal(backdrop.id);
-      }
-    });
-  });
+let _routerInitialized = false;
 
-  // Escape key
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      document.querySelectorAll('.modal-backdrop:not([hidden])').forEach(m => {
-        _closeModal(m.id);
+function _initRouter() {
+  if (_routerInitialized) return;
+  _routerInitialized = true;
+
+  document.querySelectorAll('[data-view]').forEach(el => {
+    if (el.tagName === 'A') {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        _navigateTo(el.dataset.view);
       });
     }
   });
 
-  // Botón nueva alerta
-  const newAlertBtn = document.getElementById('newAlertBtn');
-  if (newAlertBtn) {
-    newAlertBtn.addEventListener('click', () => _openModal('modalNuevaAlerta'));
-  }
-
-  // Submit nueva alerta
-  const formNuevaAlerta = document.getElementById('formNuevaAlerta');
-  if (formNuevaAlerta) {
-    formNuevaAlerta.addEventListener('submit', async (e) => {
+  document.querySelectorAll('.panel-link[data-view]').forEach(el => {
+    el.addEventListener('click', (e) => {
       e.preventDefault();
-      await _onCreateAlert(new FormData(formNuevaAlerta));
-      _closeModal('modalNuevaAlerta');
-      formNuevaAlerta.reset();
+      _navigateTo(el.dataset.view);
     });
+  });
+
+  window.addEventListener('hashchange', () => {
+    const view = location.hash.replace('#', '') || 'resumen';
+    _activateView(view, false);
+  });
+
+  const hash = location.hash.replace('#', '');
+  if (hash && VIEW_TITLES[hash]) {
+    _activateView(hash, false);
+    _loadViewData(hash);
   }
 }
 
-function _openModal(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.hidden = false;
-  // Focus trap: focus primer input
-  const first = el.querySelector('input, select, textarea, button:not(.modal-close)');
-  if (first) first.focus();
+function _navigateTo(view) {
+  if (!VIEW_TITLES[view]) return;
+  _activateView(view, true);
+  _loadViewData(view);
 }
 
-function _closeModal(id) {
-  const el = document.getElementById(id);
-  if (el) el.hidden = true;
+function _activateView(view, pushHash) {
+  if (pushHash) location.hash = view;
+  STATE.currentView = view;
+
+  document.querySelectorAll('.view').forEach(el => {
+    const active = el.dataset.view === view;
+    el.classList.toggle('view--active', active);
+    el.hidden = !active;
+  });
+
+  document.querySelectorAll('[data-view]').forEach(el => {
+    if (el.tagName === 'A') {
+      el.setAttribute('aria-current', el.dataset.view === view ? 'page' : 'false');
+      el.classList.toggle('nav-link--active', el.dataset.view === view);
+    }
+  });
+
+  _set('topbarTitle', VIEW_TITLES[view] ?? view);
+
+  const shell = document.getElementById('appShell');
+  if (shell) shell.dataset.mobileOpen = 'false';
+  const main = document.getElementById('mainContent');
+  if (main) main.scrollTop = 0;
 }
 
 
 /* ============================================================
-   AUTH UI
+   AUTH
 ============================================================ */
-function _initAuth() {
-  const form    = document.getElementById('authForm');
-  const errorEl = document.getElementById('authError');
+function _showApp(userData) {
+  _log('_showApp —', userData?.email);
+  const ls    = document.getElementById('loadingScreen');
+  const as    = document.getElementById('authScreen');
+  const shell = document.getElementById('appShell');
 
+  if (ls)    { ls.hidden = true; ls.style.display = 'none'; }
+  if (as)    { as.hidden = true; as.style.display = 'none'; }
+  if (shell) { shell.removeAttribute('hidden'); shell.style.display = 'grid'; }
+
+  const name     = userData?.displayName ?? userData?.email ?? 'Usuario';
+  const role     = userData?.role ?? 'guard';
+  const initials = name.trim().split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+
+  _set('userName',       name);
+  _set('userRole',       _roleLabel(role));
+  _set('topbarUserName', name);
+  _set('userAvatar',     initials);
+  _set('configClientId', userData?.clientId ?? '–');
+  _set('configRole',     _roleLabel(role));
+  _set('configEmail',    userData?.email ?? '–');
+
+  STATE.user     = userData;
+  STATE.userRole = role;
+  STATE.clientId = userData?.clientId ?? null;
+  STATE.email    = userData?.email ?? null;
+
+  _log('_showApp DONE — appShell visible');
+}
+
+function _showAuth() {
+  _log('_showAuth');
+  const ls    = document.getElementById('loadingScreen');
+  const as    = document.getElementById('authScreen');
+  const shell = document.getElementById('appShell');
+
+  if (ls)    { ls.hidden = true; ls.style.display = 'none'; }
+  if (as)    { as.removeAttribute('hidden'); as.style.display = ''; }
+  if (shell) { shell.hidden = true; shell.style.display = 'none'; }
+
+  _cleanupListeners();
+}
+
+function _cleanupListeners() {
+  STATE._unsubs.forEach(fn => { try { fn(); } catch (_) {} });
+  STATE._unsubs = [];
+  if (STATE.liveUnsub) { try { STATE.liveUnsub(); } catch (_) {} }
+  STATE.liveUnsub = null;
+}
+
+function _initAuth() {
+  const form = document.getElementById('authForm');
   if (!form || form.dataset.listenerAttached) return;
-  form.dataset.listenerAttached = 'true'; // guard: evitar doble registro
+  form.dataset.listenerAttached = 'true';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (errorEl) errorEl.hidden = true;
-
-    const email    = form.authEmail.value.trim();
-    const password = form.authPassword.value;
+    const email    = (document.getElementById('authEmail')?.value ?? '').trim();
+    const password = document.getElementById('authPassword')?.value ?? '';
+    const errEl    = document.getElementById('authError');
     const btn      = document.getElementById('authSubmit');
 
-    if (btn) { btn.disabled = true; btn.textContent = 'Verificando…'; }
+    if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+
+    if (!email || !email.includes('@')) {
+      if (errEl) { errEl.textContent = 'Ingresa un correo válido.'; errEl.hidden = false; }
+      return;
+    }
+    if (password.length < 6) {
+      if (errEl) { errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.'; errEl.hidden = false; }
+      return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Ingresando…'; }
 
     try {
-      const result = await FirebaseStubs.signIn(email, password);
-      // Con Firebase real, onAuthStateChanged se dispara automáticamente
-      // y llama a _showApp(). Si usamos el stub, necesitamos llamarlo manualmente.
-      if (result && result.user && typeof firebase === 'undefined') {
-        _showApp({ ...result.user, role: 'admin', clientId: null });
-        _initRouter();
-      }
+      await FirebaseStubs.signIn(email, password);
     } catch (err) {
-      _log('auth error', err);
-      if (errorEl) {
-        errorEl.textContent = _authErrorMsg(err.code ?? err.message);
-        errorEl.hidden = false;
-      }
+      const msgs = {
+        'auth/user-not-found':         'No existe cuenta con ese correo.',
+        'auth/wrong-password':         'Contraseña incorrecta.',
+        'auth/invalid-credential':     'Correo o contraseña incorrectos.',
+        'auth/invalid-email':          'El correo no tiene un formato válido.',
+        'auth/too-many-requests':      'Demasiados intentos. Espera unos minutos.',
+        'auth/network-request-failed': 'Error de red. Verifica tu conexión.',
+        'auth/user-disabled':          'Esta cuenta está deshabilitada.',
+      };
+      const msg = msgs[err.code] ?? `Error al iniciar sesión (${err.code ?? 'desconocido'}).`;
+      if (errEl) { errEl.textContent = msg; errEl.hidden = false; }
+      _log('signIn FAILED:', err.code);
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
     }
   });
 
-  // Sign-out
-  const signOutBtn = document.getElementById('signOutBtn');
-  if (signOutBtn) {
-    signOutBtn.addEventListener('click', async () => {
-      await FirebaseStubs.signOut();
-    });
-  }
-}
-
-function _authErrorMsg(code) {
-  const map = {
-    'auth/user-not-found':         'No existe ninguna cuenta con ese correo.',
-    'auth/wrong-password':         'Contraseña incorrecta. Verifica e intenta de nuevo.',
-    'auth/invalid-credential':     'Correo o contraseña incorrectos.',
-    'auth/invalid-email':          'El correo no tiene un formato válido.',
-    'auth/too-many-requests':      'Demasiados intentos fallidos. Espera unos minutos.',
-    'auth/network-request-failed': 'Error de conexión. Verifica tu red.',
-    'auth/user-disabled':          'Esta cuenta ha sido deshabilitada.',
-  };
-  return map[code] ?? `Error al iniciar sesión (${code}). Intenta de nuevo.`;
-}
-
-function _showApp(userData) {
-  _log('_showApp — user:', userData?.email ?? '?');
-
-  const loadingScreen = document.getElementById('loadingScreen');
-  const authScreen    = document.getElementById('authScreen');
-  const appShell      = document.getElementById('appShell');
-
-  _log('_showApp — DOM elements found:', {
-    loadingScreen: !!loadingScreen,
-    authScreen: !!authScreen,
-    appShell: !!appShell,
-  });
-
-  if (loadingScreen) {
-    loadingScreen.hidden = true;
-    loadingScreen.style.display = 'none';
-  }
-  if (authScreen) {
-    authScreen.hidden = true;
-    authScreen.style.display = 'none';
-  }
-  if (appShell) {
-    appShell.removeAttribute('hidden');
-    appShell.style.display = 'grid'; // forzar display:grid en caso de conflicto con [hidden]
-    _log('_showApp — appShell.style.display:', appShell.style.display,
-         '| computed:', window.getComputedStyle(appShell).display);
-  }
-
-  // Update user UI
-  const name   = userData?.displayName ?? userData?.email ?? 'Usuario';
-  const role   = userData?.role ?? 'guard';
-  const initials = name.trim().split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
-
-  _set('userName', name);
-  _set('userRole', _roleLabel(role));
-  _set('topbarUserName', name);
-  _set('userAvatar', initials);
-
-  STATE.user     = userData;
-  STATE.userRole = role;
-
-  _log('_showApp — DONE. Dashboard visible.');
-}
-
-function _showAuth() {
-  _log('_showAuth — mostrando pantalla de login');
-  const loadingScreen = document.getElementById('loadingScreen');
-  const authScreen    = document.getElementById('authScreen');
-  const appShell      = document.getElementById('appShell');
-  if (loadingScreen) {
-    loadingScreen.hidden = true;
-    loadingScreen.style.display = 'none';
-  }
-  if (authScreen) {
-    authScreen.removeAttribute('hidden');
-    authScreen.style.display = '';  // dejar que la clase CSS lo controle
-  }
-  if (appShell) {
-    appShell.hidden = true;
-    appShell.style.display = 'none';
-  }
-  _cleanupListeners();
-}
-
-function _roleLabel(role) {
-  return { admin: 'Administrador', guard: 'Guardia', resident: 'Residente' }[role] ?? role;
-}
-
-function _cleanupListeners() {
-  STATE._unsubs.forEach(fn => { try { fn(); } catch (_) { /* noop */ } });
-  STATE._unsubs = [];
-  if (STATE.liveUnsub) { try { STATE.liveUnsub(); } catch (_) { /* noop */ } }
-  STATE.liveUnsub = null;
+  document.getElementById('signOutBtn')?.addEventListener('click', () => FirebaseStubs.signOut());
 }
 
 
 /* ============================================================
-   INDICADORES DE ESTADO
+   DATA LOADERS
 ============================================================ */
-function _setIndicator(id, state) {
-  const el = document.getElementById(id);
-  if (el) el.dataset.state = state; // 'online' | 'offline' | 'loading' | 'unknown'
+function _loadViewData(view) {
+  switch (view) {
+    case 'resumen':      _loadResumen();      break;
+    case 'tags':         _startLiveTags();    break;
+    case 'bitacora':     _loadBitacora();     break;
+    case 'alertas':      _loadAlertas();      break;
+    case 'usuarios':     _loadUsuarios();     break;
+    case 'dispositivos': _loadDispositivos(); break;
+    case 'listas':       _loadListas();       break;
+    case 'config':       _initConfigView();   break;
+  }
 }
 
 
 /* ============================================================
    VIEW: RESUMEN
 ============================================================ */
-let _virtualListTags = null;
-
 async function _loadResumen() {
   _log('loadResumen');
-
-  // Mostrar skeletons en KPIs
-  ['kpiLecturas', 'kpiPermitidos', 'kpiDenegados', 'kpiAlertas'].forEach(id => {
-    _set(id, '–');
-  });
+  ['kpiLecturas', 'kpiPermitidos', 'kpiDenegados', 'kpiAlertas'].forEach(id => _set(id, '–'));
 
   try {
-    const data = await FirebaseStubs.getKPIs(STATE.clientId);
-    _set('kpiLecturas',   _fmtNum(data.lecturas));
-    _set('kpiPermitidos', _fmtNum(data.permitidos));
-    _set('kpiDenegados',  _fmtNum(data.denegados));
-    _set('kpiAlertas',    _fmtNum(data.alertas));
+    const [kpi, events, devices] = await Promise.all([
+      FirebaseStubs.getKPIs(STATE.clientId),
+      FirebaseStubs.getRecentEvents(STATE.clientId),
+      FirebaseStubs.getDevices(STATE.clientId),
+    ]);
+
+    _set('kpiLecturas',   _fmtNum(kpi.lecturas));
+    _set('kpiPermitidos', _fmtNum(kpi.permitidos));
+    _set('kpiDenegados',  _fmtNum(kpi.denegados));
+    _set('kpiAlertas',    _fmtNum(kpi.alertas));
+
+    _renderRecentEvents(events);
+    _renderDeviceStatus(devices);
+    _drawSparkline('sparklineTags',    _stubTrend(12, 5, 80));
+    _drawSparkline('sparklineAccesos', _stubTrend(12, 3, 70));
+    _drawChart24h(_stubTrend(24, 5, 90), _stubTrend(24, 3, 70));
     _setIndicator('indicatorDB', 'online');
   } catch (err) {
-    _warn('getKPIs error', err);
+    _warn('loadResumen error:', err);
     _setIndicator('indicatorDB', 'offline');
-    Toast.error('No se pudieron cargar las métricas.');
-  }
-
-  // Eventos recientes
-  try {
-    const eventos = await FirebaseStubs.getRecentEvents(STATE.clientId);
-    _renderResumenEvents(eventos);
-  } catch (err) {
-    _warn('getRecentEvents error', err);
-  }
-
-  // Dispositivos
-  try {
-    const devices = await FirebaseStubs.getDevices(STATE.clientId);
-    _renderDeviceStatus(devices);
-  } catch (err) {
-    _warn('getDevices error', err);
   }
 }
 
-function _renderResumenEvents(eventos) {
+function _renderRecentEvents(events = []) {
   const tbody = document.getElementById('resumenEventsBody');
   if (!tbody) return;
-
-  if (!eventos || eventos.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" class="td-empty">Sin eventos recientes</td></tr>`;
+  tbody.innerHTML = '';
+  if (!events.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="td-empty">Sin eventos recientes.</td></tr>';
     return;
   }
-
-  tbody.innerHTML = eventos.map(ev => `
-    <tr>
-      <td class="col-time">${_fmtTime(ev.timestamp)}</td>
-      <td class="col-uid">${_esc(ev.uid)}</td>
-      <td class="col-point col-hide-sm">${_esc(ev.punto ?? '–')}</td>
-      <td class="col-status">${_statusBadge(ev.estado)}</td>
-    </tr>
-  `).join('');
+  const frag = document.createDocumentFragment();
+  events.slice(0, 8).forEach(e => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td">
+        <div class="td-main">${_esc(e.userName || e.user || e.email || '–')}</div>
+        <div class="td-sub mono">${_esc(e.tagId || '')}</div>
+      </td>
+      <td class="td col-hide-sm">${_esc(e.readerName || e.reader || '–')}</td>
+      <td class="td">${_statusBadge(e.status)}</td>
+      <td class="td col-time">${_fmtTs(e.timestamp, true)}</td>
+    `;
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
 }
 
-function _renderDeviceStatus(devices) {
+function _renderDeviceStatus(devices = []) {
   const container = document.getElementById('deviceStatusList');
   if (!container) return;
-
-  if (!devices || devices.length === 0) {
-    container.innerHTML = `<p class="text-muted">Sin dispositivos registrados.</p>`;
+  container.innerHTML = '';
+  const online = devices.filter(d => d.status === 'online').length;
+  _set('devicesStatusMeta', `${online}/${devices.length} en línea`);
+  if (!devices.length) {
+    container.innerHTML = '<p class="td-empty">Sin dispositivos registrados.</p>';
     return;
   }
+  const frag = document.createDocumentFragment();
+  devices.forEach(d => {
+    const state = d.status === 'online' ? 'online' : d.status === 'offline' ? 'offline' : 'unknown';
+    const row = document.createElement('div');
+    row.className = 'device-status-row';
+    row.innerHTML = `
+      <span class="indicator-dot" data-state="${state}" aria-hidden="true"></span>
+      <span class="device-status-name">${_esc(d.name || d.id)}</span>
+      <span class="device-status-loc">${_esc(d.location || '–')}</span>
+      <span class="device-status-ping">${_fmtTs(d.lastPing, true)}</span>
+    `;
+    frag.appendChild(row);
+  });
+  container.appendChild(frag);
+}
 
-  container.innerHTML = devices.map(d => `
-    <div class="device-row">
-      <span class="device-dot device-dot--${d.estado ?? 'unknown'}"></span>
-      <span class="device-name">${_esc(d.nombre ?? d.id)}</span>
-      <span class="device-ip">${_esc(d.ip ?? '')}</span>
-    </div>
-  `).join('');
+function _drawSparkline(svgId, values) {
+  const svg = document.getElementById(svgId);
+  if (!svg || !values || values.length < 2) return;
+  const W = 72, H = 28, pad = 2;
+  const min = Math.min(...values), max = Math.max(...values) || 1;
+  const range = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = pad + ((W - pad * 2) / (values.length - 1)) * i;
+    const y = H - pad - ((v - min) / range) * (H - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const poly = svg.querySelector('.sparkline-line');
+  if (poly) poly.setAttribute('points', pts);
+}
+
+function _drawChart24h(tagsData, accessData) {
+  const canvas = document.getElementById('chart24hCanvas');
+  if (!canvas) return;
+  const parent  = document.getElementById('chartArea24h') || canvas.parentElement;
+  canvas.width  = parent.offsetWidth  || 600;
+  canvas.height = parent.offsetHeight || 180;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = { top: 16, right: 16, bottom: 28, left: 28 };
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top  - pad.bottom;
+  const bars = tagsData.length;
+  const bW   = (cW / bars) * 0.68;
+  const gap  = (cW / bars) * 0.32;
+  const maxV = Math.max(...tagsData, ...accessData, 1);
+
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+  for (let i = 1; i <= 4; i++) {
+    const y = pad.top + (cH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+  }
+
+  const clrTags   = 'rgba(99,102,241,0.72)';
+  const clrAccess = 'rgba(34,197,94,0.5)';
+  tagsData.forEach((v, i) => {
+    const bh = (v / maxV) * cH;
+    const x  = pad.left + i * (cW / bars) + gap / 2;
+    ctx.fillStyle = clrTags;
+    ctx.fillRect(x, pad.top + cH - bh, bW, bh);
+    const bh2 = ((accessData[i] || 0) / maxV) * cH;
+    ctx.fillStyle = clrAccess;
+    ctx.fillRect(x, pad.top + cH - bh2, bW, bh2);
+  });
+
+  ctx.fillStyle = 'rgba(148,175,200,0.5)';
+  ctx.font = '9px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  const nowH = new Date().getHours();
+  for (let i = 0; i < bars; i += 4) {
+    const h = (nowH - bars + 1 + i + 24) % 24;
+    const x = pad.left + i * (cW / bars) + bW / 2;
+    ctx.fillText(`${String(h).padStart(2, '0')}h`, x, H - 6);
+  }
 }
 
 
 /* ============================================================
-   VIEW: TAGS EN VIVO
+   VIEW: RFID EN VIVO
 ============================================================ */
 function _startLiveTags() {
   _log('startLiveTags');
+  if (!_vlist) _vlist = new VirtualList('tagsVScroll', 46, 6);
+  if (STATE.liveUnsub) return;
 
-  if (!_virtualListTags) {
-    _virtualListTags = new VirtualList('tagsVScroll', 46, 8);
-  }
-
-  // Detener listener anterior
-  if (STATE.liveUnsub) {
-    STATE.liveUnsub();
-    STATE.liveUnsub = null;
-  }
-
-  if (STATE.livePaused) return;
-
-  const emptyEl = document.getElementById('tagsEmpty');
-  const scroller = document.getElementById('tagsVScroll');
-  if (scroller) scroller.setAttribute('aria-busy', 'true');
-
-  try {
-    STATE.liveUnsub = FirebaseStubs.subscribeToLiveTags(
-      STATE.clientId,
-      (newRows) => {
-        if (STATE.livePaused) return;
-
-        STATE.liveRows = [newRows, ...STATE.liveRows].slice(0, 500);
-        const filtered = _filterLiveRows(STATE.liveRows);
-
-        _virtualListTags.setRows(filtered);
-
-        if (emptyEl) emptyEl.hidden = filtered.length > 0;
-        if (scroller) scroller.setAttribute('aria-busy', 'false');
-
-        // Badge nav
-        const badge = document.getElementById('navBadgeTags');
-        if (badge) badge.textContent = filtered.length > 99 ? '99+' : String(filtered.length);
-      }
-    );
-    STATE._unsubs.push(() => STATE.liveUnsub?.());
-  } catch (err) {
-    _warn('subscribeToLiveTags error', err);
-    Toast.error('Error al conectar el stream en vivo.');
-    if (scroller) scroller.setAttribute('aria-busy', 'false');
-  }
+  STATE.liveUnsub = FirebaseStubs.subscribeToLiveTags(STATE.clientId, (event) => {
+    if (STATE.livePaused) return;
+    STATE.liveRows.unshift(event);
+    if (STATE.liveRows.length > 500) STATE.liveRows.length = 500;
+    _renderLiveTags();
+    _set('liveCount',    STATE.liveRows.length);
+    _set('navBadgeTags', STATE.liveRows.length);
+  });
 }
 
-function _filterLiveRows(rows) {
-  let result = rows;
+function _renderLiveTags() {
+  const q = STATE.liveQuery.toLowerCase();
+  const f = STATE.liveFilter;
+  let rows = STATE.liveRows;
 
-  if (STATE.liveFilter !== 'todos') {
-    result = result.filter(r => r.estado === STATE.liveFilter);
+  if (f !== 'todos') {
+    rows = rows.filter(r => {
+      const s = String(r.status ?? '').toLowerCase();
+      return f === 'permitido'
+        ? (s === 'allowed' || s === 'permitido')
+        : (s === 'denied'  || s === 'denegado');
+    });
   }
-
-  if (STATE.liveQuery) {
-    const q = STATE.liveQuery.toLowerCase();
-    result = result.filter(r =>
-      (r.uid ?? '').toLowerCase().includes(q) ||
-      (r.usuario ?? '').toLowerCase().includes(q) ||
-      (r.punto ?? '').toLowerCase().includes(q)
+  if (q) {
+    rows = rows.filter(r =>
+      [r.tagId, r.userName, r.user, r.readerName, r.reader]
+        .filter(Boolean).join(' ').toLowerCase().includes(q)
     );
   }
 
-  return result;
+  const empty = document.getElementById('tagsEmpty');
+  if (empty) empty.hidden = rows.length > 0;
+  _vlist?.setRows(rows);
 }
 
-function _initTagsControls() {
-  // Filter buttons
-  const filterGroup = document.querySelector('#viewTags .filter-group');
-  if (filterGroup) {
-    filterGroup.addEventListener('click', (e) => {
-      const btn = e.target.closest('.filter-btn');
-      if (!btn) return;
-      filterGroup.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('filter-btn--active'));
+function _buildLiveRow(row) {
+  const div = document.createElement('div');
+  div.className  = 'vrow';
+  div.dataset.status = row.status ?? '';
+  div.innerHTML = `
+    <span class="vrow-mono">${_esc(row.tagId ?? '–')}</span>
+    <span class="vrow-user">${_esc(row.userName || row.user || '–')}</span>
+    <span class="vrow-point">${_esc(row.readerName || row.reader || '–')}</span>
+    <span>${_statusBadge(row.status)}</span>
+    <span class="vrow-time">${_fmtTs(row.timestamp, true)}</span>
+  `;
+  return div;
+}
+
+function _initLiveTags() {
+  document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('filter-btn--active'));
       btn.classList.add('filter-btn--active');
-      STATE.liveFilter = btn.dataset.filter ?? 'todos';
-      if (_virtualListTags) _virtualListTags.setRows(_filterLiveRows(STATE.liveRows));
+      STATE.liveFilter = btn.dataset.filter;
+      _renderLiveTags();
     });
-  }
+  });
 
-  // Search
-  const searchInput = document.getElementById('tagsSearch');
-  if (searchInput) {
-    searchInput.addEventListener('input', _debounce(() => {
-      STATE.liveQuery = searchInput.value.trim();
-      if (_virtualListTags) _virtualListTags.setRows(_filterLiveRows(STATE.liveRows));
-    }, 250));
-  }
+  document.getElementById('tagsSearch')?.addEventListener('input', _debounce(() => {
+    STATE.liveQuery = document.getElementById('tagsSearch').value;
+    _renderLiveTags();
+  }, 200));
 
-  // Pause
   const pauseBtn = document.getElementById('tagsPauseBtn');
-  if (pauseBtn) {
-    pauseBtn.addEventListener('click', () => {
-      STATE.livePaused = !STATE.livePaused;
-      pauseBtn.setAttribute('aria-pressed', String(STATE.livePaused));
-      pauseBtn.textContent = STATE.livePaused ? '▶ Reanudar' : '⏸ Pausar';
-
-      if (!STATE.livePaused) {
-        _startLiveTags();
-        Toast.info('Stream reanudado.');
-      } else {
-        if (STATE.liveUnsub) {
-          STATE.liveUnsub();
-          STATE.liveUnsub = null;
-        }
-        Toast.info('Stream pausado.');
-      }
-    });
-  }
+  pauseBtn?.addEventListener('click', () => {
+    STATE.livePaused = !STATE.livePaused;
+    const paused = STATE.livePaused;
+    pauseBtn.setAttribute('aria-pressed', String(paused));
+    pauseBtn.innerHTML = paused
+      ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Reanudar`
+      : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pausar`;
+  });
 }
 
 
 /* ============================================================
-   VIEW: USUARIOS
+   VIEW: BITÁCORA
 ============================================================ */
-async function _loadUsuarios() {
-  _log('loadUsuarios');
+async function _loadBitacora(from, to) {
+  _log('loadBitacora', from, to);
+  const tbody = document.getElementById('logsTableBody');
+  const empty = document.getElementById('logsEmpty');
+  if (tbody) tbody.innerHTML = '<tr class="row-skeleton"><td colspan="5"><span class="skeleton"></span></td></tr>';
+  if (empty) empty.hidden = true;
+
   try {
-    const users = await FirebaseStubs.getUsers(STATE.clientId);
-    STATE.users = users;
-    _renderUsuarios(users);
+    const logs = await FirebaseStubs.getAccessLogs(STATE.clientId, { from, to });
+    STATE.logs = logs;
+    _renderBitacora(logs);
+    _setIndicator('indicatorDB', 'online');
   } catch (err) {
-    _warn('getUsers error', err);
-    Toast.error('No se pudo cargar la lista de usuarios.');
+    _warn('loadBitacora error:', err);
+    _toast('Error al cargar bitácora.', 'danger');
   }
 }
 
-function _renderUsuarios(users) {
-  const tbody = document.getElementById('usuariosTableBody');
+function _renderBitacora(logs = []) {
+  const tbody = document.getElementById('logsTableBody');
+  const empty = document.getElementById('logsEmpty');
+  const count = document.getElementById('logsCount');
   if (!tbody) return;
 
-  if (!users || users.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="td-empty">Sin usuarios registrados.</td></tr>`;
+  const q = (document.getElementById('logsSearch')?.value ?? '').toLowerCase();
+  const filtered = q
+    ? logs.filter(l => [l.user, l.userName, l.email, l.tagId, l.reader, l.accessPoint]
+        .filter(Boolean).join(' ').toLowerCase().includes(q))
+    : logs;
+
+  if (count) count.textContent = `${filtered.length} registros`;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    if (empty) empty.hidden = false;
     return;
   }
+  if (empty) empty.hidden = true;
 
-  tbody.innerHTML = users.map(u => `
-    <tr>
-      <td>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div class="user-avatar" style="width:28px;height:28px;font-size:10px;" aria-hidden="true">
-            ${_esc((u.nombre ?? u.email ?? 'U').slice(0, 2).toUpperCase())}
-          </div>
-          <span>${_esc(u.nombre ?? '–')}</span>
-        </div>
+  tbody.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  filtered.forEach(l => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td">
+        <div class="td-main">${_esc(l.user || l.userName || l.email || '–')}</div>
+        <div class="td-sub">${_esc(l.email || '')}</div>
       </td>
-      <td class="col-hide-sm">${_esc(u.email ?? '–')}</td>
-      <td><span class="badge-role badge-role--${u.rol ?? 'guard'}">${_roleLabel(u.rol)}</span></td>
-      <td class="col-hide-sm">${_fmtNum(u.tagsCount ?? 0)}</td>
-      <td>
-        <span class="badge-status badge-status--${u.activo ? 'permitido' : 'denegado'}">
-          ${u.activo ? 'Activo' : 'Inactivo'}
-        </span>
-      </td>
-    </tr>
-  `).join('');
+      <td class="td col-mono col-hide-sm">${_esc(l.tagId || '–')}</td>
+      <td class="td col-hide-sm">${_esc(l.reader || l.accessPoint || l.readerName || '–')}</td>
+      <td class="td">${_statusBadge(l.status || l.action)}</td>
+      <td class="td col-time">${_fmtTs(l.timestamp)}</td>
+    `;
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
 }
 
-function _initUsuariosSearch() {
-  const input = document.getElementById('usuariosSearch');
-  if (!input) return;
-  input.addEventListener('input', _debounce(() => {
-    const q = input.value.toLowerCase();
-    const filtered = STATE.users.filter(u =>
-      (u.nombre ?? '').toLowerCase().includes(q) ||
-      (u.email  ?? '').toLowerCase().includes(q)
+function _initBitacora() {
+  document.getElementById('logsSearch')?.addEventListener('input',
+    _debounce(() => _renderBitacora(STATE.logs), 250));
+
+  document.getElementById('btnFilterLogs')?.addEventListener('click', () => {
+    const from = document.getElementById('logsDateFrom')?.value;
+    const to   = document.getElementById('logsDateTo')?.value;
+    _loadBitacora(
+      from ? new Date(from) : null,
+      to   ? new Date(to + 'T23:59:59') : null,
     );
-    _renderUsuarios(filtered);
-  }, 250));
+  });
+
+  document.getElementById('btnExportLogs')?.addEventListener('click', () =>
+    _exportCSV(STATE.logs, `bitacora_${new Date().toISOString().slice(0, 10)}.csv`));
 }
 
 
@@ -893,144 +872,779 @@ function _initUsuariosSearch() {
 ============================================================ */
 async function _loadAlertas() {
   _log('loadAlertas');
+  const activeList = document.getElementById('alertasActiveList');
+  if (activeList) activeList.innerHTML = '<div class="skeleton-alert" aria-busy="true"></div>';
+
   try {
-    const { activas, resueltas } = await FirebaseStubs.getAlerts(STATE.clientId);
-    STATE.alerts = activas;
-    STATE.alertsResolved = resueltas;
-    _renderAlertas(activas, resueltas);
+    const { active, resolved } = await FirebaseStubs.getAlerts(STATE.clientId);
+    STATE.alerts         = active;
+    STATE.alertsResolved = resolved;
+    _renderAlertas(active, resolved);
+    _updateAlertBadge(active.length);
   } catch (err) {
-    _warn('getAlerts error', err);
-    Toast.error('No se pudieron cargar las alertas.');
+    _warn('loadAlertas error:', err);
+    _toast('Error al cargar alertas.', 'danger');
   }
 }
 
-function _renderAlertas(activas, resueltas) {
-  const activeList   = document.getElementById('alertasActiveList');
-  const resolvedList = document.getElementById('alertasResolvedList');
+function _renderAlertas(active = [], resolved = []) {
+  const activeList    = document.getElementById('alertasActiveList');
+  const resolvedList  = document.getElementById('alertasResolvedList');
+  const count         = document.getElementById('alertasCount');
+  const resolvedCount = document.getElementById('resolvedCount');
 
-  _set('alertasCount', `${activas.length} alerta${activas.length !== 1 ? 's' : ''} activa${activas.length !== 1 ? 's' : ''}`);
-  _set('resolvedCount', String(resueltas.length));
-
-  // Actualizar badge nav
-  const badge = document.getElementById('navBadgeAlertas');
-  if (badge) {
-    badge.hidden = activas.length === 0;
-    badge.textContent = activas.length > 99 ? '99+' : String(activas.length);
-  }
+  if (count)         count.textContent         = active.length;
+  if (resolvedCount) resolvedCount.textContent  = resolved.length;
 
   if (activeList) {
-    if (activas.length === 0) {
-      activeList.innerHTML = `
-        <div class="empty-state" style="padding:32px 16px;">
-          <svg class="empty-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
-          <p class="empty-title">Sin alertas activas</p>
-          <p class="empty-text">El sistema opera con normalidad.</p>
-        </div>`;
+    activeList.innerHTML = '';
+    if (!active.length) {
+      activeList.innerHTML = '<div class="empty-state"><p class="empty-title">Sin alertas activas</p><p class="empty-text">El sistema está operando con normalidad.</p></div>';
     } else {
-      activeList.innerHTML = activas.map(a => _alertCardHTML(a, false)).join('');
+      const frag = document.createDocumentFragment();
+      active.forEach(a => frag.appendChild(_buildAlertCard(a, false)));
+      activeList.appendChild(frag);
     }
   }
 
   if (resolvedList) {
-    resolvedList.innerHTML = resueltas.length
-      ? resueltas.map(a => _alertCardHTML(a, true)).join('')
-      : '<p style="padding:14px 16px;color:var(--color-text-3);font-size:.8125rem;">Sin alertas resueltas hoy.</p>';
+    resolvedList.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    resolved.forEach(a => frag.appendChild(_buildAlertCard(a, true)));
+    resolvedList.appendChild(frag);
   }
 }
 
-function _alertCardHTML(alert, resolved) {
-  return `
-    <div class="alert-card alert-card--${alert.tipo}${resolved ? ' alert-card--resolved' : ''}">
-      ${_alertPill(alert.tipo)}
-      <div class="alert-body">
-        <p class="alert-msg">${_esc(alert.mensaje)}</p>
-        <div class="alert-meta">
-          <span>${_fmtTime(alert.createdAt)}</span>
-          ${alert.punto ? `<span>📍 ${_esc(alert.punto)}</span>` : ''}
-        </div>
+function _buildAlertCard(alert, resolved = false) {
+  const sev  = String(alert.severity || 'low').toLowerCase();
+  const card = document.createElement('article');
+  card.className = `alert-card alert-card--${sev}`;
+  card.setAttribute('role', 'listitem');
+  card.innerHTML = `
+    <div class="alert-card-main">
+      <div class="alert-card-head">
+        ${_severityBadge(sev)}
+        <span class="alert-card-title">${_esc(alert.title || 'Alerta sin título')}</span>
       </div>
-      ${!resolved ? `
-        <div class="alert-actions">
-          <button class="btn btn--ghost btn--sm" data-alert-ack="${_esc(alert.id)}" type="button">
-            Resolver
-          </button>
-        </div>
-      ` : ''}
+      <p class="alert-card-desc">${_esc(alert.description || '')}</p>
+      <div class="alert-card-meta">
+        <span>🕐 ${_fmtTs(alert.createdAt)}</span>
+        ${alert.zone ? `<span>📍 ${_esc(alert.zone)}</span>` : ''}
+        ${alert.acknowledged ? '<span>✅ Reconocida</span>' : ''}
+      </div>
     </div>
+    ${!resolved ? `
+    <div class="alert-card-actions">
+      <button class="btn btn--ghost btn--sm btn-ack" data-id="${_esc(alert.id)}"
+              ${alert.acknowledged ? 'disabled' : ''}>Reconocer</button>
+      <button class="btn btn--primary btn--sm btn-resolve" data-id="${_esc(alert.id)}">Resolver</button>
+    </div>` : ''}
   `;
+  card.querySelector('.btn-ack')?.addEventListener('click', () => _acknowledgeAlert(alert.id));
+  card.querySelector('.btn-resolve')?.addEventListener('click', () => _resolveAlert(alert.id));
+  return card;
 }
 
-function _initAlertaActions() {
-  // Delegación: resolver alerta
-  document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-alert-ack]');
-    if (!btn) return;
-    const alertId = btn.dataset.alertAck;
-    btn.disabled = true;
-    btn.textContent = 'Resolviendo…';
+async function _acknowledgeAlert(id) {
+  if (!id) return;
+  try {
+    if (typeof db !== 'undefined') {
+      await db.collection('alerts').doc(id).update({
+        acknowledged: true,
+        acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        acknowledgedBy: STATE.user?.uid ?? null,
+      });
+    }
+    _toast('Alerta reconocida.', 'success');
+    _loadAlertas();
+  } catch (e) { _warn('acknowledgeAlert error:', e); }
+}
+
+async function _resolveAlert(id) {
+  _confirm('¿Marcar esta alerta como resuelta?', async () => {
     try {
-      await FirebaseStubs.acknowledgeAlert(STATE.clientId, alertId);
-      Toast.success('Alerta resuelta.');
-      await _loadAlertas();
+      if (typeof db !== 'undefined') {
+        await db.collection('alerts').doc(id).update({
+          resolved: true,
+          resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          resolvedBy: STATE.user?.uid ?? null,
+        });
+      }
+      _toast('Alerta resuelta.', 'success');
+      _loadAlertas();
+    } catch (e) { _warn('resolveAlert error:', e); }
+  });
+}
+
+function _updateAlertBadge(count) {
+  const badge = document.getElementById('navBadgeAlertas');
+  if (!badge) return;
+  if (count > 0) { badge.textContent = count; badge.hidden = false; }
+  else           { badge.hidden = true; }
+}
+
+function _initAlertas() {
+  document.getElementById('btnRefreshAlertas')?.addEventListener('click', _loadAlertas);
+
+  document.getElementById('newAlertBtn')?.addEventListener('click', () => {
+    document.getElementById('formNuevaAlerta')?.reset();
+    _openModal('modalNuevaAlerta');
+  });
+
+  document.getElementById('formNuevaAlerta')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btnSubmitAlerta');
+    if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
+    const severity    = document.getElementById('alertSeverity')?.value ?? 'medium';
+    const title       = document.getElementById('alertTitle')?.value.trim() ?? '';
+    const description = document.getElementById('alertDesc')?.value.trim() ?? '';
+    const zone        = document.getElementById('alertZona')?.value.trim() ?? '';
+    if (!title) {
+      _toast('El título es obligatorio.', 'warning');
+      if (btn) { btn.disabled = false; btn.textContent = 'Crear alerta'; }
+      return;
+    }
+    try {
+      await FirebaseStubs.createAlert({ severity, title, description, zone,
+        clientId: STATE.clientId, createdBy: STATE.user?.uid ?? null });
+      _closeModal('modalNuevaAlerta');
+      _toast('Alerta creada correctamente.', 'success');
+      _loadAlertas();
     } catch (err) {
-      _warn('acknowledgeAlert error', err);
-      Toast.error('No se pudo resolver la alerta.');
-      btn.disabled = false;
-      btn.textContent = 'Resolver';
+      _toast('Error al crear la alerta.', 'danger');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Crear alerta'; }
     }
   });
 }
 
-async function _onCreateAlert(formData) {
+
+/* ============================================================
+   VIEW: USUARIOS
+============================================================ */
+async function _loadUsuarios() {
+  _log('loadUsuarios');
+  const tbody = document.getElementById('usuariosTableBody');
+  if (tbody) tbody.innerHTML = '<tr class="row-skeleton"><td colspan="5"><span class="skeleton"></span></td></tr>';
   try {
-    await FirebaseStubs.createAlert(STATE.clientId, {
-      tipo:    formData.get('tipo'),
-      mensaje: formData.get('mensaje'),
-      punto:   formData.get('punto'),
-    });
-    Toast.success('Alerta creada correctamente.');
-    if (STATE.currentView === 'alertas') await _loadAlertas();
+    const users = await FirebaseStubs.getUsers(STATE.clientId);
+    STATE.users = users;
+    _set('usuariosCount', users.length);
+    _renderUsuarios(users);
+    _populateUserSelect('qrUserId', users);
   } catch (err) {
-    _warn('createAlert error', err);
-    Toast.error('Error al crear la alerta.');
+    _warn('loadUsuarios error:', err);
+    _toast('Error al cargar usuarios.', 'danger');
   }
+}
+
+function _renderUsuarios(users = []) {
+  const tbody  = document.getElementById('usuariosTableBody');
+  const empty  = document.getElementById('usuariosEmpty');
+  if (!tbody) return;
+
+  const q = (document.getElementById('usuariosSearch')?.value ?? '').toLowerCase();
+  const f = document.querySelector('[data-ufilter].filter-btn--active')?.dataset.ufilter ?? 'todos';
+
+  let filtered = users;
+  if (q) {
+    filtered = filtered.filter(u =>
+      [u.name, u.email, u.block, u.unit, u.departamento]
+        .filter(Boolean).join(' ').toLowerCase().includes(q));
+  }
+  if (f === 'activo')   filtered = filtered.filter(u => u.active !== false);
+  if (f === 'inactivo') filtered = filtered.filter(u => u.active === false);
+
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    if (empty) empty.hidden = false;
+    return;
+  }
+  if (empty) empty.hidden = true;
+
+  tbody.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  filtered.forEach(u => {
+    const tags = Array.isArray(u.tags) ? u.tags.length : 0;
+    const unit = u.departamento || u.unit || '–';
+    const blk  = u.block ? `${u.block} · ` : '';
+    const tr   = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td">
+        <div class="td-main">${_esc(u.name || '–')}</div>
+        <div class="td-sub">${_esc(u.email || '')}</div>
+      </td>
+      <td class="td col-hide-sm">${_esc(blk + unit)}</td>
+      <td class="td col-hide-sm">
+        <span class="badge badge--neutral">${tags} tag${tags !== 1 ? 's' : ''}</span>
+      </td>
+      <td class="td">${u.active !== false
+        ? '<span class="badge badge--success">Activo</span>'
+        : '<span class="badge badge--danger">Inactivo</span>'}</td>
+      <td class="td col-actions">
+        <button class="btn-icon btn-icon--ghost" title="Editar" data-edit-user="${_esc(u.id)}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <button class="btn-icon btn-icon--ghost btn-icon--danger" title="Eliminar" data-delete-user="${_esc(u.id)}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/><path d="M14 11v6"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </button>
+      </td>
+    `;
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
+
+  tbody.querySelectorAll('[data-edit-user]').forEach(btn =>
+    btn.addEventListener('click', () => _openEditUser(btn.dataset.editUser)));
+  tbody.querySelectorAll('[data-delete-user]').forEach(btn =>
+    btn.addEventListener('click', () => _deleteUser(btn.dataset.deleteUser)));
+}
+
+function _populateUserSelect(selectId, users = []) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const placeholder = sel.options[0] || new Option('Seleccione un residente…', '');
+  sel.innerHTML = '';
+  sel.appendChild(placeholder);
+  users.forEach(u => sel.appendChild(new Option(u.name || u.email || u.id, u.id)));
+}
+
+function _openNewUser() {
+  STATE.pendingTags = [];
+  document.getElementById('formUsuario')?.reset();
+  document.getElementById('usuarioId').value = '';
+  document.getElementById('modalUsuarioTitle').textContent = 'Nuevo usuario';
+  document.getElementById('tagsDisplay').innerHTML = '';
+  _openModal('modalUsuario');
+}
+
+function _openEditUser(userId) {
+  const u = STATE.users.find(u => u.id === userId);
+  if (!u) return;
+  STATE.pendingTags = Array.isArray(u.tags) ? [...u.tags] : [];
+  document.getElementById('usuarioId').value       = u.id;
+  document.getElementById('usuarioNombre').value   = u.name || '';
+  document.getElementById('usuarioEmail').value    = u.email || '';
+  document.getElementById('usuarioTelefono').value = u.phone || '';
+  document.getElementById('usuarioVehiculo').value = u.vehicle || '';
+  document.getElementById('usuarioBloque').value   = u.block || '';
+  document.getElementById('usuarioUnidad').value   = u.unit || u.departamento || '';
+  const av = u.active !== false ? 'true' : 'false';
+  const radioEl = document.querySelector(`[name="active"][value="${av}"]`);
+  if (radioEl) radioEl.checked = true;
+  document.getElementById('modalUsuarioTitle').textContent = 'Editar usuario';
+  _renderTagsDisplay();
+  _openModal('modalUsuario');
+}
+
+function _renderTagsDisplay() {
+  const container = document.getElementById('tagsDisplay');
+  if (!container) return;
+  container.innerHTML = '';
+  STATE.pendingTags.forEach(tagId => {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.innerHTML = `<span class="mono">${_esc(tagId)}</span>
+      <button type="button" class="tag-chip-remove" aria-label="Quitar tag">×</button>`;
+    chip.querySelector('.tag-chip-remove').addEventListener('click', () => {
+      STATE.pendingTags = STATE.pendingTags.filter(t => t !== tagId);
+      _renderTagsDisplay();
+    });
+    container.appendChild(chip);
+  });
+}
+
+async function _saveUser(e) {
+  e.preventDefault();
+  const btn     = document.getElementById('btnSubmitUsuario');
+  const id      = document.getElementById('usuarioId').value.trim();
+  const name    = document.getElementById('usuarioNombre').value.trim();
+  const email   = document.getElementById('usuarioEmail').value.trim();
+  const phone   = document.getElementById('usuarioTelefono').value.trim();
+  const vehicle = document.getElementById('usuarioVehiculo').value.trim().toUpperCase();
+  const block   = document.getElementById('usuarioBloque').value.trim();
+  const unit    = document.getElementById('usuarioUnidad').value.trim();
+  const active  = document.querySelector('[name="active"]:checked')?.value !== 'false';
+
+  if (!name) { _toast('El nombre es obligatorio.', 'warning'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+
+  try {
+    await FirebaseStubs.saveUser(id, {
+      name, email, phone, vehicle, block, unit, active,
+      tags: [...STATE.pendingTags], clientId: STATE.clientId,
+    });
+    _closeModal('modalUsuario');
+    _toast(id ? 'Usuario actualizado.' : 'Usuario creado.', 'success');
+    _loadUsuarios();
+  } catch (err) {
+    _warn('saveUser error:', err);
+    _toast('Error al guardar el usuario.', 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  }
+}
+
+async function _deleteUser(userId) {
+  _confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.', async () => {
+    try {
+      await FirebaseStubs.deleteUser(userId);
+      _toast('Usuario eliminado.', 'success');
+      _loadUsuarios();
+    } catch (err) {
+      _toast('Error al eliminar el usuario.', 'danger');
+    }
+  });
+}
+
+function _initUsuarios() {
+  document.getElementById('btnNuevoUsuario')?.addEventListener('click', _openNewUser);
+  document.getElementById('formUsuario')?.addEventListener('submit', _saveUser);
+
+  document.getElementById('btnAddTag')?.addEventListener('click', () => {
+    const input = document.getElementById('nuevoTagInput');
+    const tagId = (input?.value ?? '').trim().toUpperCase();
+    if (!tagId) return;
+    if (STATE.pendingTags.includes(tagId)) { _toast('Ese tag ya está asignado.', 'warning'); return; }
+    STATE.pendingTags.push(tagId);
+    _renderTagsDisplay();
+    if (input) input.value = '';
+  });
+
+  document.getElementById('nuevoTagInput')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btnAddTag')?.click(); }
+  });
+
+  document.getElementById('usuariosSearch')?.addEventListener('input',
+    _debounce(() => _renderUsuarios(STATE.users), 250));
+
+  document.querySelectorAll('[data-ufilter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-ufilter]').forEach(b => b.classList.remove('filter-btn--active'));
+      btn.classList.add('filter-btn--active');
+      _renderUsuarios(STATE.users);
+    });
+  });
 }
 
 
 /* ============================================================
-   REFRESH BUTTONS
+   VIEW: DISPOSITIVOS
 ============================================================ */
-function _initRefreshButtons() {
-  const btnRefresh = document.getElementById('btnRefreshResumen');
-  if (btnRefresh) {
-    btnRefresh.addEventListener('click', () => {
-      if (STATE.currentView === 'resumen') _loadResumen();
-    });
+async function _loadDispositivos() {
+  _log('loadDispositivos');
+  const grid = document.getElementById('devicesGrid');
+  if (grid) grid.innerHTML = '<div class="device-card device-card--skeleton" aria-busy="true"></div>'.repeat(3);
+  try {
+    const [devices, history] = await Promise.all([
+      FirebaseStubs.getDevices(STATE.clientId),
+      FirebaseStubs.getManualOpenHistory(STATE.clientId),
+    ]);
+    STATE.devices = devices;
+    _renderDeviceCards(devices);
+    _renderManualHistory(history);
+    const online = devices.filter(d => d.status === 'online').length;
+    _set('devOnlineCount', online);
+    _set('devTotalCount',  devices.length);
+  } catch (err) {
+    _warn('loadDispositivos error:', err);
+    _toast('Error al cargar dispositivos.', 'danger');
   }
+}
+
+function _renderDeviceCards(devices = []) {
+  const grid  = document.getElementById('devicesGrid');
+  const empty = document.getElementById('devicesEmpty');
+  if (!grid) return;
+  if (!devices.length) {
+    grid.innerHTML = '';
+    if (empty) empty.hidden = false;
+    return;
+  }
+  if (empty) empty.hidden = true;
+  grid.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  devices.forEach(d => {
+    const state = d.status === 'online' ? 'online' : d.status === 'offline' ? 'offline' : 'unknown';
+    const card  = document.createElement('article');
+    card.className = 'device-card';
+    card.innerHTML = `
+      <div class="device-card-header">
+        <span class="indicator-dot" data-state="${state}" aria-hidden="true"></span>
+        <span class="device-card-name">${_esc(d.name || d.id)}</span>
+        <span class="badge badge--${state === 'online' ? 'success' : state === 'offline' ? 'danger' : 'neutral'}" style="margin-left:auto">
+          ${state === 'online' ? 'En línea' : state === 'offline' ? 'Sin conexión' : 'Desconocido'}
+        </span>
+      </div>
+      <div class="device-card-body">
+        <div class="device-card-row"><span class="device-card-label">IP</span><span class="mono">${_esc(d.ip || '–')}</span></div>
+        <div class="device-card-row"><span class="device-card-label">Ubicación</span><span>${_esc(d.location || '–')}</span></div>
+        <div class="device-card-row"><span class="device-card-label">Último ping</span><span>${_fmtTs(d.lastPing, true)}</span></div>
+      </div>
+      <div class="device-card-footer">
+        <button class="btn btn--primary btn--sm btn-open-gate"
+                data-device="${_esc(d.id)}" data-name="${_esc(d.name || d.id)}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          Abrir
+        </button>
+      </div>
+    `;
+    card.querySelector('.btn-open-gate').addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      _confirm(`¿Abrir "${btn.dataset.name}" manualmente?`,
+        () => _openGate(btn.dataset.device, btn.dataset.name));
+    });
+    frag.appendChild(card);
+  });
+  grid.appendChild(frag);
+}
+
+async function _openGate(deviceId, deviceName) {
+  try {
+    await FirebaseStubs.openGate(deviceId, {
+      clientId: STATE.clientId,
+      openedBy: STATE.user?.email ?? STATE.email ?? 'dashboard',
+      deviceName,
+    });
+    _toast(`Apertura enviada a "${deviceName}".`, 'success');
+    _loadDispositivos();
+  } catch (err) {
+    _warn('openGate error:', err);
+    _toast('Error al enviar la apertura.', 'danger');
+  }
+}
+
+function _renderManualHistory(history = []) {
+  const tbody = document.getElementById('manualOpenHistory');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (!history.length) {
+    tbody.innerHTML = '<tr><td colspan="3" class="td-empty">Sin aperturas manuales recientes.</td></tr>';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  history.forEach(h => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td">${_esc(h.deviceName || h.accessPointId || '–')}</td>
+      <td class="td">${_esc(h.openedBy || h.user || '–')}</td>
+      <td class="td col-time">${_fmtTs(h.timestamp)}</td>
+    `;
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
+}
+
+function _initDispositivos() {
+  document.getElementById('btnPingDevices')?.addEventListener('click', _loadDispositivos);
+}
+
+
+/* ============================================================
+   VIEW: LISTAS
+============================================================ */
+async function _loadListas() {
+  _log('loadListas');
+  try {
+    const [wl, bl] = await Promise.all([
+      FirebaseStubs.getWhitelist(STATE.clientId),
+      FirebaseStubs.getBlacklist(STATE.clientId),
+    ]);
+    STATE.whitelist = wl;
+    STATE.blacklist = bl;
+    _renderLista('whitelist', wl);
+    _renderLista('blacklist', bl);
+    _set('whitelistCount', wl.length);
+    _set('blacklistCount', bl.length);
+  } catch (err) {
+    _warn('loadListas error:', err);
+    _toast('Error al cargar listas.', 'danger');
+  }
+}
+
+function _renderLista(type, items = []) {
+  const bodyId = type === 'whitelist' ? 'whitelistBody' : 'blacklistBody';
+  const tbody  = document.getElementById(bodyId);
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="3" class="td-empty">Sin registros en ${type}.</td></tr>`;
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  items.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td col-mono">${_esc(item.tag_id || item.tagId || '–')}</td>
+      <td class="td">${_esc(item.user_name || item.userName || item.motivo || '–')}</td>
+      <td class="td col-actions">
+        <button class="btn-icon btn-icon--ghost btn-icon--danger" title="Eliminar"
+                data-remove-from="${type}" data-doc="${_esc(item.id)}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/><path d="M14 11v6"/>
+          </svg>
+        </button>
+      </td>
+    `;
+    tr.querySelector('[data-remove-from]').addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      _confirm(`¿Eliminar este tag de ${btn.dataset.removeFrom}?`, async () => {
+        try {
+          await FirebaseStubs.removeFromList(btn.dataset.removeFrom, btn.dataset.doc);
+          _toast('Tag eliminado.', 'success');
+          _loadListas();
+        } catch (err) { _toast('Error al eliminar.', 'danger'); }
+      });
+    });
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
+}
+
+function _initListas() {
+  document.getElementById('btnAddWhitelist')?.addEventListener('click', () => {
+    document.getElementById('formAddLista')?.reset();
+    _openModal('modalAddLista');
+  });
+
+  document.getElementById('formAddLista')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn    = document.getElementById('btnSubmitLista');
+    const tagId  = (document.getElementById('listaTagId')?.value ?? '').trim().toUpperCase();
+    const lista  = document.getElementById('listaLista')?.value ?? 'whitelist';
+    const motivo = (document.getElementById('listaMotivo')?.value ?? '').trim();
+    if (!tagId) { _toast('El tag ID es obligatorio.', 'warning'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Agregando…'; }
+    try {
+      await FirebaseStubs.addToList(lista, { tagId, motivo, clientId: STATE.clientId });
+      _closeModal('modalAddLista');
+      _toast(`Tag agregado a ${lista}.`, 'success');
+      _loadListas();
+    } catch (err) {
+      _toast('Error al agregar el tag.', 'danger');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Agregar'; }
+    }
+  });
+}
+
+
+/* ============================================================
+   VIEW: CONFIGURACIÓN
+============================================================ */
+const _READER_KEY = 'nt_reader_settings';
+let _readerPingInterval = null;
+
+function _initConfigView() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(_READER_KEY) || 'null');
+    if (saved?.ip) {
+      document.getElementById('readerIp').value   = saved.ip;
+      document.getElementById('readerPort').value = saved.port || '8080';
+      _startReaderPing(saved.ip, saved.port || '8080');
+    }
+  } catch (_) {}
+}
+
+function _initConfig() {
+  document.getElementById('btnSaveReader')?.addEventListener('click', () => {
+    const ip   = (document.getElementById('readerIp')?.value ?? '').trim();
+    const port = (document.getElementById('readerPort')?.value ?? '').trim() || '8080';
+    if (!ip) { _toast('Ingresa una IP válida.', 'warning'); return; }
+    localStorage.setItem(_READER_KEY, JSON.stringify({ ip, port }));
+    _startReaderPing(ip, port);
+    _toast('Configuración del lector guardada.', 'success');
+  });
+
+  document.getElementById('btnTestReader')?.addEventListener('click', async () => {
+    const ip   = (document.getElementById('readerIp')?.value ?? '').trim();
+    const port = (document.getElementById('readerPort')?.value ?? '').trim() || '8080';
+    if (!ip) return;
+    const btn = document.getElementById('btnTestReader');
+    btn.disabled = true; btn.textContent = 'Probando…';
+    const ok = await _pingReader(ip, port);
+    btn.disabled = false; btn.textContent = ok ? '✅ Conectado' : '❌ Sin respuesta';
+    setTimeout(() => { btn.textContent = 'Probar conexión'; }, 3000);
+  });
+
+  _initPush();
+  _initQR();
+}
+
+async function _pingReader(ip, port) {
+  const ctrl = new AbortController();
+  const tid  = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    await fetch(`http://${ip}:${port}/health`, { signal: ctrl.signal, mode: 'no-cors' });
+    clearTimeout(tid);
+    _setIndicator('indicatorReader', 'online');
+    _setIndicator('readerStatusBadge', 'online');
+    _set('readerStatusLabel', 'Conectado');
+    return true;
+  } catch (_) {
+    clearTimeout(tid);
+    _setIndicator('indicatorReader', 'offline');
+    _setIndicator('readerStatusBadge', 'offline');
+    _set('readerStatusLabel', 'Sin respuesta');
+    return false;
+  }
+}
+
+function _startReaderPing(ip, port) {
+  if (_readerPingInterval) clearInterval(_readerPingInterval);
+  _setIndicator('indicatorReader', 'loading');
+  _pingReader(ip, port);
+  _readerPingInterval = setInterval(() => _pingReader(ip, port), 30_000);
+}
+
+function _initPush() {
+  const btn = document.getElementById('btnActivatePush');
+  if (!btn) return;
+
+  if (!('Notification' in window)) {
+    _set('pushStatusText', '⚠️ Este navegador no soporta notificaciones.');
+    btn.disabled = true;
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    _set('pushStatusText', '✅ Notificaciones activadas');
+    _setIndicator('indicatorPush', 'online');
+    btn.disabled = true; btn.textContent = 'Activadas';
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    _set('pushStatusText', '⛔ Bloqueadas en el navegador');
+    _setIndicator('indicatorPush', 'offline');
+    btn.disabled = true;
+    return;
+  }
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Solicitando…';
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        _set('pushStatusText', '✅ Notificaciones activadas');
+        _setIndicator('indicatorPush', 'online');
+        btn.textContent = 'Activadas';
+      } else {
+        _set('pushStatusText', '⚠️ Permiso denegado');
+        _setIndicator('indicatorPush', 'offline');
+        btn.disabled = false; btn.textContent = 'Activar notificaciones';
+      }
+    } catch (_) {
+      btn.disabled = false; btn.textContent = 'Activar notificaciones';
+    }
+  });
+}
+
+/* QR Scanner */
+let _qrStream = null, _qrRaf = null;
+
+function _initQR() {
+  const startBtn = document.getElementById('btnStartQR');
+  const linkBtn  = document.getElementById('btnLinkQR');
+  if (!startBtn) return;
+
+  document.getElementById('qrTagId')?.addEventListener('input', () => {
+    if (linkBtn) linkBtn.disabled = !(document.getElementById('qrTagId').value.trim());
+  });
+
+  startBtn.addEventListener('click', async () => {
+    if (_qrStream) { _stopQR(); startBtn.textContent = 'Activar cámara'; return; }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      _toast('Cámara no disponible (requiere HTTPS).', 'warning'); return;
+    }
+    try {
+      _qrStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      const area = document.getElementById('qrScannerArea');
+      let video  = document.getElementById('dpQrVideo');
+      let canvas = document.getElementById('dpQrCanvas');
+      if (!video) {
+        video  = Object.assign(document.createElement('video'),
+          { id: 'dpQrVideo', autoplay: true, playsInline: true });
+        video.style.cssText = 'width:100%;border-radius:8px;display:block;';
+        canvas = Object.assign(document.createElement('canvas'), { id: 'dpQrCanvas' });
+        canvas.style.display = 'none';
+        area.prepend(canvas); area.prepend(video);
+      }
+      video.srcObject = _qrStream;
+      startBtn.textContent = 'Detener cámara';
+      const ctx = canvas.getContext('2d');
+      const scan = () => {
+        if (!_qrStream) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          if (typeof jsQR === 'function') {
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code    = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
+            if (code?.data) {
+              document.getElementById('qrTagId').value = code.data;
+              if (linkBtn) linkBtn.disabled = false;
+              _stopQR();
+              startBtn.textContent = '✅ QR leído';
+              _toast(`QR leído: ${code.data}`, 'success');
+              return;
+            }
+          }
+        }
+        _qrRaf = requestAnimationFrame(scan);
+      };
+      _qrRaf = requestAnimationFrame(scan);
+    } catch (err) { _qrStream = null; _toast('Acceso a cámara denegado.', 'warning'); }
+  });
+
+  linkBtn?.addEventListener('click', async () => {
+    const tagId  = (document.getElementById('qrTagId')?.value ?? '').trim();
+    const userId = document.getElementById('qrUserId')?.value ?? '';
+    if (!tagId || !userId) { _toast('Selecciona un residente y escanea un QR.', 'warning'); return; }
+    try {
+      await FirebaseStubs.linkTagToUser(userId, tagId, STATE.clientId);
+      _toast('Tag vinculado correctamente.', 'success');
+      document.getElementById('qrTagId').value = '';
+      if (linkBtn) linkBtn.disabled = true;
+    } catch (err) { _toast('Error al vincular el tag.', 'danger'); }
+  });
+}
+
+function _stopQR() {
+  if (_qrRaf)    { cancelAnimationFrame(_qrRaf); _qrRaf = null; }
+  if (_qrStream) { _qrStream.getTracks().forEach(t => t.stop()); _qrStream = null; }
+  const v = document.getElementById('dpQrVideo');
+  if (v) v.srcObject = null;
 }
 
 
 /* ============================================================
    FIREBASE STUBS
-   Reemplazar cada función con la implementación real
-   de Firebase cuando sea el momento de integrarlo.
+   Usa Firebase real si está disponible, o datos de demo.
 ============================================================ */
 const FirebaseStubs = {
 
-  /** Inicializar Firebase Auth listener — REAL */
   initAuth(onLogin, onLogout) {
     _log('initAuth — Firebase real');
-
-    // Usar Firebase Auth real si está disponible
     if (typeof firebase !== 'undefined' && firebase.auth) {
       firebase.auth().onAuthStateChanged(async (user) => {
-        _log('onAuthStateChanged — user:', user ? user.email : 'null (no session)');
+        _log('onAuthStateChanged —', user ? user.email : 'null');
         if (user) {
           try {
-            const token = await user.getIdTokenResult(/* forceRefresh= */ false);
+            const token = await user.getIdTokenResult(false);
             onLogin({
               uid:         user.uid,
               email:       user.email,
@@ -1039,216 +1653,314 @@ const FirebaseStubs = {
               clientId:    token.claims.clientId ?? null,
             });
           } catch (err) {
-            _warn('getIdTokenResult error', err);
-            // Continuar con datos mínimos si falla el token
-            onLogin({
-              uid:         user.uid,
-              email:       user.email,
-              displayName: user.displayName ?? user.email,
-              role:        'guard',
-              clientId:    null,
-            });
+            _warn('getIdTokenResult error:', err);
+            onLogin({ uid: user.uid, email: user.email, displayName: user.email, role: 'guard', clientId: null });
           }
         } else {
           onLogout();
         }
       });
     } else {
-      // Fallback: modo demo si Firebase no carga (útil para abrir el HTML directo)
-      _warn('Firebase no disponible — activando modo demo');
+      _warn('Firebase no disponible — modo demo');
       setTimeout(() => onLogin({
-        uid:         'demo-uid-001',
-        email:       'admin@neostech.mx',
-        displayName: 'Administrador Demo',
-        role:        'admin',
-        clientId:    'demo-client',
-      }), 600);
+        uid: 'demo', email: 'admin@neostech.mx',
+        displayName: 'Admin Demo', role: 'admin', clientId: 'demo',
+      }), 800);
     }
   },
 
   async signIn(email, password) {
     _log('signIn', email, password.length, 'chars');
-
-    // Validación básica antes de llamar a Firebase (evita errores Uncaught)
-    if (!email || !email.includes('@')) {
-      throw { code: 'auth/invalid-email', message: 'El correo no tiene un formato válido.' };
-    }
-    if (!password || password.length < 6) {
-      throw { code: 'auth/wrong-password', message: 'La contraseña debe tener al menos 6 caracteres.' };
-    }
-
+    if (!email || !email.includes('@')) throw { code: 'auth/invalid-email' };
+    if (!password || password.length < 6) throw { code: 'auth/wrong-password' };
     if (typeof firebase !== 'undefined' && firebase.auth) {
       try {
-        const result = await firebase.auth().signInWithEmailAndPassword(email, password);
-        _log('signIn OK — uid:', result.user?.uid);
-        return result;
+        const r = await firebase.auth().signInWithEmailAndPassword(email, password);
+        _log('signIn OK — uid:', r.user?.uid);
+        return r;
       } catch (err) {
-        _log('signIn FAILED — code:', err.code, '| msg:', err.message);
-        // Re-lanzar como objeto plano para que el catch externo siempre lo capture
+        _log('signIn FAILED:', err.code);
         throw { code: err.code, message: err.message };
       }
     }
-
-    // Fallback demo
-    await _delay(800);
-    return { user: { email, displayName: email.split('@')[0] } };
+    await _delay(600);
+    return { user: { email } };
   },
 
-  async signOut() {
+  signOut() {
     _log('signOut');
-
-    if (typeof firebase !== 'undefined' && firebase.auth) {
-      return firebase.auth().signOut();
-    }
-
-    // Fallback demo
-    await _delay(300);
+    if (typeof firebase !== 'undefined' && firebase.auth) return firebase.auth().signOut();
     _showAuth();
   },
 
   async getKPIs(clientId) {
-    _log('[stub] getKPIs', clientId);
-    // En producción:
-    // const snap = await db.collection('kpis').doc(clientId).get();
-    // return snap.data();
-    await _delay(600);
-    return {
-      lecturas:   Math.floor(Math.random() * 800) + 100,
-      permitidos: Math.floor(Math.random() * 700) + 80,
-      denegados:  Math.floor(Math.random() * 50),
-      alertas:    Math.floor(Math.random() * 5),
-    };
+    if (typeof db !== 'undefined') {
+      try {
+        const today    = _todayStart();
+        const evSnap   = await db.collection('rfid_events')
+          .where('clientId', '==', clientId)
+          .where('timestamp', '>=', firebase.firestore.Timestamp.fromDate(today))
+          .get();
+        let lecturas = 0, permitidos = 0, denegados = 0;
+        evSnap.forEach(d => {
+          lecturas++;
+          const s = String(d.data().status ?? '').toLowerCase();
+          if (s === 'allowed' || s === 'permitido') permitidos++;
+          else if (s === 'denied' || s === 'denegado') denegados++;
+        });
+        const alSnap = await db.collection('alerts')
+          .where('clientId', '==', clientId).where('resolved', '==', false).get();
+        return { lecturas, permitidos, denegados, alertas: alSnap.size };
+      } catch (e) { _warn('getKPIs error:', e); }
+    }
+    await _delay(400);
+    const l = Math.floor(Math.random() * 800) + 100;
+    const p = Math.floor(l * 0.85);
+    return { lecturas: l, permitidos: p, denegados: l - p, alertas: Math.floor(Math.random() * 5) };
   },
 
   async getRecentEvents(clientId) {
-    _log('[stub] getRecentEvents', clientId);
-    // En producción:
-    // const snap = await db.collection('rfid_events')
-    //   .where('clientId', '==', clientId)
-    //   .orderBy('timestamp', 'desc').limit(10).get();
-    // return snap.docs.map(d => d.data());
-    await _delay(700);
+    if (typeof db !== 'undefined') {
+      try {
+        const snap = await db.collection('rfid_events')
+          .where('clientId', '==', clientId)
+          .orderBy('timestamp', 'desc').limit(10).get();
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { _warn('getRecentEvents error:', e); }
+    }
+    await _delay(300);
     return _demoEvents(8);
   },
 
   subscribeToLiveTags(clientId, callback) {
-    _log('[stub] subscribeToLiveTags', clientId);
-    // En producción:
-    // const unsub = db.collection('rfid_events')
-    //   .where('clientId', '==', clientId)
-    //   .orderBy('timestamp', 'desc').limit(1)
-    //   .onSnapshot(snap => {
-    //     snap.docChanges().forEach(change => {
-    //       if (change.type === 'added') callback(change.doc.data());
-    //     });
-    //   });
-    // return unsub;
-
-    // STUB: genera un evento aleatorio cada 3 s
-    const intervalId = setInterval(() => {
-      callback(_demoEvents(1)[0]);
-    }, 3000);
-
-    // También enviar datos iniciales
-    setTimeout(() => {
-      _demoEvents(20).forEach((ev, i) => {
-        setTimeout(() => callback(ev), i * 50);
+    _log('subscribeToLiveTags', clientId);
+    if (typeof db !== 'undefined') {
+      try {
+        return db.collection('rfid_events')
+          .where('clientId', '==', clientId)
+          .orderBy('timestamp', 'desc').limit(1)
+          .onSnapshot(snap => {
+            snap.docChanges().forEach(change => {
+              if (change.type === 'added') callback({ id: change.doc.id, ...change.doc.data() });
+            });
+          });
+      } catch (e) { _warn('subscribeToLiveTags error:', e); }
+    }
+    const names  = ['Ana García', 'Carlos López', 'María Pérez', 'Juan Martínez', 'Laura Jiménez'];
+    const points = ['Portón principal', 'Puerta trasera', 'Acceso garaje', 'Recepción'];
+    const timer  = setInterval(() => {
+      callback({
+        id:         Math.random().toString(36).slice(2),
+        tagId:      Math.random().toString(16).slice(2, 14).toUpperCase(),
+        userName:   names[Math.floor(Math.random() * names.length)],
+        readerName: points[Math.floor(Math.random() * points.length)],
+        status:     Math.random() > 0.15 ? 'allowed' : 'denied',
+        timestamp:  { toDate: () => new Date() },
       });
-    }, 400);
-
-    return () => clearInterval(intervalId); // función unsub
+    }, Math.random() * 4000 + 4000);
+    return () => clearInterval(timer);
   },
 
-  async getUsers(clientId) {
-    _log('[stub] getUsers', clientId);
-    // En producción:
-    // const snap = await db.collection('users')
-    //   .where('clientId', '==', clientId).get();
-    // return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    await _delay(700);
-    return [
-      { id: '1', nombre: 'Ana García',     email: 'ana@empresa.mx',    rol: 'admin',    tagsCount: 2, activo: true  },
-      { id: '2', nombre: 'Luis Mendoza',   email: 'luis@empresa.mx',   rol: 'guard',    tagsCount: 1, activo: true  },
-      { id: '3', nombre: 'María Torres',   email: 'maria@empresa.mx',  rol: 'resident', tagsCount: 3, activo: true  },
-      { id: '4', nombre: 'Carlos Ruiz',    email: 'carlos@empresa.mx', rol: 'resident', tagsCount: 1, activo: false },
-      { id: '5', nombre: 'Sofía Jiménez',  email: 'sofia@empresa.mx',  rol: 'guard',    tagsCount: 2, activo: true  },
-    ];
-  },
-
-  async getDevices(clientId) {
-    _log('[stub] getDevices', clientId);
-    // En producción:
-    // const snap = await db.collection('access_points')
-    //   .where('clientId', '==', clientId).get();
-    // return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    await _delay(500);
-    return [
-      { id: 'AP-01', nombre: 'Entrada Principal', ip: '192.168.1.101', estado: 'online'  },
-      { id: 'AP-02', nombre: 'Estacionamiento',   ip: '192.168.1.102', estado: 'online'  },
-      { id: 'AP-03', nombre: 'Acceso Bodega',      ip: '192.168.1.103', estado: 'offline' },
-      { id: 'AP-04', nombre: 'Acceso Oficinas',    ip: '192.168.1.104', estado: 'online'  },
-    ];
+  async getAccessLogs(clientId, { from, to } = {}) {
+    if (typeof db !== 'undefined') {
+      try {
+        let q = db.collection('access_logs')
+          .where('clientId', '==', clientId)
+          .orderBy('timestamp', 'desc');
+        if (from) q = q.where('timestamp', '>=', firebase.firestore.Timestamp.fromDate(from));
+        if (to)   q = q.where('timestamp', '<=', firebase.firestore.Timestamp.fromDate(to));
+        const snap = await q.limit(500).get();
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { _warn('getAccessLogs error:', e); }
+    }
+    await _delay(400);
+    return _demoEvents(40);
   },
 
   async getAlerts(clientId) {
-    _log('[stub] getAlerts', clientId);
-    // En producción:
-    // const snap = await db.collection('alerts')
-    //   .where('clientId', '==', clientId)
-    //   .where('status', '==', 'active').get();
-    // return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    await _delay(600);
+    if (typeof db !== 'undefined') {
+      try {
+        const today = _todayStart();
+        const [aSnap, rSnap] = await Promise.all([
+          db.collection('alerts').where('clientId', '==', clientId)
+            .where('resolved', '==', false).orderBy('createdAt', 'desc').limit(50).get(),
+          db.collection('alerts').where('clientId', '==', clientId)
+            .where('resolved', '==', true)
+            .where('resolvedAt', '>=', firebase.firestore.Timestamp.fromDate(today))
+            .limit(20).get(),
+        ]);
+        return {
+          active:   aSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          resolved: rSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        };
+      } catch (e) { _warn('getAlerts error:', e); }
+    }
+    await _delay(300);
     return {
-      activas: [
-        { id: 'al-01', tipo: 'high',   mensaje: 'Intento de acceso no autorizado — Bodega',    punto: 'AP-03', createdAt: Date.now() - 300_000 },
-        { id: 'al-02', tipo: 'medium', mensaje: 'Lector AP-04 sin respuesta hace 15 minutos.', punto: 'AP-04', createdAt: Date.now() - 900_000 },
+      active: [
+        { id: 'a1', severity: 'high',   title: 'Tag no autorizado detectado', description: 'Lector Portón principal detectó tag desconocido', zone: 'Portón principal', createdAt: { toDate: () => new Date() },               acknowledged: false, resolved: false },
+        { id: 'a2', severity: 'medium', title: 'Lector sin respuesta',        description: 'El lector de recepción no responde desde hace 10 min', zone: 'Recepción',  createdAt: { toDate: () => new Date(Date.now() - 600_000) }, acknowledged: true, resolved: false },
       ],
-      resueltas: [
-        { id: 'al-00', tipo: 'low', mensaje: 'Tag desconocido en entrada principal.', punto: 'AP-01', createdAt: Date.now() - 3_600_000 },
-      ],
+      resolved: [],
     };
   },
 
-  async acknowledgeAlert(clientId, alertId) {
-    _log('[stub] acknowledgeAlert', alertId);
-    // En producción:
-    // await db.collection('alerts').doc(alertId).update({
-    //   status: 'resolved', resolvedAt: firebase.firestore.FieldValue.serverTimestamp()
-    // });
-    await _delay(500);
+  async createAlert(data) {
+    if (typeof db !== 'undefined') {
+      return db.collection('alerts').add({
+        ...data, resolved: false, acknowledged: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    _log('[stub] createAlert', data); await _delay(300);
   },
 
-  async createAlert(clientId, data) {
-    _log('[stub] createAlert', data);
-    // En producción:
-    // await db.collection('alerts').add({
-    //   ...data, clientId, status: 'active',
-    //   createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    // });
-    await _delay(600);
+  async getUsers(clientId) {
+    if (typeof db !== 'undefined') {
+      try {
+        const snap = await db.collection('users')
+          .where('clientId', '==', clientId).limit(200).get();
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { _warn('getUsers error:', e); }
+    }
+    await _delay(400);
+    return [
+      { id: 'u1', name: 'Ana García',   email: 'ana@ejemplo.com',    block: 'Bloque A', unit: 'Depto 101', active: true,  tags: ['A1B2C3D4E5F6'] },
+      { id: 'u2', name: 'Carlos López', email: 'carlos@ejemplo.com', block: 'Bloque B', unit: 'Depto 204', active: true,  tags: [] },
+      { id: 'u3', name: 'María Pérez',  email: 'maria@ejemplo.com',  block: 'Bloque A', unit: 'Depto 302', active: false, tags: ['AABBCCDD1122'] },
+    ];
+  },
+
+  async saveUser(id, data) {
+    if (typeof db !== 'undefined') {
+      if (id) return db.collection('users').doc(id).update(data);
+      return db.collection('users').add({
+        ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    _log('[stub] saveUser', id, data); await _delay(400);
+  },
+
+  async deleteUser(id) {
+    if (typeof db !== 'undefined') return db.collection('users').doc(id).delete();
+    _log('[stub] deleteUser', id); await _delay(300);
+  },
+
+  async getDevices(clientId) {
+    if (typeof db !== 'undefined') {
+      try {
+        const snap = await db.collection('access_points')
+          .where('clientId', '==', clientId).get();
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { _warn('getDevices error:', e); }
+    }
+    await _delay(300);
+    return [
+      { id: 'd1', name: 'Portón principal', location: 'Entrada vehicular', ip: '192.168.1.101', status: 'online',  lastPing: { toDate: () => new Date() } },
+      { id: 'd2', name: 'Puerta peatonal',  location: 'Entrada peatonal',  ip: '192.168.1.102', status: 'online',  lastPing: { toDate: () => new Date() } },
+      { id: 'd3', name: 'Acceso garaje',    location: 'Subsuelo',          ip: '192.168.1.103', status: 'offline', lastPing: { toDate: () => new Date(Date.now() - 900_000) } },
+    ];
+  },
+
+  async openGate(deviceId, { clientId, openedBy, deviceName }) {
+    if (typeof db !== 'undefined') {
+      const batch  = db.batch();
+      const evRef  = db.collection('rfid_events').doc();
+      batch.set(evRef, {
+        clientId, event_type: 'manual_open', accessPointId: deviceId,
+        deviceName, openedBy, source: 'dashboard', status: 'manual',
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      const cmdRef = db.collection('gate_commands').doc();
+      batch.set(cmdRef, {
+        clientId, deviceId, deviceName, command: 'OPEN',
+        openedBy, executed: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      return batch.commit();
+    }
+    _log('[stub] openGate', deviceId, { clientId, openedBy, deviceName }); await _delay(300);
+  },
+
+  async getManualOpenHistory(clientId) {
+    if (typeof db !== 'undefined') {
+      try {
+        const snap = await db.collection('rfid_events')
+          .where('clientId', '==', clientId)
+          .where('event_type', '==', 'manual_open')
+          .orderBy('timestamp', 'desc').limit(10).get();
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { _warn('getManualOpenHistory error:', e); }
+    }
+    await _delay(200); return [];
+  },
+
+  async getWhitelist(clientId) {
+    if (typeof db !== 'undefined') {
+      try {
+        const snap = await db.collection('whitelist')
+          .where('clientId', '==', clientId).limit(200).get();
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { _warn('getWhitelist error:', e); }
+    }
+    await _delay(200);
+    return [{ id: 'w1', tag_id: 'A1B2C3D4E5F6', user_name: 'Ana García' }];
+  },
+
+  async getBlacklist(clientId) {
+    if (typeof db !== 'undefined') {
+      try {
+        const snap = await db.collection('blacklist')
+          .where('clientId', '==', clientId).limit(200).get();
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { _warn('getBlacklist error:', e); }
+    }
+    await _delay(200); return [];
+  },
+
+  async addToList(lista, { tagId, motivo, clientId }) {
+    if (typeof db !== 'undefined') {
+      return db.collection(lista).add({
+        tag_id: tagId, user_name: motivo || '', clientId,
+        added_at: firebase.firestore.FieldValue.serverTimestamp(),
+        added_by: STATE.user?.email ?? null,
+      });
+    }
+    _log('[stub] addToList', lista, { tagId, motivo }); await _delay(300);
+  },
+
+  async removeFromList(lista, docId) {
+    if (typeof db !== 'undefined') return db.collection(lista).doc(docId).delete();
+    _log('[stub] removeFromList', lista, docId); await _delay(200);
+  },
+
+  async linkTagToUser(userId, tagId, clientId) {
+    if (typeof db !== 'undefined') {
+      return db.collection('users').doc(userId).update({
+        tags: firebase.firestore.FieldValue.arrayUnion(tagId),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    _log('[stub] linkTagToUser', userId, tagId); await _delay(300);
   },
 };
 
 
 /* ============================================================
-   HELPERS PARA STUBS
+   DATOS DE DEMOSTRACIÓN
 ============================================================ */
-function _delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-const _UIDS    = ['A1B2C3D4', '9F3E7A12', 'CC840021', '3D5F9B01', 'FF001234', 'AB9870EF'];
-const _PUNTOS  = ['Entrada Principal', 'Estacionamiento', 'Acceso Bodega', 'Acceso Oficinas'];
-const _NOMBRES = ['Ana García', 'Luis Mendoza', 'María Torres', 'Carlos Ruiz', 'Sofía Jiménez'];
-const _ESTADOS = ['permitido', 'permitido', 'permitido', 'denegado']; // 75% permitido
-
-function _demoEvents(n) {
+function _demoEvents(n = 10) {
+  const names  = ['Ana García', 'Carlos López', 'María Pérez', 'Juan Martínez', 'Laura Jiménez', 'Pedro Soto'];
+  const points = ['Portón principal', 'Puerta trasera', 'Acceso garaje', 'Recepción', 'Escalera B'];
   return Array.from({ length: n }, (_, i) => ({
-    uid:       _UIDS[Math.floor(Math.random() * _UIDS.length)],
-    usuario:   _NOMBRES[Math.floor(Math.random() * _NOMBRES.length)],
-    punto:     _PUNTOS[Math.floor(Math.random() * _PUNTOS.length)],
-    estado:    _ESTADOS[Math.floor(Math.random() * _ESTADOS.length)],
-    timestamp: Date.now() - i * 12_000,
+    id:         `demo-${i}`,
+    tagId:      Math.random().toString(16).slice(2, 14).toUpperCase(),
+    userName:   names[i % names.length],
+    user:       names[i % names.length],
+    readerName: points[i % points.length],
+    reader:     points[i % points.length],
+    status:     Math.random() > 0.15 ? 'allowed' : 'denied',
+    timestamp:  { toDate: () => new Date(Date.now() - i * 180_000) },
   }));
 }
 
@@ -1257,6 +1969,7 @@ function _demoEvents(n) {
    PUNTO DE ENTRADA
 ============================================================ */
 let _initialized = false;
+
 function init() {
   if (_initialized) return;
   _initialized = true;
@@ -1265,30 +1978,32 @@ function init() {
   _initTopbar();
   _initSidebar();
   _initModals();
-  _initRefreshButtons();
-  _initTagsControls();
-  _initUsuariosSearch();
-  _initAlertaActions();
+  _initConfirm();
   _initAuth();
+  _initLiveTags();
+  _initBitacora();
+  _initAlertas();
+  _initUsuarios();
+  _initDispositivos();
+  _initListas();
+  _initConfig();
 
-  // Inicializar auth listener (Firebase o stub)
+  document.getElementById('btnRefreshResumen')?.addEventListener('click', _loadResumen);
+
   FirebaseStubs.initAuth(
     (userData) => {
       STATE.clientId = userData.clientId ?? null;
       _showApp(userData);
       _initRouter();
+      _loadViewData('resumen');
       _setIndicator('indicatorDB', 'loading');
     },
     () => {
       _showAuth();
-      // Mostrar auth screen
-      const authScreen = document.getElementById('authScreen');
-      if (authScreen) authScreen.hidden = false;
     }
   );
 }
 
-// Arrancar cuando el DOM esté listo
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
