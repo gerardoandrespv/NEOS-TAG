@@ -1736,14 +1736,52 @@ const FirebaseStubs = {
     _log('subscribeToLiveTags', clientId);
     if (typeof db !== 'undefined') {
       try {
-        return db.collection('rfid_events')
-          .where('clientId', '==', clientId)
-          .orderBy('timestamp', 'desc').limit(1)
-          .onSnapshot(snap => {
-            snap.docChanges().forEach(change => {
-              if (change.type === 'added') callback({ id: change.doc.id, ...change.doc.data() });
-            });
+        // Cursor: solo documentos escritos desde que el dashboard abrió.
+        // Escuchamos DOS colecciones en paralelo:
+        //   1. rfid_events  — escritos por el gateway vía Cloud Function "rfid-gateway"
+        //   2. rfid_tags    — escritos por el gateway vía Cloud Function legacy "process_tag"
+        // Normalizamos los campos al esquema del dashboard:
+        //   tagId, userName, readerName, status, timestamp, clientId
+        const startAt = firebase.firestore.Timestamp.now();
+        const normalize = (doc) => {
+          const d = doc.data();
+          return {
+            id:         doc.id,
+            tagId:      d.tagId      || d.tag_id   || d.epc        || d.id    || '–',
+            userName:   d.userName   || d.user_name || d.name       || '',
+            readerName: d.readerName || d.reader_name || d.reader_sn || d.accessPointId || '',
+            status:     d.status     || (d.access_granted === true  ? 'allowed'
+                                      : d.access_granted === false ? 'denied' : 'unknown'),
+            timestamp:  d.timestamp,
+            clientId:   d.clientId   || d.client_id || clientId,
+          };
+        };
+
+        const handler = snap => {
+          snap.docChanges().forEach(change => {
+            if (change.type === 'added' && !change.doc.metadata.hasPendingWrites) {
+              callback(normalize(change.doc));
+            }
           });
+        };
+        const errHandler = err => _warn('subscribeToLiveTags snapshot error:', err);
+
+        // Colección principal (rfid_events)
+        const unsub1 = db.collection('rfid_events')
+          .where('clientId', '==', clientId)
+          .where('timestamp', '>=', startAt)
+          .orderBy('timestamp', 'asc')
+          .onSnapshot({ includeMetadataChanges: false }, handler, errHandler);
+
+        // Colección legacy (rfid_tags con client_id)
+        const unsub2 = db.collection('rfid_tags')
+          .where('client_id', '==', clientId)
+          .where('timestamp', '>=', startAt)
+          .orderBy('timestamp', 'asc')
+          .onSnapshot({ includeMetadataChanges: false }, handler, errHandler);
+
+        // Retorna una función que cancela ambas suscripciones
+        return () => { unsub1(); unsub2(); };
       } catch (e) { _warn('subscribeToLiveTags error:', e); }
     }
     const names  = ['Ana García', 'Carlos López', 'María Pérez', 'Juan Martínez', 'Laura Jiménez'];

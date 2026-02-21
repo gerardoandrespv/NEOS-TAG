@@ -153,17 +153,22 @@ th { font-weight: 600; text-align: left; }
   color: var(--color-text-3);
 }
 
-/* ── Logo auth: SVG 200×60 mostrado como bloque horizontal */
+/* ── Logo auth: PNG cuadrado, centrado */
 .auth-logo {
-  width: 140px;
-  height: auto;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 2px 8px rgba(37 99 235 / .35));
 }
 
-/* ── Logo sidebar: mostrar solo el ícono izquierdo del SVG */
+/* ── Logo sidebar: ícono cuadrado */
 .sidebar-logo {
-  width: 36px;
-  height: auto;
-  overflow: hidden;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
