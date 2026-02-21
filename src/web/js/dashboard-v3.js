@@ -16,7 +16,7 @@
    DEBUG LOGGER
    Cambiar DEBUG = true para ver logs en desarrollo.
 ============================================================ */
-const DEBUG = false;
+const DEBUG = true; // ← desactivar en producción (cambiar a false)
 function _log(...args) {
   if (DEBUG) {
     // eslint-disable-next-line no-console
@@ -973,51 +973,72 @@ function _initRefreshButtons() {
 ============================================================ */
 const FirebaseStubs = {
 
-  /** Inicializar Firebase Auth listener */
+  /** Inicializar Firebase Auth listener — REAL */
   initAuth(onLogin, onLogout) {
-    _log('[stub] initAuth — simulando usuario demo');
+    _log('initAuth — Firebase real');
 
-    // En producción:
-    // firebase.auth().onAuthStateChanged(async (user) => {
-    //   if (user) {
-    //     const token = await user.getIdTokenResult();
-    //     onLogin({ ...user, role: token.claims.role, clientId: token.claims.clientId });
-    //   } else {
-    //     onLogout();
-    //   }
-    // });
-
-    // STUB: simula sesión no iniciada por defecto.
-    // Para demo inmediata, cambiar a: onLogin(demoUser)
-    const autoDemo = true; // ← poner false para mostrar pantalla de login
-    if (autoDemo) {
+    // Usar Firebase Auth real si está disponible
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+      firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+          try {
+            const token = await user.getIdTokenResult(/* forceRefresh= */ false);
+            onLogin({
+              uid:         user.uid,
+              email:       user.email,
+              displayName: user.displayName ?? user.email,
+              role:        token.claims.role     ?? 'guard',
+              clientId:    token.claims.clientId ?? null,
+            });
+          } catch (err) {
+            _warn('getIdTokenResult error', err);
+            // Continuar con datos mínimos si falla el token
+            onLogin({
+              uid:         user.uid,
+              email:       user.email,
+              displayName: user.displayName ?? user.email,
+              role:        'guard',
+              clientId:    null,
+            });
+          }
+        } else {
+          onLogout();
+        }
+      });
+    } else {
+      // Fallback: modo demo si Firebase no carga (útil para abrir el HTML directo)
+      _warn('Firebase no disponible — activando modo demo');
       setTimeout(() => onLogin({
         uid:         'demo-uid-001',
         email:       'admin@neostech.mx',
-        displayName: 'Administrador',
+        displayName: 'Administrador Demo',
         role:        'admin',
         clientId:    'demo-client',
       }), 600);
-    } else {
-      onLogout();
     }
   },
 
   async signIn(email, password) {
-    _log('[stub] signIn', email);
-    // En producción:
-    // return firebase.auth().signInWithEmailAndPassword(email, password);
+    _log('signIn', email);
 
-    // STUB: acepta cualquier credencial
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+      return firebase.auth().signInWithEmailAndPassword(email, password);
+    }
+
+    // Fallback demo
     await _delay(800);
     if (!email || !password) throw { code: 'auth/invalid-email' };
     return { user: { email, displayName: email.split('@')[0] } };
   },
 
   async signOut() {
-    _log('[stub] signOut');
-    // En producción:
-    // return firebase.auth().signOut();
+    _log('signOut');
+
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+      return firebase.auth().signOut();
+    }
+
+    // Fallback demo
     await _delay(300);
     _showAuth();
   },
