@@ -474,6 +474,10 @@ function _showApp(userData) {
   STATE.clientId = userData?.clientId ?? null;
   STATE.email    = userData?.email ?? null;
 
+  // Exponer clientId globalmente para consultas Firestore post-auth.
+  // Se asigna UNA sola vez aquí, después de validar onAuthStateChanged.
+  window.currentUserClientId = STATE.clientId;
+
   _log('_showApp DONE — appShell visible');
 }
 
@@ -487,6 +491,7 @@ function _showAuth() {
   if (as)    { as.removeAttribute('hidden'); as.style.display = ''; }
   if (shell) { shell.hidden = true; shell.style.display = 'none'; }
 
+  window.currentUserClientId = null;
   _cleanupListeners();
 }
 
@@ -913,7 +918,8 @@ function _startAlertas() {
 
   if (typeof db !== 'undefined') {
     try {
-      const clientId = STATE.clientId;
+      // Usar window.currentUserClientId (asignado en _showApp tras onAuthStateChanged).
+      const clientId = window.currentUserClientId ?? STATE.clientId;
       const today    = _todayStart();
       let   firstSnap = true;
 
@@ -933,7 +939,14 @@ function _startAlertas() {
             });
           }
           firstSnap = false;
-        }, err => _warn('alerts onSnapshot error:', err));
+        }, err => {
+          _warn('alerts onSnapshot error:', err);
+          // Índice faltante — no reintentar en loop.
+          // STATE.alertsUnsub permanece asignado para bloquear llamadas futuras a _startAlertas.
+          if (err.code === 'failed-precondition') {
+            _error('[NT] alerts: índice compuesto faltante. Ejecuta: firebase deploy --only firestore:indexes');
+          }
+        });
 
       // Alertas resueltas hoy
       const unsubResolved = db.collection('alerts')
@@ -945,7 +958,12 @@ function _startAlertas() {
         .onSnapshot({ includeMetadataChanges: false }, snap => {
           STATE.alertsResolved = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           _renderAlertas(STATE.alerts, STATE.alertsResolved);
-        }, err => _warn('alerts resolved onSnapshot error:', err));
+        }, err => {
+          _warn('alerts resolved onSnapshot error:', err);
+          if (err.code === 'failed-precondition') {
+            _error('[NT] alerts(resolved): índice compuesto faltante. Ejecuta: firebase deploy --only firestore:indexes');
+          }
+        });
 
       STATE.alertsUnsub = () => { unsubActive(); unsubResolved(); };
       return;
