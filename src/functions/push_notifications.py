@@ -88,26 +88,14 @@ def send_alert_to_all_devices(alert_type: str, title: str, body: str, severity: 
         # Multicast en lotes de 500 (límite FCM)
         for i in range(0, len(tokens), 500):
             batch = tokens[i:i + 500]
-            # webpush.notification (NO top-level notification, NO data)
-            # → FCM via protocolo Web Push nativo → el browser muestra la
-            # notificación directamente, sin depender de onBackgroundMessage.
-            # Urgency:high = alta prioridad (ignora modo ahorro de batería en Chrome).
             message = messaging.MulticastMessage(
                 webpush=messaging.WebpushConfig(
                     headers={'Urgency': 'high'},
                     notification=messaging.WebpushNotification(
                         title=title,
                         body=body,
-                        icon='/assets/images/neostechb.png',
-                        badge='/assets/images/neostechb.png',
-                        vibrate=[400, 100, 400],
+                        icon='https://neos-tech.web.app/assets/images/neostechb.png',
                         require_interaction=True,
-                        tag='sae-alert',
-                        renotify=True,
-                        custom_data={
-                            'alert_type': alert_type,
-                            'severity':   severity
-                        }
                     ),
                     fcm_options=messaging.WebpushFCMOptions(
                         link='https://neos-tech.web.app/sae'
@@ -119,6 +107,10 @@ def send_alert_to_all_devices(alert_type: str, title: str, body: str, severity: 
             success_count += response.success_count
             failure_count += response.failure_count
             logger.info(f'[SAE] Lote {i//500 + 1}: {response.success_count} ok, {response.failure_count} fail')
+            # Log individual failures para diagnóstico
+            for idx, resp in enumerate(response.responses):
+                if not resp.success:
+                    logger.error(f'[SAE] Token[{i+idx}] fallo: {resp.exception}')
 
         return {
             'success':       True,
