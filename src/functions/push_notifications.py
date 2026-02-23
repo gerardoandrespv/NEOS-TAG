@@ -88,18 +88,27 @@ def send_alert_to_all_devices(alert_type: str, title: str, body: str, severity: 
         # Multicast en lotes de 500 (límite FCM)
         for i in range(0, len(tokens), 500):
             batch = tokens[i:i + 500]
-            # Data-only (sin notification en top-level ni webpush.notification)
-            # → FCM llama onBackgroundMessage en el SW UNA VEZ → SW muestra una
-            # sola notificación con sonido.  Urgency:high = prioridad alta en Android.
+            # webpush.notification (NO top-level notification, NO data)
+            # → FCM via protocolo Web Push nativo → el browser muestra la
+            # notificación directamente, sin depender de onBackgroundMessage.
+            # Urgency:high = alta prioridad (ignora modo ahorro de batería en Chrome).
             message = messaging.MulticastMessage(
-                data={
-                    'alert_type': alert_type,
-                    'severity':   severity,
-                    'title':      title,
-                    'body':       body
-                },
                 webpush=messaging.WebpushConfig(
                     headers={'Urgency': 'high'},
+                    notification=messaging.WebpushNotification(
+                        title=title,
+                        body=body,
+                        icon='/assets/images/neostechb.png',
+                        badge='/assets/images/neostechb.png',
+                        vibrate=[400, 100, 400],
+                        require_interaction=True,
+                        tag='sae-alert',
+                        renotify=True,
+                        custom_data={
+                            'alert_type': alert_type,
+                            'severity':   severity
+                        }
+                    ),
                     fcm_options=messaging.WebpushFCMOptions(
                         link='https://neos-tech.web.app/sae'
                     )

@@ -16,25 +16,10 @@ if (!firebase.apps.length) {
 
 const messaging = firebase.messaging();
 
-// Mostrar notificación cuando la app está en segundo plano
-// El mensaje es data-only (sin notification field) → onBackgroundMessage se llama
-// una sola vez → exactamente una notificación con sonido.
-messaging.onBackgroundMessage(function(payload) {
-  const d     = payload.data || {};
-  const title = d.title || payload.notification?.title || '🚨 Alerta de Emergencia';
-  const body  = d.body  || payload.notification?.body  || '';
-  const options = {
-    body,
-    icon:    '/assets/images/neostechb.png',
-    badge:   '/assets/images/neostechb.png',
-    vibrate: [400, 100, 400],
-    tag:     'sae-alert',
-    renotify: true,
-    silent:  false,
-    data:    d,
-  };
-  return self.registration.showNotification(title, options);
-});
+// Con webpush.notification en el backend, Firebase Messaging muestra la
+// notificación automáticamente vía protocolo Web Push nativo.
+// onBackgroundMessage NO se registra — evita duplicados y depende de menos
+// pasos JS en background. notificationclick sigue funcionando igual.
 
 // Al hacer click en la notificación → abrir/enfocar la app SAE
 self.addEventListener('notificationclick', function(e) {
@@ -51,7 +36,7 @@ self.addEventListener('notificationclick', function(e) {
 });
 
 // ─── Caché offline ──────────────────────────────────────────────────────────
-const CACHE    = 'neostech-sae-v5';
+const CACHE    = 'neostech-sae-v6';
 const PRECACHE = ['/sae/', '/sae/index.html', '/assets/images/neostechb.png'];
 
 self.addEventListener('install', e => {
