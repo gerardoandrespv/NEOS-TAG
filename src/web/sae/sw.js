@@ -17,9 +17,12 @@ if (!firebase.apps.length) {
 const messaging = firebase.messaging();
 
 // Mostrar notificación cuando la app está en segundo plano
+// El mensaje es data-only (sin notification field) → onBackgroundMessage se llama
+// una sola vez → exactamente una notificación con sonido.
 messaging.onBackgroundMessage(function(payload) {
-  const title   = payload.notification?.title || '🚨 Alerta de Emergencia';
-  const body    = payload.notification?.body  || '';
+  const d     = payload.data || {};
+  const title = d.title || payload.notification?.title || '🚨 Alerta de Emergencia';
+  const body  = d.body  || payload.notification?.body  || '';
   const options = {
     body,
     icon:    '/assets/images/neostechb.png',
@@ -27,7 +30,8 @@ messaging.onBackgroundMessage(function(payload) {
     vibrate: [400, 100, 400],
     tag:     'sae-alert',
     renotify: true,
-    data:    payload.data || {},
+    silent:  false,
+    data:    d,
   };
   return self.registration.showNotification(title, options);
 });
@@ -47,7 +51,7 @@ self.addEventListener('notificationclick', function(e) {
 });
 
 // ─── Caché offline ──────────────────────────────────────────────────────────
-const CACHE    = 'neostech-sae-v2';
+const CACHE    = 'neostech-sae-v3';
 const PRECACHE = ['/sae/', '/sae/index.html', '/assets/images/neostechb.png'];
 
 self.addEventListener('install', e => {

@@ -317,15 +317,18 @@ def subscribeToTopic(request: https_fn.Request) -> https_fn.Response:
         
         result = subscribe_to_topic(token, topic)
 
-        # Guardar token en alert_subscribers para que alert_trigger.py pueda enviar push
+        # Guardar token en alert_subscribers — usar device_id como clave estable
+        # para que re-activaciones del mismo dispositivo sobreescriban el mismo doc.
         client_id   = request_json.get('clientId', '')
         device_type = request_json.get('device_type', 'web')
+        device_id   = request_json.get('device_id') or token[:128]
         try:
-            _get_db().collection('alert_subscribers').document(token[:128]).set({
+            _get_db().collection('alert_subscribers').document(device_id).set({
                 'fcm_token':             token,
                 'notifications_enabled': True,
                 'clientId':              client_id,
                 'device_type':           device_type,
+                'device_id':             device_id,
                 'last_updated':          fs_admin.SERVER_TIMESTAMP,
             }, merge=True)
         except Exception as db_err:

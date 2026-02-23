@@ -183,6 +183,14 @@
     let   clientId = params.get('c') || localStorage.getItem('sae_clientId') || '';
     if (clientId) localStorage.setItem('sae_clientId', clientId); // persistir
 
+    // ─── ID estable por dispositivo — evita duplicados en Firestore ──────────
+    // Browser y PWA del mismo dispositivo comparten localStorage en Chrome Android.
+    let saeDeviceId = localStorage.getItem('sae_device_id');
+    if (!saeDeviceId) {
+      saeDeviceId = 'dev_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
+      localStorage.setItem('sae_device_id', saeDeviceId);
+    }
+
     const statusCard  = document.getElementById('status-card');
     const statusIcon  = document.getElementById('status-icon');
     const statusTitle = document.getElementById('status-title');
@@ -436,7 +444,7 @@
         await fetch('https://subscribetotopic-6psjv5t2ka-uc.a.run.app', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, topic: 'all-users', clientId, device_type: 'sae_resident' }),
+          body: JSON.stringify({ token, topic: 'all-users', clientId, device_type: 'sae_resident', device_id: saeDeviceId }),
         });
 
         localStorage.setItem('sae_push_ok', '1');
