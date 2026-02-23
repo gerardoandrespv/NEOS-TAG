@@ -133,20 +133,8 @@ def emit_alert(request):
         for recipient in recipients:
             recipient_id = save_recipient(alert_id, recipient, alert_data)
             
-            # Enviar notificación push
-            if alert_data['send_push'] and recipient.get('device_tokens'):
-                try:
-                    send_push_notification(recipient, alert_data)
-                    results['push_sent'] += 1
-                    update_recipient_delivery(recipient_id, 'push')
-                except Exception as e:
-                    logger.error(f"Error enviando push a {recipient['user_id']}: {str(e)}")
-                    results['errors'].append({
-                        'user_id': recipient['user_id'],
-                        'channel': 'push',
-                        'error': str(e)
-                    })
-            
+            # Push manejado por alert_trigger.py (on_document_created) — no duplicar aquí.
+
             # Enviar SMS
             if alert_data['send_sms'] and recipient.get('phone'):
                 try:
