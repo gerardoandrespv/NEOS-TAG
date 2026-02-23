@@ -74,7 +74,8 @@
     }
   </style>
 
-  <!-- Firebase SDK 8 — misma versión que el dashboard -->
+  <!-- Firebase SDK 8 — Auth incluido solo porque firebase-config.js lo requiere;
+       NO se llama signInAnonymously, la regla Firestore permite request.auth == null -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -203,15 +204,8 @@
         );
     }
 
-    // ─── Auth: anonymous sign-in para satisfacer la regla Firestore ─────────
-    // Requiere: Firebase Console > Authentication > Sign-in providers > Anónimo > Activar
-    firebase.auth().signInAnonymously()
-      .then(() => { subscribeAlerts(); })
-      .catch(() => {
-        // Si el anónimo no está habilitado, intenta de todas formas
-        // (funciona si la regla Firestore permite request.auth != null)
-        subscribeAlerts();
-      });
+    // ─── Sin autenticación: regla Firestore permite request.auth == null ────
+    subscribeAlerts();
 
     // ─── Service Worker ──────────────────────────────────────────────────────
     if ('serviceWorker' in navigator) {

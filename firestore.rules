@@ -307,11 +307,10 @@ service cloud.firestore {
     match /emergency_alerts/{alertId} {
 
       // Lectura: staff/admin del tenant (autenticación completa),
-      //          O cualquier sesión Firebase autenticada (incluye anonymous auth)
-      //          para que el SAE público (/sae) pueda leer alertas activas.
-      //          Nota: activar "Anónimo" en Firebase Console > Auth > Sign-in providers.
+      //          O sin autenticación para el SAE público (/sae).
+      //          Las alertas de emergencia son broadcasts públicos — sin PII.
       allow read: if isAuthenticated() && isSameTenantDoc()
-                  || request.auth != null;
+                  || request.auth == null;
 
       // Creación: staff o admin del tenant.
       // Las alertas nacen siempre en estado ACTIVE.
