@@ -484,6 +484,73 @@ service cloud.firestore {
 
 
     // ============================================
+    // COLECCIÓN: alerts  (Alertas operativas del dashboard)
+    // Creadas desde el dashboard por staff/admin.
+    // Cloud Functions pueden actualizar vía Admin SDK (bypass de reglas).
+    // ============================================
+    match /alerts/{alertId} {
+
+      // Lectura: staff y admin del mismo tenant (onSnapshot en tiempo real).
+      allow read: if isStaffOrAdmin() && isSameTenantDoc();
+
+      // Creación: staff o admin del tenant.
+      // El campo clientId debe coincidir con el token del solicitante.
+      allow create: if isStaffOrAdmin() && isSameTenantNew();
+
+      // Actualización: staff o admin del tenant.
+      // Cubre: acknowledge (acknowledged, acknowledgedAt, acknowledgedBy)
+      //        y resolve (resolved, resolvedAt, resolvedBy).
+      // clientId no puede cambiar.
+      allow update: if isStaffOrAdmin() &&
+                       isSameTenantDoc() &&
+                       clientIdUnchanged();
+
+      // Eliminación deshabilitada desde el dashboard.
+      allow delete: if false;
+    }
+
+
+    // ============================================
+    // COLECCIÓN: gate_commands  (Comandos de apertura manual)
+    // El dashboard crea documentos; la Cloud Function los marca como ejecutados
+    // mediante Admin SDK (que no aplica reglas de seguridad del cliente).
+    // ============================================
+    match /gate_commands/{cmdId} {
+
+      // Lectura: solo admin del mismo tenant.
+      allow read: if isAdmin() && isSameTenantDoc();
+
+      // Creación: solo admin del tenant (openGate desde dashboard).
+      allow create: if isAdmin() && isSameTenantNew();
+
+      // Actualización y eliminación bloqueadas desde el cliente.
+      // La CF marca executed=true vía Admin SDK (bypass de reglas).
+      allow update: if false;
+      allow delete: if false;
+    }
+
+
+    // ============================================
+    // COLECCIÓN: rfid_tags  (Eventos RFID — gateway legacy)
+    // Escritura exclusiva de Cloud Functions (gateway → process_tag CF).
+    // El dashboard solo lee en tiempo real (subscribeToLiveTags).
+    // NOTA: usa client_id (snake_case) en lugar de clientId — verificación inline.
+    // ============================================
+    match /rfid_tags/{tagId} {
+
+      // Lectura: staff y admin del mismo tenant.
+      // Verificación inline porque este schema usa client_id en lugar de clientId.
+      allow read: if isStaffOrAdmin() &&
+                     tokenClientId() == resource.data.client_id;
+
+      // Escritura exclusiva del gateway vía Cloud Function (Admin SDK).
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+
+    // ============================================
     // DENEGACIÓN POR DEFECTO
     // Cualquier colección no especificada está completamente bloqueada.
     // ============================================

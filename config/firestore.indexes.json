@@ -1,4 +1,4 @@
-﻿{
+{
   "indexes": [
     {
       "collectionGroup": "access_logs",
@@ -30,8 +30,16 @@
       "collectionGroup": "rfid_events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "clientId",   "order": "ASCENDING"  },
-        { "fieldPath": "timestamp",  "order": "DESCENDING" }
+        { "fieldPath": "clientId",  "order": "ASCENDING"  },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "rfid_events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId",  "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
       ]
     },
     {
@@ -41,6 +49,32 @@
         { "fieldPath": "clientId",   "order": "ASCENDING"  },
         { "fieldPath": "event_type", "order": "ASCENDING"  },
         { "fieldPath": "timestamp",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "rfid_tags",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "client_id", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "alerts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId",  "order": "ASCENDING"  },
+        { "fieldPath": "resolved",  "order": "ASCENDING"  },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "alerts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId",   "order": "ASCENDING" },
+        { "fieldPath": "resolved",   "order": "ASCENDING" },
+        { "fieldPath": "resolvedAt", "order": "ASCENDING" }
       ]
     },
     {
@@ -88,7 +122,7 @@
       "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "clientId", "order": "ASCENDING"        },
+        { "fieldPath": "clientId", "order": "ASCENDING"       },
         { "fieldPath": "tags",     "arrayConfig": "CONTAINS" }
       ]
     },

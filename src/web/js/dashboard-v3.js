@@ -20,9 +20,10 @@
 /* ============================================================
    DEBUG LOGGER
 ============================================================ */
-const DEBUG = true; // ← cambiar a false en producción
-function _log(...args)  { if (DEBUG) console.log('[NT]',  ...args); }
-function _warn(...args) { if (DEBUG) console.warn('[NT]', ...args); }
+const DEBUG = false; // poner true solo en desarrollo local
+function _log(...args)   { if (DEBUG) console.log('[NT]',   ...args); }
+function _warn(...args)  { console.warn('[NT]',  ...args); }  // siempre visible (errores Firestore/red)
+function _error(...args) { console.error('[NT]', ...args); }  // siempre visible (errores críticos)
 
 
 /* ============================================================
@@ -569,6 +570,7 @@ function _loadViewData(view) {
 ============================================================ */
 async function _loadResumen() {
   _log('loadResumen');
+  if (!STATE.clientId) { _warn('_loadResumen: clientId no disponible, abortando'); return; }
   ['kpiLecturas', 'kpiPermitidos', 'kpiDenegados', 'kpiAlertas'].forEach(id => _set(id, '–'));
 
   try {
@@ -714,6 +716,7 @@ function _drawChart24h(tagsData, accessData) {
 ============================================================ */
 function _startLiveTags() {
   _log('startLiveTags');
+  if (!STATE.clientId) { _warn('_startLiveTags: clientId no disponible, abortando'); return; }
   if (!_vlist) _vlist = new VirtualList('tagsVScroll', 46, 6);
   if (STATE.liveUnsub) return;
 
@@ -798,6 +801,7 @@ function _initLiveTags() {
 ============================================================ */
 async function _loadBitacora(from, to) {
   _log('loadBitacora', from, to);
+  if (!STATE.clientId) { _warn('_loadBitacora: clientId no disponible, abortando'); return; }
   const tbody = document.getElementById('logsTableBody');
   const empty = document.getElementById('logsEmpty');
   if (tbody) tbody.innerHTML = '<tr class="row-skeleton"><td colspan="5"><span class="skeleton"></span></td></tr>';
@@ -904,6 +908,7 @@ async function _loadAlertas() {
 // Suscripción en tiempo real — se llama al entrar a la vista
 function _startAlertas() {
   if (STATE.alertsUnsub) return; // ya activa
+  if (!STATE.clientId) { _warn('_startAlertas: clientId no disponible, abortando'); return; }
   _log('startAlertas');
 
   if (typeof db !== 'undefined') {
@@ -935,6 +940,7 @@ function _startAlertas() {
         .where('clientId', '==', clientId)
         .where('resolved', '==', true)
         .where('resolvedAt', '>=', firebase.firestore.Timestamp.fromDate(today))
+        .orderBy('resolvedAt', 'asc')
         .limit(20)
         .onSnapshot({ includeMetadataChanges: false }, snap => {
           STATE.alertsResolved = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1757,7 +1763,7 @@ const FirebaseStubs = {
               clientId:    token.claims.clientId ?? null,
             });
           } catch (err) {
-            _warn('getIdTokenResult error:', err);
+            _error('getIdTokenResult error:', err);
             onLogin({ uid: user.uid, email: user.email, displayName: user.email, role: 'guard', clientId: null });
           }
         } else {
@@ -1929,6 +1935,7 @@ const FirebaseStubs = {
           db.collection('alerts').where('clientId', '==', clientId)
             .where('resolved', '==', true)
             .where('resolvedAt', '>=', firebase.firestore.Timestamp.fromDate(today))
+            .orderBy('resolvedAt', 'asc')
             .limit(20).get(),
         ]);
         return {
