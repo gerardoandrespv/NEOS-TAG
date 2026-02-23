@@ -557,6 +557,13 @@ function _initAuth() {
    DATA LOADERS
 ============================================================ */
 function _loadViewData(view) {
+  // Todas las queries Firestore requieren clientId del token autenticado.
+  // Si window.currentUserClientId no está definido, onAuthStateChanged aún
+  // no ha completado — abortar para evitar queries sin autenticación.
+  if (!window.currentUserClientId) {
+    _warn('_loadViewData: currentUserClientId no disponible, abortando');
+    return;
+  }
   switch (view) {
     case 'resumen':      _loadResumen();      break;
     case 'tags':         _startLiveTags();    break;
@@ -575,14 +582,15 @@ function _loadViewData(view) {
 ============================================================ */
 async function _loadResumen() {
   _log('loadResumen');
-  if (!STATE.clientId) { _warn('_loadResumen: clientId no disponible, abortando'); return; }
+  const clientId = window.currentUserClientId;
+  if (!clientId) { _warn('_loadResumen: currentUserClientId no disponible, abortando'); return; }
   ['kpiLecturas', 'kpiPermitidos', 'kpiDenegados', 'kpiAlertas'].forEach(id => _set(id, '–'));
 
   try {
     const [kpi, events, devices] = await Promise.all([
-      FirebaseStubs.getKPIs(STATE.clientId),
-      FirebaseStubs.getRecentEvents(STATE.clientId),
-      FirebaseStubs.getDevices(STATE.clientId),
+      FirebaseStubs.getKPIs(clientId),
+      FirebaseStubs.getRecentEvents(clientId),
+      FirebaseStubs.getDevices(clientId),
     ]);
 
     _set('kpiLecturas',   _fmtNum(kpi.lecturas));
@@ -721,11 +729,12 @@ function _drawChart24h(tagsData, accessData) {
 ============================================================ */
 function _startLiveTags() {
   _log('startLiveTags');
-  if (!STATE.clientId) { _warn('_startLiveTags: clientId no disponible, abortando'); return; }
+  const clientId = window.currentUserClientId;
+  if (!clientId) { _warn('_startLiveTags: currentUserClientId no disponible, abortando'); return; }
   if (!_vlist) _vlist = new VirtualList('tagsVScroll', 46, 6);
   if (STATE.liveUnsub) return;
 
-  STATE.liveUnsub = FirebaseStubs.subscribeToLiveTags(STATE.clientId, (event) => {
+  STATE.liveUnsub = FirebaseStubs.subscribeToLiveTags(clientId, (event) => {
     if (STATE.livePaused) return;
     STATE.liveRows.unshift(event);
     if (STATE.liveRows.length > 500) STATE.liveRows.length = 500;
@@ -806,14 +815,15 @@ function _initLiveTags() {
 ============================================================ */
 async function _loadBitacora(from, to) {
   _log('loadBitacora', from, to);
-  if (!STATE.clientId) { _warn('_loadBitacora: clientId no disponible, abortando'); return; }
+  const clientId = window.currentUserClientId;
+  if (!clientId) { _warn('_loadBitacora: currentUserClientId no disponible, abortando'); return; }
   const tbody = document.getElementById('logsTableBody');
   const empty = document.getElementById('logsEmpty');
   if (tbody) tbody.innerHTML = '<tr class="row-skeleton"><td colspan="5"><span class="skeleton"></span></td></tr>';
   if (empty) empty.hidden = true;
 
   try {
-    const logs = await FirebaseStubs.getAccessLogs(STATE.clientId, { from, to });
+    const logs = await FirebaseStubs.getAccessLogs(clientId, { from, to });
     STATE.logs = logs;
     _renderBitacora(logs);
     _setIndicator('indicatorDB', 'online');
@@ -913,13 +923,12 @@ async function _loadAlertas() {
 // Suscripción en tiempo real — se llama al entrar a la vista
 function _startAlertas() {
   if (STATE.alertsUnsub) return; // ya activa
-  if (!STATE.clientId) { _warn('_startAlertas: clientId no disponible, abortando'); return; }
+  const clientId = window.currentUserClientId;
+  if (!clientId) { _warn('_startAlertas: currentUserClientId no disponible, abortando'); return; }
   _log('startAlertas');
 
   if (typeof db !== 'undefined') {
     try {
-      // Usar window.currentUserClientId (asignado en _showApp tras onAuthStateChanged).
-      const clientId = window.currentUserClientId ?? STATE.clientId;
       const today    = _todayStart();
       let   firstSnap = true;
 
@@ -1093,7 +1102,7 @@ function _initAlertas() {
     }
     try {
       await FirebaseStubs.createAlert({ severity, title, description, zone,
-        clientId: STATE.clientId, createdBy: STATE.user?.uid ?? null });
+        clientId: window.currentUserClientId, createdBy: STATE.user?.uid ?? null });
       _closeModal('modalNuevaAlerta');
       _toast('Alerta creada y notificación enviada.', 'success');
       // onSnapshot actualiza la vista automáticamente
@@ -1111,10 +1120,12 @@ function _initAlertas() {
 ============================================================ */
 async function _loadUsuarios() {
   _log('loadUsuarios');
+  const clientId = window.currentUserClientId;
+  if (!clientId) { _warn('_loadUsuarios: currentUserClientId no disponible, abortando'); return; }
   const tbody = document.getElementById('usuariosTableBody');
   if (tbody) tbody.innerHTML = '<tr class="row-skeleton"><td colspan="5"><span class="skeleton"></span></td></tr>';
   try {
-    const users = await FirebaseStubs.getUsers(STATE.clientId);
+    const users = await FirebaseStubs.getUsers(clientId);
     STATE.users = users;
     _set('usuariosCount', users.length);
     _renderUsuarios(users);
@@ -1267,7 +1278,7 @@ async function _saveUser(e) {
   try {
     await FirebaseStubs.saveUser(id, {
       name, email, phone, vehicle, block, unit, active,
-      tags: [...STATE.pendingTags], clientId: STATE.clientId,
+      tags: [...STATE.pendingTags], clientId: window.currentUserClientId,
     });
     _closeModal('modalUsuario');
     _toast(id ? 'Usuario actualizado.' : 'Usuario creado.', 'success');
@@ -1328,12 +1339,14 @@ function _initUsuarios() {
 ============================================================ */
 async function _loadDispositivos() {
   _log('loadDispositivos');
+  const clientId = window.currentUserClientId;
+  if (!clientId) { _warn('_loadDispositivos: currentUserClientId no disponible, abortando'); return; }
   const grid = document.getElementById('devicesGrid');
   if (grid) grid.innerHTML = '<div class="device-card device-card--skeleton" aria-busy="true"></div>'.repeat(3);
   try {
     const [devices, history] = await Promise.all([
-      FirebaseStubs.getDevices(STATE.clientId),
-      FirebaseStubs.getManualOpenHistory(STATE.clientId),
+      FirebaseStubs.getDevices(clientId),
+      FirebaseStubs.getManualOpenHistory(clientId),
     ]);
     STATE.devices = devices;
     _renderDeviceCards(devices);
@@ -1400,7 +1413,7 @@ function _renderDeviceCards(devices = []) {
 async function _openGate(deviceId, deviceName) {
   try {
     await FirebaseStubs.openGate(deviceId, {
-      clientId: STATE.clientId,
+      clientId: window.currentUserClientId,
       openedBy: STATE.user?.email ?? STATE.email ?? 'dashboard',
       deviceName,
     });
@@ -1443,10 +1456,12 @@ function _initDispositivos() {
 ============================================================ */
 async function _loadListas() {
   _log('loadListas');
+  const clientId = window.currentUserClientId;
+  if (!clientId) { _warn('_loadListas: currentUserClientId no disponible, abortando'); return; }
   try {
     const [wl, bl] = await Promise.all([
-      FirebaseStubs.getWhitelist(STATE.clientId),
-      FirebaseStubs.getBlacklist(STATE.clientId),
+      FirebaseStubs.getWhitelist(clientId),
+      FirebaseStubs.getBlacklist(clientId),
     ]);
     STATE.whitelist = wl;
     STATE.blacklist = bl;
@@ -1516,7 +1531,7 @@ function _initListas() {
     if (!tagId) { _toast('El tag ID es obligatorio.', 'warning'); return; }
     if (btn) { btn.disabled = true; btn.textContent = 'Agregando…'; }
     try {
-      await FirebaseStubs.addToList(lista, { tagId, motivo, clientId: STATE.clientId });
+      await FirebaseStubs.addToList(lista, { tagId, motivo, clientId: window.currentUserClientId });
       _closeModal('modalAddLista');
       _toast(`Tag agregado a ${lista}.`, 'success');
       _loadListas();
