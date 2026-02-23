@@ -67,6 +67,18 @@
       text-align: center; font-size: 13px; color: #fbbf24;
     }
 
+    #push-prompt {
+      display: none; border-radius: 14px; padding: 16px 18px;
+      background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.4);
+      text-align: center;
+    }
+    #push-prompt p { font-size: 13px; color: #c7d2fe; margin-bottom: 10px; line-height: 1.4; }
+    #btn-push {
+      background: #6366f1; color: #fff; border: none; border-radius: 8px;
+      padding: 9px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    #btn-push:active { opacity: 0.8; }
+
     #footer {
       padding: 12px 16px; text-align: center;
       font-size: 11px; color: #334155;
@@ -74,11 +86,11 @@
     }
   </style>
 
-  <!-- Firebase SDK 8 — SOLO App + Firestore. Sin firebase-auth.js ni firebase-config.js
-       para evitar que firebase.auth() dispare requests de autenticación.
+  <!-- Firebase SDK 8 — App + Firestore + Messaging. Sin firebase-auth.js.
        La regla Firestore permite request.auth == null (broadcast público). -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
   <script>
     // Inicialización directa — no importar firebase-config.js (llama firebase.auth())
     if (!firebase.apps.length) {
@@ -109,15 +121,20 @@
     </div>
 
     <div id="alerts-list"></div>
+    <div id="push-prompt">
+      <p>🔔 Activa las notificaciones para recibir alertas aunque la app esté cerrada</p>
+      <button id="btn-push" onclick="activarPush()">Activar notificaciones</button>
+    </div>
     <div id="err-card">No se pudo conectar al sistema SAE.<br>Verifica tu conexión o escanea el QR nuevamente.</div>
   </div>
 
   <div id="footer">neostech · Sistema de Alertas de Emergencia</div>
 
   <script>
-    // ─── Leer clientId desde URL param ?c=XXX ───────────────────────────────
+    // ─── clientId desde URL ?c= o localStorage (para clicks desde notificación) ──
     const params   = new URLSearchParams(location.search);
-    const clientId = params.get('c');
+    let   clientId = params.get('c') || localStorage.getItem('sae_clientId') || '';
+    if (clientId) localStorage.setItem('sae_clientId', clientId); // persistir
 
     const statusCard  = document.getElementById('status-card');
     const statusIcon  = document.getElementById('status-icon');
@@ -126,6 +143,7 @@
     const alertsList  = document.getElementById('alerts-list');
     const errCard     = document.getElementById('err-card');
     const liveBadge   = document.getElementById('liveBadge');
+    const pushPrompt  = document.getElementById('push-prompt');
 
     const ALERT_ICONS = {
       FIRE:        '🔥',
@@ -216,12 +234,67 @@
         );
     }
 
-    // ─── Sin autenticación: regla Firestore permite request.auth == null ────
+    // ─── Push Notifications ──────────────────────────────────────────────────
+    let _swReg = null;
+
+    async function initPush() {
+      if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+      if (Notification.permission === 'granted' && localStorage.getItem('sae_push_ok')) {
+        pushPrompt.style.display = 'none';
+        return;
+      }
+      if (Notification.permission !== 'denied') {
+        pushPrompt.style.display = 'block';
+      }
+    }
+
+    async function activarPush() {
+      const btn = document.getElementById('btn-push');
+      btn.disabled = true;
+      btn.textContent = 'Activando...';
+
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') {
+          btn.disabled = false;
+          btn.textContent = 'Activar notificaciones';
+          return;
+        }
+
+        // Usar el SW del SAE para Firebase Messaging
+        _swReg = await navigator.serviceWorker.ready;
+        const messaging = firebase.messaging();
+
+        const token = await messaging.getToken({
+          vapidKey: 'BEd-BNhI_7rq5_sjALjNVA7UKpXhvrsfDX23vSVHr7GPsvAZ654qFAN7LkKudcLLF_Ot8EPZ03ebzHcKZO8WgtM',
+          serviceWorkerRegistration: _swReg,
+        });
+
+        // Registrar token en el backend (guarda en alert_subscribers + suscribe al topic)
+        await fetch('https://subscribetotopic-6psjv5t2ka-uc.a.run.app', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, topic: 'all-users', clientId, device_type: 'sae_resident' }),
+        });
+
+        localStorage.setItem('sae_push_ok', '1');
+        pushPrompt.style.display = 'none';
+        console.log('[SAE] Push activado');
+      } catch (err) {
+        console.error('[SAE] Error activando push:', err);
+        btn.disabled = false;
+        btn.textContent = 'Error — reintentar';
+      }
+    }
+
+    // ─── Sin autenticación: regla Firestore permite request.auth == null ─────
     subscribeAlerts();
 
-    // ─── Service Worker ──────────────────────────────────────────────────────
+    // ─── Service Worker + push init ──────────────────────────────────────────
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sae/sw.js', { scope: '/sae/' }).catch(() => {});
+      navigator.serviceWorker.register('/sae/sw.js', { scope: '/sae/' })
+        .then(() => initPush())
+        .catch(() => {});
     }
   </script>
 </body>

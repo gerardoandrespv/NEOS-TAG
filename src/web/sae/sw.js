@@ -1,12 +1,54 @@
 // sw.js — Service Worker SAE (neostech — Sistema de Alertas de Emergencia)
-// Scope: /sae/ — independiente del Service Worker del dashboard
-// Estrategia: network-first con fallback a caché para operación offline básica.
-const CACHE = 'neostech-sae-v1';
-const PRECACHE = [
-  '/sae/',
-  '/sae/index.html',
-  '/assets/images/neostechb.png',
-];
+// Scope: /sae/ — maneja caché + Firebase Messaging background push para residentes.
+
+// ─── Firebase Messaging (background push) ──────────────────────────────────
+importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js');
+importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js');
+
+if (!firebase.apps.length) {
+  firebase.initializeApp({
+    apiKey:            'AIzaSyBZ-XRSRgC2gz9E6zdYpes7yv5nLZtKmSw',
+    projectId:         'neos-tech',
+    messagingSenderId: '738411977369',
+    appId:             '1:738411977369:web:7facc71cea4c271d217608',
+  });
+}
+
+const messaging = firebase.messaging();
+
+// Mostrar notificación cuando la app está en segundo plano
+messaging.onBackgroundMessage(function(payload) {
+  const title   = payload.notification?.title || '🚨 Alerta de Emergencia';
+  const body    = payload.notification?.body  || '';
+  const options = {
+    body,
+    icon:    '/assets/images/neostechb.png',
+    badge:   '/assets/images/neostechb.png',
+    vibrate: [400, 100, 400],
+    tag:     'sae-alert',
+    renotify: true,
+    data:    payload.data || {},
+  };
+  return self.registration.showNotification(title, options);
+});
+
+// Al hacer click en la notificación → abrir/enfocar la app SAE
+self.addEventListener('notificationclick', function(e) {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(cls) {
+      for (const c of cls) {
+        if (c.url.includes('/sae')) { c.focus(); return; }
+      }
+      // La página SAE lee clientId desde localStorage al abrir sin ?c=
+      return clients.openWindow('/sae');
+    })
+  );
+});
+
+// ─── Caché offline ──────────────────────────────────────────────────────────
+const CACHE    = 'neostech-sae-v2';
+const PRECACHE = ['/sae/', '/sae/index.html', '/assets/images/neostechb.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE).catch(() => {})));
@@ -25,7 +67,5 @@ self.addEventListener('activate', e => {
 // Network-first: intenta red, cae a caché si sin conexión
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
-  );
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });

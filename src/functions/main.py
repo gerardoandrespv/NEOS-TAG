@@ -5,6 +5,9 @@ from push_notifications import emit_emergency_alert, subscribe_to_topic
 from firebase_functions import https_fn
 import functions_framework
 from flask import jsonify
+from firebase_admin import firestore as fs_admin
+
+db = fs_admin.client()
 
 # TODO: Firestore trigger requiere Python <3.14
 # from alert_trigger import on_alert_created
@@ -307,6 +310,20 @@ def subscribeToTopic(request: https_fn.Request) -> https_fn.Response:
             )
         
         result = subscribe_to_topic(token, topic)
+
+        # Guardar token en alert_subscribers para que alert_trigger.py pueda enviar push
+        client_id   = request_json.get('clientId', '')
+        device_type = request_json.get('device_type', 'web')
+        try:
+            db.collection('alert_subscribers').document(token[:128]).set({
+                'fcm_token':             token,
+                'notifications_enabled': True,
+                'clientId':              client_id,
+                'device_type':           device_type,
+                'last_updated':          fs_admin.SERVER_TIMESTAMP,
+            }, merge=True)
+        except Exception as db_err:
+            logger.warning(f"subscribeToTopic: no se pudo guardar en Firestore: {db_err}")
         
         return https_fn.Response(
             json.dumps(result),
