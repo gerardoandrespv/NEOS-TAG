@@ -305,9 +305,16 @@
       if (btnInstall) { btnInstall.textContent = 'Instalada ✓'; btnInstall.disabled = true; btnInstall.classList.add('secondary'); }
     }
 
+    // Detecta Chrome de Google en Android (excluye Firefox, Samsung, Opera, Edge)
+    function _isAndroidChrome() {
+      const ua = navigator.userAgent;
+      return /Android/i.test(ua)
+          && /Chrome\/\d/.test(ua)
+          && !/Firefox|FxiOS|OPR\/|EdgA\/|SamsungBrowser/.test(ua);
+    }
+
     async function initSetup() {
       if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-        // Browser no soporta push — mostrar advertencia
         setupCard.style.display = 'block';
         browserWarning.style.display = 'block';
         if (btnInstall) btnInstall.style.display = 'none';
@@ -321,11 +328,13 @@
 
       setupCard.style.display = 'block';
 
-      // Si no es Chrome/Edge/Samsung (no soporta beforeinstallprompt), mostrar aviso
-      const isChromish = /Chrome|Chromium|CriOS|EdgA|SamsungBrowser/i.test(navigator.userAgent);
-      if (!isChromish) {
+      // Solo Chrome de Google en Android puede activar notificaciones
+      if (!_isAndroidChrome()) {
+        browserWarning.textContent = '⚠️ Las alertas solo funcionan en Chrome para Android. Abre esta app en Chrome en tu teléfono Android.';
         browserWarning.style.display = 'block';
         if (btnInstall) btnInstall.style.display = 'none';
+        if (btnPush)    btnPush.style.display    = 'none';
+        return;
       }
 
       // Marcar paso de notificaciones si ya están activadas
@@ -355,6 +364,17 @@
       const btn = document.getElementById('btn-push');
       btn.disabled = true;
       btn.textContent = 'Activando...';
+
+      // Bloqueo duro: solo Chrome de Google en Android
+      if (!_isAndroidChrome()) {
+        btn.disabled = false;
+        btn.textContent = 'Requiere Chrome en Android';
+        if (browserWarning) {
+          browserWarning.textContent = '⚠️ Las alertas solo funcionan en Chrome para Android. Abre esta app en Chrome en tu teléfono Android.';
+          browserWarning.style.display = 'block';
+        }
+        return;
+      }
 
       try {
         const perm = await Notification.requestPermission();

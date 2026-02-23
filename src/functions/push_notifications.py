@@ -54,123 +54,81 @@ def subscribe_to_topic(token: str, topic: str = 'all-users') -> Dict:
 
 def send_alert_to_all_devices(alert_type: str, title: str, body: str, severity: str = 'MEDIUM') -> Dict:
     """
-    Envía notificación push a TODOS los dispositivos registrados
-    Lee los tokens FCM de Firestore y envía a cada uno
-    
-    Args:
-        alert_type: Tipo de alerta (FIRE, EVACUATION, etc.)
-        title: Título de la notificación
-        body: Mensaje de la alerta
-        severity: Nivel de severidad (CRITICAL, HIGH, MEDIUM, LOW)
-        
-    Returns:
-        Resultado del envío con estadísticas
+    Envía notificación push SOLO a residentes SAE en Android Chrome
+    (device_type == 'sae_resident'). No envía a PC ni a Firefox.
+    Usa multicast por tokens individuales, no topic broadcast.
     """
-    
     try:
-        # Obtener todos los tokens FCM de Firestore (users + alert_subscribers)
         db = firestore.Client()
-        tokens = []
-        
-        # 1. Buscar en colección 'users' (dashboard de escritorio)
-        users_ref = db.collection('users')
-        users_query = users_ref.where(filter=firestore.FieldFilter('notifications_enabled', '==', True)).stream()
-        
-        desktop_tokens = 0
-        for user in users_query:
-            user_data = user.to_dict()
-            token = user_data.get('fcm_token')
-            if token:
-                tokens.append(token)
-                desktop_tokens += 1
-        
-        # 2. Buscar en colección 'alert_subscribers' (apps móviles)
-        subscribers_ref = db.collection('alert_subscribers')
-        subscribers_query = subscribers_ref.where(filter=firestore.FieldFilter('notifications_enabled', '==', True)).stream()
-        
-        mobile_tokens = 0
-        for subscriber in subscribers_query:
-            subscriber_data = subscriber.to_dict()
-            token = subscriber_data.get('fcm_token')
-            if token and token not in tokens:  # Evitar duplicados
-                tokens.append(token)
-                mobile_tokens += 1
-        
-        logger.info(f"📱 Tokens encontrados - Desktop: {desktop_tokens}, Mobile: {mobile_tokens}, Total: {len(tokens)}")
-        
-        # Enviar al topic "all-users" (más confiable que tokens individuales web)
-        try:
-            message = messaging.Message(
-                notification=messaging.Notification(
-                    title=title,
-                    body=body
-                ),
+
+        # Solo tokens de residentes SAE (mobile Android Chrome)
+        q = db.collection('alert_subscribers').where(
+            filter=firestore.FieldFilter('notifications_enabled', '==', True)
+        ).where(
+            filter=firestore.FieldFilter('device_type', '==', 'sae_resident')
+        ).stream()
+
+        tokens = [doc.to_dict().get('fcm_token') for doc in q if doc.to_dict().get('fcm_token')]
+
+        if not tokens:
+            logger.warning('[SAE] No hay tokens de residentes para enviar push')
+            return {
+                'success': True,
+                'success_count': 0,
+                'failure_count': 0,
+                'total_tokens': 0,
+                'method': 'multicast_sae_resident'
+            }
+
+        logger.info(f'[SAE] Enviando push a {len(tokens)} residentes')
+
+        success_count = 0
+        failure_count = 0
+
+        # Multicast en lotes de 500 (límite FCM)
+        for i in range(0, len(tokens), 500):
+            batch = tokens[i:i + 500]
+            message = messaging.MulticastMessage(
+                notification=messaging.Notification(title=title, body=body),
                 data={
                     'alert_type': alert_type,
-                    'severity': severity,
-                    'alertId': f"all-users_{alert_type}_{int(time.time())}",
-                    'title': title,
-                    'body': body
+                    'severity':   severity,
+                    'title':      title,
+                    'body':       body
                 },
                 webpush=messaging.WebpushConfig(
                     notification=messaging.WebpushNotification(
-                        icon='/assets/images/neostechc.png',
-                        badge='/assets/images/neostechc.png',
-                        vibrate=[200, 100, 200, 100, 200, 100, 200],
+                        icon='/assets/images/neostechb.png',
+                        badge='/assets/images/neostechb.png',
+                        vibrate=[400, 100, 400],
                         require_interaction=True
                     ),
                     fcm_options=messaging.WebpushFCMOptions(
-                        link='https://neos-tech.web.app/alert-view.html'
+                        link='https://neos-tech.web.app/sae'
                     )
                 ),
-                topic='all-users'
+                tokens=batch
             )
-            
-            message_id = messaging.send(message)
-            logger.info(f"✅ Notificación enviada al topic all-users: {message_id}")
-            
-            return {
-                'success': True,
-                'success_count': 1,
-                'failure_count': 0,
-                'total_tokens': len(tokens),
-                'alert_type': alert_type,
-                'severity': severity,
-                'method': 'topic',
-                'message_id': message_id
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ Error enviando al topic: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e),
-                'method': 'topic'
-            }
-        
+            response = messaging.send_each_for_multicast(message)
+            success_count += response.success_count
+            failure_count += response.failure_count
+            logger.info(f'[SAE] Lote {i//500 + 1}: {response.success_count} ok, {response.failure_count} fail')
+
         return {
-            'success': True,
+            'success':       True,
             'success_count': success_count,
             'failure_count': failure_count,
-            'total_tokens': len(tokens),
-            'alert_type': alert_type,
-            'severity': severity,
-            'failed_tokens': failed_tokens[:5] if len(failed_tokens) > 0 else []  # Solo los primeros 5
+            'total_tokens':  len(tokens),
+            'alert_type':    alert_type,
+            'severity':      severity,
+            'method':        'multicast_sae_resident'
         }
-        
-        return {
-            'success': True,
-            'message_id': response,
-            'topic': 'all-devices',
-            'alert_type': alert_type,
-            'severity': severity
-        }
-        
+
     except Exception as e:
-        logger.error(f"❌ Error enviando push: {str(e)}")
+        logger.error(f'[SAE] Error enviando push multicast: {str(e)}')
         return {
             'success': False,
-            'error': str(e)
+            'error':   str(e)
         }
 
 
