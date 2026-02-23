@@ -114,20 +114,8 @@ def emit_alert(request):
         
         logger.info(f"Alerta creada: {alert_id} - Tipo: {alert_data['type']}")
         
-        # 🔥 ENVIAR PUSH NOTIFICATION A TODOS LOS DISPOSITIVOS MÓVILES
-        push_result = None
-        try:
-            push_result = send_emergency_push(
-                alert_type=alert_data['type'],
-                severity=alert_data['severity'],
-                message=alert_data['message'],
-                tower=alert_data.get('affected_tower'),
-                floor=alert_data.get('affected_floor')
-            )
-            logger.info(f"✅ Push notifications enviadas: {push_result}")
-        except Exception as e:
-            logger.error(f"❌ Error enviando push: {str(e)}")
-        
+        # Push enviado por alert_trigger.py (on_document_created) — no duplicar aquí.
+
         # Obtener destinatarios (todos los usuarios activos)
         recipients = get_recipients(request_json.get('affected_floors'))
         
