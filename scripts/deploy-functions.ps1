@@ -40,7 +40,7 @@ Write-Host "📦 Desplegando funciones..." -ForegroundColor Cyan
 Write-Host ""
 
 # Desplegar ambas funciones
-firebase deploy --only functions:rfid-gateway,functions:check-tag-access --project neos-tech
+firebase deploy --only functions:rfid-gateway,functions:check-tag-access --project neostech
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""

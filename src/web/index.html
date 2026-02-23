@@ -54,50 +54,54 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Dashboard Clean Styles (Override) -->
+    <link rel="stylesheet" href="css/dashboard-clean.css?v=20260209-1430">
 
     <style>
+        /* Neos Tech RFID Dashboard - Diseño Profesional 2026 */
         :root {
             /* Layout dimensions - Responsive */
             --header-height: 70px;
             --sidebar-width: 260px;
             --content-max-width: 1400px;
             
-            /* Paleta de colores moderna */
-            --color-primary: #2563EB;
-            --color-primary-dark: #1E40AF;
-            --color-primary-light: #60A5FA;
-            --color-secondary: #64748B;
-            --color-secondary-dark: #475569;
-            --color-secondary-light: #94A3B8;
-            --color-success: #10B981;
-            --color-success-dark: #059669;
-            --color-danger: #EF4444;
-            --color-danger-dark: #DC2626;
-            --color-warning: #F59E0B;
-            --color-info: #3B82F6;
+            /* Colores principales - Esquema azul profesional Neos Tech */
+            --primary-dark: #1a237e;
+            --primary: #283593;
+            --primary-light: #3949ab;
+            --accent: #00bcd4;
+            --accent-light: #4dd0e1;
+            
+            /* Colores de estado */
+            --success: #00c853;
+            --warning: #ffa726;
+            --danger: #f44336;
+            --info: #29b6f6;
             
             /* Backgrounds */
+            --bg-primary: #f5f7fa;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
             --bg-dark: #0F172A;
             --bg-dark-secondary: #1E293B;
-            --bg-card: #FFFFFF;
-            --bg-card-hover: #F8FAFC;
             
             /* Text colors */
-            --text-primary: #1E293B;
-            --text-secondary: #64748B;
-            --text-light: #94A3B8;
+            --text-primary: #212121;
+            --text-secondary: #616161;
+            --text-light: #9e9e9e;
             --text-white: #FFFFFF;
             
-            /* Shadows */
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+            /* Borders y Sombras */
+            --border: #e0e0e0;
+            --shadow: rgba(0, 0, 0, 0.08);
+            --shadow-lg: rgba(0, 0, 0, 0.12);
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
             --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
             
             /* Border radius */
-            --radius-sm: 6px;
-            --radius: 8px;
+            --radius-sm: 8px;
+            --radius: 12px;
             --radius-md: 12px;
             --radius-lg: 16px;
             --radius-xl: 24px;
@@ -121,13 +125,13 @@
 
         body {
             font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-dark-secondary) 100%);
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
             min-height: 100vh;
             color: var(--text-primary);
             line-height: 1.6;
             font-size: 15px;
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
         }
         
         h1, h2, h3, h4, h5, h6 {
@@ -159,13 +163,13 @@
         }
         
         ::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
+            background: linear-gradient(180deg, var(--primary-light), var(--primary));
             border-radius: var(--radius-sm);
             transition: var(--transition);
         }
         
         ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(180deg, var(--color-primary-light), var(--color-primary));
+            background: linear-gradient(180deg, var(--accent), var(--primary-light));
         }
 
         /* ===== HEADER FIJO ===== */
@@ -175,15 +179,17 @@
             left: var(--sidebar-width);
             right: 0;
             height: var(--header-height);
-            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding: 0 32px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 4px 20px var(--shadow-lg);
             z-index: 999;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            color: white;
         }
 
         .header::after {
@@ -216,26 +222,32 @@
         }
 
         .main-logo {
-            height: 50px;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+            height: 55px;
+            width: auto;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
             transition: var(--transition);
         }
 
         .header-logo:hover .main-logo {
             transform: scale(1.05);
+            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
         }
 
         .header-title h1 {
-            color: var(--text-white);
-            font-size: 20px;
-            font-weight: 500;
-            margin-bottom: 2px;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+            margin: 0;
         }
 
         .header-title p {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 12px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.85rem;
             font-weight: 400;
+            letter-spacing: 0.5px;
+            margin: 0;
         }
 
         /* Header Right - User Info */
@@ -248,32 +260,38 @@
         .status-badge {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: var(--radius-lg);
-            font-size: 13px;
-            color: var(--text-white);
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50px;
+            font-size: 0.95rem;
+            color: white;
             border: 1px solid rgba(255, 255, 255, 0.2);
             transition: var(--transition);
+            backdrop-filter: blur(10px);
         }
 
         .status-badge:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.15);
         }
 
         .status-badge i {
-            font-size: 12px;
+            font-size: 10px;
         }
 
         .status-badge.connected i {
-            color: var(--color-success);
-            animation: pulse 2s infinite;
+            color: var(--success);
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
         }
 
         .user-info {
@@ -309,15 +327,15 @@
         }
 
         .user-role.admin {
-            background: linear-gradient(135deg, var(--color-success), var(--color-success-dark));
+            background: linear-gradient(135deg, var(--success), #00a344);
         }
 
         .user-role.guard {
-            background: linear-gradient(135deg, var(--color-warning), #D97706);
+            background: linear-gradient(135deg, var(--warning), #e67c00);
         }
 
         .btn-logout {
-            background: rgba(239, 68, 68, 0.9);
+            background: rgba(244, 67, 54, 0.9);
             color: white;
             padding: 8px 16px;
             border: none;
@@ -332,7 +350,7 @@
         }
 
         .btn-logout:hover {
-            background: var(--color-danger);
+            background: var(--danger);
             transform: translateY(-2px);
             box-shadow: var(--shadow-md);
         }
@@ -344,13 +362,15 @@
             top: 0;
             width: var(--sidebar-width);
             height: 100vh;
-            background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
             padding: 20px 0;
             overflow-y: auto;
             z-index: 1000;
-            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
             border-right: 1px solid rgba(255, 255, 255, 0.08);
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
         }
 
         .sidebar-section {
@@ -390,9 +410,9 @@
         }
 
         .sidebar-item:hover {
-            background: rgba(59, 130, 246, 0.12);
-            color: var(--color-primary-light);
-            transform: translateX(4px);
+            background: rgba(0, 188, 212, 0.15);
+            color: var(--accent-light);
+            transform: translateX(6px);
         }
 
         .sidebar-item:hover i {
@@ -400,15 +420,15 @@
         }
 
         .sidebar-item.active {
-            background: linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(59, 130, 246, 0.08));
+            background: linear-gradient(135deg, rgba(57, 73, 171, 0.2), rgba(40, 53, 147, 0.1));
             color: var(--text-white);
             font-weight: 500;
-            border-left: 3px solid var(--color-primary);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+            border-left: 3px solid var(--accent);
+            box-shadow: 0 4px 16px rgba(0, 188, 212, 0.25);
         }
 
         .sidebar-item.active i {
-            color: var(--color-primary-light);
+            color: var(--accent-light);
         }
 
         /* Main Content Area */
@@ -425,14 +445,14 @@
             background: var(--bg-card);
             border-radius: var(--radius-lg);
             padding: 24px;
-            box-shadow: var(--shadow-md);
+            box-shadow: 0 2px 8px var(--shadow), 0 8px 24px rgba(0, 0, 0, 0.04);
             transition: var(--transition);
-            border: 1px solid rgba(148, 163, 184, 0.1);
+            border: 1px solid var(--border);
             margin-bottom: 24px;
         }
 
         .card:hover {
-            box-shadow: var(--shadow-lg);
+            box-shadow: 0 4px 12px var(--shadow-lg), 0 12px 32px rgba(0, 0, 0, 0.06);
             transform: translateY(-2px);
         }
 
@@ -442,22 +462,22 @@
             align-items: center;
             margin-bottom: 20px;
             padding-bottom: 16px;
-            border-bottom: 2px solid var(--color-primary-light);
+            border-bottom: 2px solid var(--bg-primary);
         }
 
         .card-header h3 {
-            font-size: 18px;
-            font-weight: 500;
-            color: var(--text-primary);
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary-dark);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 0.75rem;
             margin: 0;
         }
 
         .card-header h3 i {
-            color: var(--color-primary);
-            font-size: 20px;
+            color: var(--accent);
+            font-size: 1.4rem;
         }
 
         /* ===== BOTONES CON ANIMACI�N HOVER ===== */
@@ -486,66 +506,68 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
             color: white;
         }
 
         .btn-primary:hover {
-            background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+            background: linear-gradient(135deg, #00acc1 0%, var(--accent) 100%);
         }
 
         .btn-success {
-            background: linear-gradient(135deg, var(--color-success), var(--color-success-dark));
+            background: linear-gradient(135deg, var(--success) 0%, #00b248 100%);
             color: white;
         }
 
         .btn-success:hover {
-            background: linear-gradient(135deg, #34D399, var(--color-success));
+            background: linear-gradient(135deg, #00e676, var(--success));
         }
 
         .btn-danger {
-            background: linear-gradient(135deg, var(--color-danger), var(--color-danger-dark));
+            background: linear-gradient(135deg, var(--danger), #e53935);
             color: white;
         }
 
         .btn-danger:hover {
-            background: linear-gradient(135deg, #F87171, var(--color-danger));
+            background: linear-gradient(135deg, #f55a4e, var(--danger));
         }
 
         .btn-secondary {
-            background: linear-gradient(135deg, var(--color-secondary), var(--color-secondary-dark));
+            background: linear-gradient(135deg, var(--text-secondary), var(--text-light));
             color: white;
         }
 
         .btn-secondary:hover {
-            background: linear-gradient(135deg, var(--color-secondary-light), var(--color-secondary));
+            background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
         }
 
         /* ===== FOOTER DISCRETO ===== */
         .footer {
             margin-left: 260px;
-            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             padding: 24px 32px;
             text-align: center;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 -4px 20px var(--shadow-lg);
+            color: white;
         }
 
         .footer p {
-            color: rgba(255, 255, 255, 0.6);
+            color: rgba(255, 255, 255, 0.85);
             font-size: 13px;
             font-weight: 400;
+            margin: 0.25rem 0;
         }
 
         .footer a {
-            color: var(--color-primary-light);
+            color: var(--accent-light);
             text-decoration: none;
             transition: var(--transition);
             font-weight: 500;
         }
 
         .footer a:hover {
-            color: var(--text-white);
+            color: white;
             text-decoration: underline;
         }
         }
@@ -2771,10 +2793,37 @@
                 </button>
                 
                 <div class="header-logo" id="headerLogo">
-                    <img src="assets/images/neostechc.png" alt="NeosTech Logo" class="main-logo logo-3d">
+                    <!-- Logo SVG de Neos Tech incrustado -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60" class="main-logo">
+                        <defs>
+                            <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#00bcd4;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#0097a7;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        <!-- Escudo de seguridad -->
+                        <path d="M 30 10 L 40 5 L 40 25 C 40 35, 35 40, 30 45 C 25 40, 20 35, 20 25 L 20 5 Z" 
+                              fill="url(#shieldGradient)" stroke="#0097a7" stroke-width="1.5"/>
+                        <!-- S\u00edmbolo de RFID/Ondas -->
+                        <g transform="translate(30, 25)">
+                            <circle cx="0" cy="0" r="2" fill="white"/>
+                            <path d="M -5 0 A 5 5 0 0 1 5 0" stroke="white" stroke-width="1.5" fill="none" opacity="0.9"/>
+                            <path d="M -8 0 A 8 8 0 0 1 8 0" stroke="white" stroke-width="1.5" fill="none" opacity="0.7"/>
+                            <path d="M -11 0 A 11 11 0 0 1 11 0" stroke="white" stroke-width="1.5" fill="none" opacity="0.5"/>
+                        </g>
+                        <!-- Candado de seguridad -->
+                        <rect x="27" y="32" width="6" height="7" rx="1" fill="white" opacity="0.9"/>
+                        <path d="M 28 32 L 28 29 A 2 2 0 0 1 32 29 L 32 32" stroke="white" stroke-width="1.5" fill="none" opacity="0.9"/>
+                        <!-- Texto NEOS -->
+                        <text x="50" y="25" font-family="'Roboto', 'Arial', sans-serif" font-size="18" font-weight="700" fill="#1a237e">NEOS</text>
+                        <!-- Texto TECH -->
+                        <text x="50" y="42" font-family="'Roboto', 'Arial', sans-serif" font-size="14" font-weight="500" fill="#00bcd4" letter-spacing="2">TECH</text>
+                        <!-- L\u00ednea decorativa -->
+                        <line x1="50" y1="28" x2="95" y2="28" stroke="#00bcd4" stroke-width="2" opacity="0.3"/>
+                    </svg>
                     <div class="header-title">
                         <h1>Sistema de Control de Acceso Integral</h1>
-                        <p>Gesti�n Inteligente y Segura</p>
+                        <p>Neos Tech - Soluciones de Seguridad Avanzada</p>
                     </div>
                 </div>
             </div>
@@ -4461,9 +4510,7 @@
     <script>
         // VERSION DEL DASHBOARD - VERIFICAR CACHE
         console.clear();
-        console.log('%c NeosTech RFID Dashboard v2.5.0-QR-REGISTER', 'background: #10b981; color: white; padding: 8px 15px; border-radius: 5px; font-weight: bold; font-size: 14px;');
-        console.log('%c Cargado:', new Date().toLocaleString('es-ES'), 'color: #64748b;');
-        console.log('%c✅ Sistema de registro por QR activado', 'color: #10b981; font-weight: bold;');
+        console.log('[NeosTech] Dashboard ready — ' + new Date().toLocaleString('es-ES'));
         
         // Firebase Configuration
         const firebaseConfig = {
@@ -4587,7 +4634,7 @@
             if (lastOpenEl) lastOpenEl.textContent = now.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'});
             
             try {
-                const eventDoc = await db.collection('rfid_tags').add({
+                const eventDoc = await db.collection('rfid_events').add({
                     event_type: 'manual_open',
                     access_point_id: accessPointId,
                     access_point_name: accessPointName,
@@ -4603,7 +4650,7 @@
                     reader_id: accessPointId,
                     location: accessPointName,
                     source: 'dashboard_manual',
-                    client_id: 'condominio-neos'
+                    clientId: window.currentUserClientId
                 });
                 
                 // El Gateway monitorea la colecci�n rfid_tags y ejecutar� el relay automáticamente
@@ -4613,7 +4660,7 @@
                 // Esperar un momento y verificar si el Gateway proces� el evento
                 setTimeout(async () => {
                     try {
-                        const eventSnapshot = await db.collection('rfid_tags').doc(eventDoc.id).get();
+                        const eventSnapshot = await db.collection('rfid_events').doc(eventDoc.id).get();
                         const eventData = eventSnapshot.data();
                         
                         if (eventData && eventData.relay_activated) {
@@ -4740,50 +4787,61 @@
                 currentUser = user;
                 
                 try {
-                    // Obtener datos del usuario desde Firestore
-                    const userDoc = await db.collection('users').doc(user.uid).get();
-                    
-                    if (userDoc.exists) {
-                        const userData = userDoc.data();
+                    // Obtener datos del usuario — clientId del JWT, luego query multi-tenant
+                    const tokenResult = await user.getIdTokenResult();
+                    const tenantClientId = tokenResult.claims.clientId || null;
+                    if (!tenantClientId) {
+                        console.error('❌ clientId faltante en JWT claims para UID: ' + user.uid);
+                        showNotification('Error: clientId no configurado. Contactar al administrador.', 'error');
+                        return;
+                    }
+                    window.currentUserClientId = tenantClientId;
+                    const userSnap = await db.collection('users')
+                        .where('clientId', '==', tenantClientId)
+                        .where(firebase.firestore.FieldPath.documentId(), '==', user.uid)
+                        .limit(1)
+                        .get();
+
+                    if (!userSnap.empty) {
+                        const userData = userSnap.docs[0].data();
                         userRole = userData.role || 'resident';
                         userDisplayName = userData.name || user.displayName || user.email;
                         
                         console.log('✅ Usuario autenticado:', {
                             email: user.email,
                             role: userRole,
-                            name: userDisplayName
+                            name: userDisplayName,
+                            clientId: window.currentUserClientId
                         });
                         
                         // Actualizar UI
                         updateUIForAuthenticatedUser(userDisplayName, userRole);
                         applyRoleRestrictions();
                         hideLoginModal();
-                        
-                        // Log de inicio de sesión
-                        await db.collection('login_logs').add({
+
+                        // Log de inicio de sesión (antes de redirigir)
+                        await db.collection('access_logs').add({
                             user: userDisplayName,
                             user_id: user.uid,
                             email: user.email,
                             role: userRole,
+                            clientId: window.currentUserClientId,
                             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                             action: 'login'
                         });
+
+                        // index.html es solo login — redirigir al dashboard Pro
+                        window.location.replace('/dashboard-pro.html');
+                        return;
                         
                     } else {
-                        console.error('✅ Usuario autenticado pero no existe en Firestore');
-                        showNotification('Error: Usuario no encontrado en base de datos', 'error');
-                        await firebase.auth().signOut();
+                        console.error('❌ Perfil no encontrado para UID: ' + user.uid + ' (clientId: ' + tenantClientId + ')');
+                        showNotification('Error: Perfil no encontrado en Firestore', 'error');
                     }
                     
                 } catch (error) {
-                    console.error('❌ Error obteniendo datos de usuario:', error);
-                    showNotification('Error al cargar datos del usuario: ' + error.message, 'error');
-                    
-                    // Si es error de permisos, es probable que las reglas de seguridad bloqueen el acceso
-                    if (error.code === 'permission-denied') {
-                        showNotification(' Sin permisos. Contacta al administrador.', 'error');
-                        await firebase.auth().signOut();
-                    }
+                    console.error('❌ Error obteniendo datos de usuario:', error.code, error.message);
+                    showNotification('Error al cargar perfil: ' + error.code + ' — ' + error.message, 'error');
                 }
                 
             } else {
@@ -4947,11 +5005,12 @@
             try {
                 // Registrar logout antes de cerrar sesión
                 if (currentUser) {
-                    await db.collection('login_logs').add({
+                    await db.collection('access_logs').add({
                         user: userDisplayName || currentUser.email,
                         user_id: currentUser.uid,
                         email: currentUser.email,
                         role: userRole,
+                        clientId: window.currentUserClientId,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                         action: 'logout'
                     });
@@ -5174,9 +5233,9 @@
             try {
                 let whitelistSnapshot;
                 try {
-                    whitelistSnapshot = await db.collection('whitelist').limit(100).get();
+                    whitelistSnapshot = await db.collection('whitelist').where('clientId', '==', window.currentUserClientId).limit(100).get();
                 } catch (err) {
-                    const usersSnapshot = await db.collection('users').where('rfid_tag', '!=', '').get();
+                    const usersSnapshot = await db.collection('users').where('clientId', '==', window.currentUserClientId).where('rfid_tag', '!=', '').get();
                     whitelistSnapshot = { empty: usersSnapshot.empty, docs: [] };
                     for (const userDoc of usersSnapshot.docs) {
                         const userData = userDoc.data();
@@ -5189,7 +5248,7 @@
                             });
                         }
                     }
-                    whitelistSnapshot = await db.collection('whitelist').limit(100).get();
+                    whitelistSnapshot = await db.collection('whitelist').where('clientId', '==', window.currentUserClientId).limit(100).get();
                 }
                 
                 let whitelistHtml = '';
@@ -5219,7 +5278,7 @@
                 }
                 whitelistContainer.innerHTML = whitelistHtml;
 
-                const blacklistSnapshot = await db.collection('blacklist').limit(100).get();
+                const blacklistSnapshot = await db.collection('blacklist').where('clientId', '==', window.currentUserClientId).limit(100).get();
                 let blacklistHtml = '';
                 if (blacklistSnapshot.empty) {
                     blacklistHtml = '<p style="text-align:center; color:#7f8c8d;">No hay tags bloqueados</p>';
@@ -6579,10 +6638,22 @@
             }
         });
 
+        /**
+         * Guard: aborta queries si clientId aún no está disponible.
+         * @returns {boolean}
+         */
+        function requireClientId() {
+            if (!window.currentUserClientId) {
+                console.error('❌ currentUserClientId no definido, abortando query Firestore');
+                return false;
+            }
+            return true;
+        }
+
         function initFirestore() {
             const statusEl = document.getElementById('connection-status');
             
-            db.collection('rfid_tags').limit(1).get()
+            db.collection('rfid_events').where('clientId', '==', window.currentUserClientId).limit(1).get()
                 .then(() => {
                     if (statusEl) {
                         statusEl.innerHTML = '<i class="fas fa-circle"></i> <span>Conectado</span>';
@@ -6612,7 +6683,7 @@
         async function updateStats() {
             try {
                 // Count users
-                const usersSnapshot = await db.collection('users').get();
+                const usersSnapshot = await db.collection('users').where('clientId', '==', window.currentUserClientId).get();
                 const residentEl = document.getElementById('residentCount');
                 if (residentEl) residentEl.textContent = usersSnapshot.size;
                 
@@ -6633,7 +6704,8 @@
                 
                 let totalAccesses = 0;
                 try {
-                    const accessSnapshot = await db.collection('rfid_tags')
+                    const accessSnapshot = await db.collection('rfid_events')
+                        .where('clientId', '==', window.currentUserClientId)
                         .where('timestamp', '>=', today)
                         .get();
                     totalAccesses += accessSnapshot.size;
@@ -6642,7 +6714,8 @@
                 }
                 
                 try {
-                    const loginSnapshot = await db.collection('login_logs')
+                    const loginSnapshot = await db.collection('access_logs')
+                        .where('clientId', '==', window.currentUserClientId)
                         .where('timestamp', '>=', today)
                         .get();
                     totalAccesses += loginSnapshot.size;
@@ -6655,7 +6728,8 @@
                 
                 // Count today's alerts
                 try {
-                    const alertSnapshot = await db.collection('alerts')
+                    const alertSnapshot = await db.collection('emergency_alerts')
+                        .where('clientId', '==', window.currentUserClientId)
                         .where('timestamp', '>=', today)
                         .get();
                     
@@ -6669,10 +6743,10 @@
                 
                 // Count whitelist and blacklist
                 try {
-                    const whitelistSnapshot = await db.collection('whitelist').get();
+                    const whitelistSnapshot = await db.collection('whitelist').where('clientId', '==', window.currentUserClientId).get();
                     console.log(`📝 Whitelist: ${whitelistSnapshot.size} tags`);
                     
-                    const blacklistSnapshot = await db.collection('blacklist').get();
+                    const blacklistSnapshot = await db.collection('blacklist').where('clientId', '==', window.currentUserClientId).get();
                     console.log(`🚫 Blacklist: ${blacklistSnapshot.size} tags bloqueados`);
                 } catch (err) {
                     console.log('list counts error:', err.message);
@@ -6744,7 +6818,8 @@
             console.log('🚀 Iniciando listener de eventos...');
             
             // Escuchar eventos en tiempo real
-            eventsListener = db.collection('rfid_tags')
+            eventsListener = db.collection('rfid_events')
+                .where('clientId', '==', window.currentUserClientId)
                 .orderBy('timestamp', 'desc')
                 .limit(100)
                 .onSnapshot(snapshot => {
@@ -6930,7 +7005,9 @@
             tbody.innerHTML = '<tr><td colspan="8" class="loading"><div class="spinner"></div>Cargando...</td></tr>';
             
             try {
-                const snapshot = await db.collection('users').orderBy('name').get();
+                const snapshot = await db.collection('users')
+                    .where('clientId', '==', window.currentUserClientId)
+                    .orderBy('name').get();
                 users = [];
                 snapshot.forEach(doc => {
                     users.push({ id: doc.id, ...doc.data() });
@@ -7329,6 +7406,7 @@
             try {
                 const currentUserId = document.getElementById('userId').value;
                 const snapshot = await db.collection('users')
+                    .where('clientId', '==', window.currentUserClientId)
                     .where('tags', 'array-contains', tagId)
                     .get();
                 
@@ -7405,13 +7483,17 @@
         async function editUser(userId) {
             try {
                 console.log('📋 Editando usuario:', userId);
-                const userDoc = await db.collection('users').doc(userId).get();
-                if (!userDoc.exists) {
+                const userSnap = await db.collection('users')
+                    .where('clientId', '==', window.currentUserClientId)
+                    .where(firebase.firestore.FieldPath.documentId(), '==', userId)
+                    .limit(1)
+                    .get();
+                if (userSnap.empty) {
                     showNotification(' Usuario no encontrado', 'error');
                     return;
                 }
                 
-                const user = userDoc.data();
+                const user = userSnap.docs[0].data();
                 console.log('📋 Datos del usuario:', user);
                 
                 const modal = document.getElementById('userModal');
@@ -7468,9 +7550,13 @@
                 showNotification(' Eliminando usuario...', 'info');
                 
                 // Obtener usuario para eliminar sus tags de whitelist
-                const userDoc = await db.collection('users').doc(userId).get();
-                if (userDoc.exists) {
-                    const user = userDoc.data();
+                const userSnap = await db.collection('users')
+                    .where('clientId', '==', window.currentUserClientId)
+                    .where(firebase.firestore.FieldPath.documentId(), '==', userId)
+                    .limit(1)
+                    .get();
+                if (!userSnap.empty) {
+                    const user = userSnap.docs[0].data();
                     const tags = user.tags || [];
                     
                     // Eliminar tags de whitelist
@@ -7510,7 +7596,7 @@
                 console.log('🚀 Iniciando eliminaci�n masiva de usuarios');
 
                 // Obtener todos los usuarios
-                const snapshot = await db.collection('users').get();
+                const snapshot = await db.collection('users').where('clientId', '==', window.currentUserClientId).get();
                 console.log(` Total de usuarios a eliminar: ${snapshot.size}`);
 
                 if (snapshot.empty) {
@@ -7728,12 +7814,12 @@
                         reader_id: randomReader,
                         access_point_name: randomReader.replace('_', ' ').toUpperCase(),
                         timestamp: firebase.firestore.Timestamp.fromDate(eventTime), //  FIRESTORE TIMESTAMP
-                        client_id: 'condominio-neos',
+                        clientId: window.currentUserClientId,
                         source: 'testing_script',
                         status: randomTag.granted ? 'whitelist' : 'not_registered'
                     };
 
-                    await db.collection('rfid_tags').add(eventData);
+                    await db.collection('rfid_events').add(eventData);
                     console.log(`   Evento ${i + 1}/20: ${randomTag.name} - ${eventTime.toLocaleString('es-ES')}`);
                 }
 
@@ -7946,6 +8032,7 @@
                 try {
                     for (const tagId of tags) {
                         const snapshot = await db.collection('users')
+                            .where('clientId', '==', window.currentUserClientId)
                             .where('tags', 'array-contains', tagId)
                             .get();
                         
@@ -7979,7 +8066,8 @@
                     tags: tags,
                     active: active,
                     updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-                    updated_by: currentUser || 'dashboard'
+                    updated_by: currentUser || 'dashboard',
+                    clientId: window.currentUserClientId
                 };
                 
                 if (userId) {
@@ -8007,6 +8095,7 @@
                             departamento: departamento,
                             added_at: firebase.firestore.FieldValue.serverTimestamp(),
                             added_by: currentUser || 'dashboard',
+                            clientId: window.currentUserClientId,
                             active: active
                         })
                     ));
@@ -8293,7 +8382,7 @@
                 // Obtener logs de tags desconocidos (�ltimos 7 días)
                 const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
                 const snapshot = await db.collection('access_logs')
-                    .where('status', '==', 'unknown')
+                    .where('clientId', '==', window.currentUserClientId).where('status', '==', 'unknown')
                     .where('timestamp', '>=', sevenDaysAgo)
                     .orderBy('timestamp', 'desc')
                     .limit(100)
@@ -8369,7 +8458,8 @@
                 await db.collection('blacklist').doc(tagId).set({
                     added_at: firebase.firestore.FieldValue.serverTimestamp(),
                     added_by: currentUser || 'Sistema',
-                    reason: 'Bloqueado manualmente'
+                    reason: 'Bloqueado manualmente',
+                    clientId: window.currentUserClientId
                 });
                 
                 showNotification(' Tag agregado a la blacklist', 'success');
@@ -8680,6 +8770,7 @@
                     
                     // Buscar �ltima lectura de este reader_id en access_logs
                     const lastActivitySnapshot = await db.collection('access_logs')
+                        .where('clientId', '==', window.currentUserClientId)
                         .where('reader_id', '==', readerId)
                         .orderBy('timestamp', 'desc')
                         .limit(1)
@@ -8717,7 +8808,7 @@
                 // 2. Alertas de tags desconocidos (�ltimas 24 horas)
                 const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
                 const unknownTagsSnapshot = await db.collection('access_logs')
-                    .where('status', '==', 'unknown')
+                    .where('clientId', '==', window.currentUserClientId).where('status', '==', 'unknown')
                     .where('timestamp', '>=', oneDayAgo)
                     .orderBy('timestamp', 'desc')
                     .limit(10)
@@ -8737,6 +8828,7 @@
                 
                 // 3. Alertas de accesos denegados (�ltimas 24 horas)
                 const deniedAccessSnapshot = await db.collection('access_logs')
+                    .where('clientId', '==', window.currentUserClientId)
                     .where('status', '==', 'denied')
                     .where('timestamp', '>=', oneDayAgo)
                     .orderBy('timestamp', 'desc')
@@ -8835,7 +8927,8 @@
                 
                 // Cargar desde login_logs (aperturas manuales y eventos del sistema)
                 try {
-                    const loginSnapshot = await db.collection('login_logs')
+                    const loginSnapshot = await db.collection('access_logs')
+                        .where('clientId', '==', window.currentUserClientId)
                         .where('timestamp', '>=', date)
                         .where('timestamp', '<=', endDate)
                         .orderBy('timestamp', 'desc')
@@ -8851,7 +8944,8 @@
                 
                 // Cargar desde rfid_tags (lecturas de tags)
                 try {
-                    const tagSnapshot = await db.collection('rfid_tags')
+                    const tagSnapshot = await db.collection('rfid_events')
+                        .where('clientId', '==', window.currentUserClientId)
                         .where('timestamp', '>=', date)
                         .where('timestamp', '<=', endDate)
                         .orderBy('timestamp', 'desc')
@@ -9416,6 +9510,7 @@
                 // Estrategia 1: Intentar access_logs sin orderBy
                 try {
                     const logsSnapshot = await db.collection('access_logs')
+                        .where('clientId', '==', window.currentUserClientId)
                         .limit(500)
                         .get();
                     
@@ -9433,7 +9528,8 @@
                     
                     // Estrategia 2: Intentar rfid_tags sin orderBy
                     try {
-                        const tagsSnapshot = await db.collection('rfid_tags')
+                        const tagsSnapshot = await db.collection('rfid_events')
+                            .where('clientId', '==', window.currentUserClientId)
                             .limit(500)
                             .get();
                         
@@ -10253,7 +10349,8 @@
             // Escuchar colecci�n rfid_tags en tiempo real
             // Intentar sin orderBy primero para evitar problemas de �ndice
             try {
-                db.collection('rfid_tags')
+                db.collection('rfid_events')
+                    .where('clientId', '==', window.currentUserClientId)
                     .limit(50)
                     .onSnapshot(snapshot => {
                         console.log(`📦 Snapshot recibido: ${snapshot.size} documentos`);
@@ -10522,7 +10619,7 @@
             
             try {
                 // Cargar lista de usuarios para el selector (sin orderBy para evitar �ndice compuesto)
-                const usersSnapshot = await db.collection('users').where('active', '==', true).get();
+                const usersSnapshot = await db.collection('users').where('clientId', '==', window.currentUserClientId).where('active', '==', true).get();
                 const usersList = [];
                 usersSnapshot.forEach(doc => {
                     const user = doc.data();
@@ -10746,6 +10843,7 @@
                         departamento: userData.departamento,
                         added_at: firebase.firestore.FieldValue.serverTimestamp(),
                         added_by: currentUser || 'dashboard',
+                        clientId: window.currentUserClientId,
                         active: true
                     });
                     
@@ -10826,7 +10924,8 @@
                         tags: [tagId],
                         active: active,
                         created_at: firebase.firestore.FieldValue.serverTimestamp(),
-                        created_by: currentUser || 'dashboard'
+                        created_by: currentUser || 'dashboard',
+                        clientId: window.currentUserClientId
                     };
                     
                     await db.collection('users').add(userData);
@@ -10838,6 +10937,7 @@
                         departamento: departamento,
                         added_at: firebase.firestore.FieldValue.serverTimestamp(),
                         added_by: currentUser || 'dashboard',
+                        clientId: window.currentUserClientId,
                         active: true
                     });
                     
@@ -10940,7 +11040,7 @@
                 }
                 
                 // 2. REGISTRAR EVENTO en Firestore
-                const eventDoc = await db.collection('rfid_tags').add({
+                const eventDoc = await db.collection('rfid_events').add({
                     event_type: 'manual_door_open',
                     access_point_id: doorId,
                     access_point_name: doorName,
@@ -10953,7 +11053,7 @@
                     reader_id: doorId,
                     location: doorName,
                     source: 'dashboard_manual',
-                    client_id: 'condominio-neos'
+                    clientId: window.currentUserClientId
                 });
                 
                 showNotification(` ${doorName} abierta exitosamente`, 'success');
@@ -10997,7 +11097,8 @@
                 console.log('⏳ Cargando historial de acciones de control...');
                 
                 // Consultar eventos manuales (sin orderBy para evitar �ndice compuesto)
-                const manualEventsSnapshot = await db.collection('rfid_tags')
+                const manualEventsSnapshot = await db.collection('rfid_events')
+                    .where('clientId', '==', window.currentUserClientId)
                     .where('event_type', '==', 'manual_open')
                     .limit(50)
                     .get();
@@ -11531,7 +11632,7 @@
             if (!confirm('�Eliminar todos los registros de access_logs')) return;
             
             try {
-                const snapshot = await db.collection('access_logs').limit(500).get();
+                const snapshot = await db.collection('access_logs').where('clientId', '==', window.currentUserClientId).limit(500).get();
                 const batch = db.batch();
                 
                 snapshot.forEach(doc => {
@@ -11709,8 +11810,6 @@
         console.log('   - generateSampleChartData()  📊 Gráficos con datos de ejemplo');
         console.log('   - loadLectoraConfig()  ⚙️ Cargar config lectora THY');
         console.log('   - saveLectoraConfig()  💾 Guardar config lectora THY');
-        console.log('   - debugSubscribers()  👀 Ver todos los suscriptores de alertas');
-        console.log('   - activateAllSubscribers()  ✅ Activar todos los suscriptores');
         console.log('   - checkServiceWorker()  🔍 Diagnosticar estado del Service Worker');
         console.log('   - testDirectPush()  📤 Enviar notificación de prueba directa');
         
@@ -11823,17 +11922,14 @@
             console.log('🚀 Iniciando aplicaci�n NeosTech RFID System Pro v2.4.14-OPTIMIZED');
             
             try {
-                initFirestore();
-                loadData();
+                // initFirestore(), loadData() e initLiveTagReading() se llaman desde
+                // onAuthStateChanged, una vez que window.currentUserClientId está disponible.
                 if (typeof initCharts === 'function') {
                     initCharts();
                 }
                 
                 // Inicializar sistema de paginación de live tags
                 initializeLiveTagsPagination();
-                
-                // Inicializar listener en tiempo real para tags RFID
-                initLiveTagReading();
             } catch (error) {
                 console.warn('❌ Error durante inicializaci�n:', error.message);
             }
@@ -11854,9 +11950,7 @@
                     if (e.key === 'Enter') performLogin();
                 });
             }
-            
-            console.log(' Sistema inicializado correctamente');
-            
+
             // Global keyboard shortcuts
             document.addEventListener('keydown', (e) => {
                 // Ctrl+K o Cmd+K para b�squeda global
@@ -11876,8 +11970,6 @@
             // if (globalSearchInput) {
             //     globalSearchInput.addEventListener('input', handleGlobalSearch);
             // }
-            
-            console.log(' Aplicaci�n inicializada correctamente');
         });
 
         // ============================================
@@ -12102,6 +12194,7 @@ Se actualizar� información en breve.`,
         async function loadActiveAlerts() {
             try {
                 const alertsSnapshot = await db.collection('emergency_alerts')
+                    .where('clientId', '==', window.currentUserClientId)
                     .where('status', '==', 'ACTIVE')
                     .orderBy('issued_at', 'desc')
                     .get();
@@ -12250,7 +12343,7 @@ Se actualizar� información en breve.`,
         // Cargar contador total
         async function loadTotalAlertsCount() {
             try {
-                const snapshot = await db.collection('emergency_alerts').get();
+                const snapshot = await db.collection('emergency_alerts').where('clientId', '==', window.currentUserClientId).get();
                 const counter = document.getElementById('totalAlertsCount');
                 if (counter) {
                     counter.textContent = snapshot.size;
@@ -12263,6 +12356,7 @@ Se actualizar� información en breve.`,
         // Escuchar cambios en tiempo real
         function listenToActiveAlerts() {
             db.collection('emergency_alerts')
+                .where('clientId', '==', window.currentUserClientId)
                 .where('status', '==', 'ACTIVE')
                 .onSnapshot(snapshot => {
                     console.log('[Alertas] Actualizaci�n en tiempo real');
@@ -12456,7 +12550,8 @@ Se actualizar� información en breve.`,
                     issued_by: currentUser.uid || 'admin',
                     created_at: firebase.firestore.FieldValue.serverTimestamp(),
                     confirmed_safe_count: 0,
-                    total_recipients: 0
+                    total_recipients: 0,
+                    clientId: window.currentUserClientId
                 };
                 
                 console.log('[Alertas]  Datos de alerta preparados:', alertData);
@@ -12471,7 +12566,7 @@ Se actualizar� información en breve.`,
                 console.log('[Alertas]  Consultando suscriptores...');
                 
                 // Primero ver TODOS los suscriptores (sin filtro)
-                const allSubscribersSnapshot = await db.collection('alert_subscribers').get();
+                const allSubscribersSnapshot = await db.collection('alert_subscribers').where('clientId', '==', window.currentUserClientId).get();
                 console.log(`[Alertas]  Total de registros en DB: ${allSubscribersSnapshot.size}`);
                 
                 allSubscribersSnapshot.forEach(doc => {
@@ -12488,7 +12583,7 @@ Se actualizar� información en breve.`,
                 
                 // Ahora filtrar solo los activos
                 const subscribersSnapshot = await db.collection('alert_subscribers')
-                    .where('notifications_enabled', '==', true)
+                    .where('clientId', '==', window.currentUserClientId).where('notifications_enabled', '==', true)
                     .get();
                 const subscribersCount = subscribersSnapshot.size;
                 
@@ -12733,7 +12828,7 @@ Se actualizar� información en breve.`,
                 console.log('[Alertas]  Activando todos los suscriptores...');
                 
                 const snapshot = await db.collection('alert_subscribers')
-                    .where('notifications_enabled', '==', false)
+                    .where('clientId', '==', window.currentUserClientId).where('notifications_enabled', '==', false)
                     .get();
                 
                 console.log(`[Alertas]  Encontrados ${snapshot.size} suscriptores inactivos`);
@@ -12765,7 +12860,7 @@ Se actualizar� información en breve.`,
             try {
                 console.log('[DEBUG]  Analizando base de datos de suscriptores...');
                 
-                const allDocs = await db.collection('alert_subscribers').get();
+                const allDocs = await db.collection('alert_subscribers').where('clientId', '==', window.currentUserClientId).get();
                 
                 console.log(`[DEBUG]  TOTAL DE DOCUMENTOS: ${allDocs.size}`);
                 console.log('[DEBUG] =====================================');
@@ -12815,7 +12910,7 @@ Se actualizar� información en breve.`,
             console.log('[CLEAN] 🚀 Iniciando limpieza de suscriptores sin token...');
             
             try {
-                const snapshot = await db.collection('alert_subscribers').get();
+                const snapshot = await db.collection('alert_subscribers').where('clientId', '==', window.currentUserClientId).get();
                 console.log(`[CLEAN]  Total documentos: ${snapshot.size}`);
                 
                 let deleted = 0;
@@ -12856,7 +12951,7 @@ Se actualizar� información en breve.`,
         async function loadSubscribersCount() {
             try {
                 const snapshot = await db.collection('alert_subscribers')
-                    .where('notifications_enabled', '==', true)
+                    .where('clientId', '==', window.currentUserClientId).where('notifications_enabled', '==', true)
                     .get();
                 
                 const count = snapshot.size;
@@ -12933,11 +13028,11 @@ Se actualizar� información en breve.`,
 
         async function loadQRStats() {
             try {
-                const snapshot = await db.collection('alert_subscribers').get();
+                const snapshot = await db.collection('alert_subscribers').where('clientId', '==', window.currentUserClientId).get();
                 const total = snapshot.size;
                 
                 const activeSnapshot = await db.collection('alert_subscribers')
-                    .where('notifications_enabled', '==', true)
+                    .where('clientId', '==', window.currentUserClientId).where('notifications_enabled', '==', true)
                     .get();
                 const active = activeSnapshot.size;
 
@@ -13316,16 +13411,6 @@ Se actualizar� información en breve.`,
             }, 5000);
         }
 
-        // Initialize push notifications after user logs in
-        if (firebase.apps.length > 0) {
-            firebase.auth().onAuthStateChanged((user) => {
-                if (user) {
-                    setTimeout(() => {
-                        initPushNotifications();
-                    }, 2000); // Wait 2 seconds after login
-                }
-            });
-        }
     </script>
 
     <style>

@@ -5,7 +5,7 @@ Write-Host "🚀 Agregando tags de prueba a Firestore..." -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════`n" -ForegroundColor Cyan
 
 $clientId = "condominio-neos"
-$projectId = "neos-tech"
+$projectId = "neostech"
 
 # Tag 1 - E28069150000502009073A7F (WHITELIST)
 Write-Host "📝 Agregando Tag 1 (whitelist)..." -ForegroundColor Yellow

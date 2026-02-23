@@ -1,6 +1,7 @@
 {
   "projects": {
-    "default": "neos-tech"
+    "default": "neos-tech",
+    "neostech": "neos-tech"
   },
   "targets": {},
   "etags": {}

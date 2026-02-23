@@ -24,6 +24,12 @@
             "value": "no-cache, no-store, must-revalidate"
           }
         ]
+      },
+      {
+        "firestore": {
+          "rules": "firestore.rules",
+          "indexes": "config/firestore.indexes.json"
+        }
       }
     ]
   }

@@ -310,12 +310,19 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // Bootstrap multi-tenant: leer clientId desde JWT claims
+        let currentUserClientId = null;
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                user.getIdTokenResult().then(function(result) {
+                    currentUserClientId = result.claims.clientId || null;
+                });
+            }
+        });
+
         // Registrar Service Worker PRIMERO
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/firebase-messaging-sw.js')
-                .then(registration => {
-                    console.log('[SW] Service Worker registrado:', registration);
-                })
                 .catch(err => {
                     console.error('[SW] Error registrando Service Worker:', err);
                 });
@@ -352,15 +359,14 @@
                     device_type: /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'iOS' : 'Android',
                     last_seen: firebase.firestore.FieldValue.serverTimestamp(),
                     platform: navigator.platform,
-                    user_agent: navigator.userAgent
+                    user_agent: navigator.userAgent,
+                    clientId: currentUserClientId
                 };
 
                 // Guardar en Firestore
                 const docRef = await db.collection('alert_subscribers').add(deviceData);
 
-                console.log('Device registered successfully:', docRef.id);
-
-                // Mostrar éxito inmediatamente
+                // Show success immediately
                 document.getElementById('registeredName').textContent = fullName;
                 document.getElementById('step1').classList.remove('active');
                 document.getElementById('step2').classList.add('active');
@@ -371,59 +377,36 @@
 
                 // DESPUÉS intentar obtener FCM token
                 setTimeout(async () => {
-                    console.log('[FCM] 🔄 Iniciando obtención de token...');
-                    
                     try {
-                        // Verificar soporte de notificaciones
                         if (!('Notification' in window)) {
-                            console.error('[FCM] ❌ Este navegador NO soporta notificaciones');
+                            console.error('[FCM] Notifications not supported');
                             return;
                         }
                         
-                        console.log('[FCM] ✅ Notification API disponible');
-                        
-                        // Solicitar permiso de notificaciones
-                        console.log('[FCM] 📋 Solicitando permisos...');
                         const permission = await Notification.requestPermission();
-                        console.log('[FCM] 📋 Permiso obtenido:', permission);
                         
                         if (permission !== 'granted') {
-                            console.warn('[FCM] ⚠️ Permisos denegados o rechazados');
                             return;
                         }
                         
-                        // Verificar soporte de Firebase Messaging
                         if (!firebase.messaging.isSupported()) {
-                            console.error('[FCM] ❌ Firebase Messaging NO soportado en este navegador');
+                            console.error('[FCM] Firebase Messaging not supported');
                             return;
                         }
                         
-                        console.log('[FCM] ✅ Firebase Messaging soportado');
-                        
-                        // Obtener FCM token
-                        console.log('[FCM] 🔑 Obteniendo token...');
                         const messaging = firebase.messaging();
-                        
                         const vapidKey = 'BEd-BNhI_7rq5_sjALjNVA7UKpXhvrsfDX23vSVHr7GPsvAZ654qFAN7LkKudcLLF_Ot8EPZ03ebzHcKZO8WgtM';
-                        console.log('[FCM] VAPID Key:', vapidKey.substring(0, 20) + '...');
-                        
                         const currentToken = await messaging.getToken({ vapidKey });
                         
                         if (currentToken) {
-                            console.log('[FCM] ✅ Token FCM obtenido:', currentToken.substring(0, 30) + '...');
-                            console.log('[FCM] 💾 Guardando en Firestore...');
-                            
-                            // Actualizar Firestore con el token
                             await docRef.update({
                                 fcm_token: currentToken,
                                 notifications_enabled: true,
                                 token_updated_at: firebase.firestore.FieldValue.serverTimestamp()
                             });
-                            
-                            console.log('[FCM] ✅ Token guardado en Firestore exitosamente');
                             alert('✅ Registro completo\n\n🔔 Ahora recibirás notificaciones de alertas');
                         } else {
-                            console.error('[FCM] ❌ No se pudo obtener token (respuesta vacía)');
+                            console.error('[FCM] Empty token response');
                         }
                         
                     } catch (tokenError) {

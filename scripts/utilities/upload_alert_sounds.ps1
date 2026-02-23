@@ -29,8 +29,8 @@ Write-Host ""
 $ProjectRoot = "C:\NeosTech-RFID-System-Pro"
 $SoundsDir = Join-Path $ProjectRoot "assets\sounds"
 $ConfigFile = Join-Path $ProjectRoot "config\alert_sounds.json"
-$FirebaseProject = "neos-tech"
-$StorageBucket = "neos-tech.appspot.com"
+$FirebaseProject = "neostech"
+$StorageBucket = "neos-tech.appspot.com"  # Firebase Storage bucket — generado por GCP, no cambia
 $StoragePath = "alert_sounds"
 
 # Archivos de sonido requeridos

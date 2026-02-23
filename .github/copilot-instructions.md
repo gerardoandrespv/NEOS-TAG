@@ -1,7 +1,6 @@
-# GitHub Copilot Instructions (Repo)
+# Instrucciones de GitHub Copilot (Repositorio)
 
-- Never apply changes automatically. Wait for the exact word: **APLICA**.
-- Provide a short plan + unified diff + list of touched files + expected `git diff --stat`.
-- Limit changes to the minimum required. Max **3 files**.
-- Do not run "format all" or broad refactors.
-- Use exact file paths and keep PowerShell commands compatible with Windows.
+- Proporcionar un plan breve + diff unificado + lista de archivos modificados + `git diff --stat` esperado.
+- Limitar los cambios al mínimo requerido. Máximo **3 archivos**.
+- No ejecutar "formatear todo" ni refactorizaciones amplias.
+- Usar rutas de archivo exactas y mantener comandos PowerShell compatibles con Windows.

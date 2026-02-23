@@ -2,6 +2,7 @@
 bin/
 obj/
 .env
+serviceAccountKey.json
 *.local
 .vs/
 .vscode/

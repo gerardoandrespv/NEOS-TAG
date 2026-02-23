@@ -48,7 +48,7 @@ if ($confirmation -ne "si") {
 
 # Desplegar
 Write-Host "`n🚀 Desplegando a Firebase Hosting..." -ForegroundColor Cyan
-Write-Host "   Proyecto: neos-tech" -ForegroundColor Gray
+Write-Host "   Proyecto: neostech" -ForegroundColor Gray
 Write-Host "   Directorio: src/web" -ForegroundColor Gray
 Write-Host "`n"
 

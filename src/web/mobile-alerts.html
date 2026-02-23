@@ -370,6 +370,16 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // Bootstrap multi-tenant: leer clientId desde JWT claims
+        let currentUserClientId = null;
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                user.getIdTokenResult().then(function(result) {
+                    currentUserClientId = result.claims.clientId || null;
+                });
+            }
+        });
+
         let activeAlerts = [];
         let previousAlertIds = new Set();
         let confirmedAlerts = JSON.parse(localStorage.getItem('confirmedAlerts') || '{}');
@@ -377,94 +387,54 @@
 
         // Preload audio files properly
         async function preloadAudioFiles() {
-            console.log('[Mobile] 🔊 Iniciando precarga de audio...');
             const audioIds = ['alertSoundFire', 'alertSoundFlood', 'alertSoundEvacuation', 'alertSoundGeneral', 'alertSoundCancel'];
             
             for (const id of audioIds) {
                 const audio = document.getElementById(id);
                 if (!audio) {
-                    console.error(`[Mobile] ❌ No se encontró: ${id}`);
+                    console.error(`[Mobile] Audio element not found: ${id}`);
                     continue;
                 }
                 
                 try {
-                    // Wait for audio to load
                     await new Promise((resolve, reject) => {
                         const timeout = setTimeout(() => {
-                            console.warn(`[Mobile] ⚠️ Timeout cargando ${id}, readyState: ${audio.readyState}`);
-                            resolve(); // Continue anyway
+                            resolve(); // Continue on timeout
                         }, 5000);
                         
                         if (audio.readyState >= 2) {
                             clearTimeout(timeout);
                             resolve();
                         } else {
-                            audio.addEventListener('canplay', () => {
-                                clearTimeout(timeout);
-                                resolve();
-                            }, { once: true });
-                            
-                            audio.addEventListener('error', (e) => {
-                                clearTimeout(timeout);
-                                console.error(`[Mobile] ❌ Error cargando ${id}:`, e);
-                                reject(e);
-                            }, { once: true });
-                            
+                            audio.addEventListener('canplay', () => { clearTimeout(timeout); resolve(); }, { once: true });
+                            audio.addEventListener('error', (e) => { clearTimeout(timeout); reject(e); }, { once: true });
                             audio.load();
                         }
                     });
-                    
-                    console.log(`[Mobile] ✅ Audio listo: ${id}, readyState: ${audio.readyState}, src: ${audio.currentSrc}`);
                 } catch (error) {
-                    console.error(`[Mobile] ❌ Falló ${id}:`, error);
+                    console.error(`[Mobile] Audio load failed: ${id}`, error.message);
                 }
             }
-            
-            console.log('[Mobile] 🎵 Precarga de audio completada');
         }
 
         // Check notification permission on load
         window.addEventListener('load', async () => {
-            console.log('[Mobile] 🚀 ========== APP CARGADA ==========');
-            console.log('[Mobile] audioPermissionGranted:', localStorage.getItem('audioPermissionGranted'));
-            console.log('[Mobile] fcmToken:', localStorage.getItem('fcmToken') ? 'Presente' : 'No presente');
-            console.log('[Mobile] Notification.permission:', Notification.permission);
-            
-            // Preload audio files properly
             await preloadAudioFiles();
-            
             checkNotificationPermission();
             loadActiveAlerts();
             
-            // Register Service Worker PRIMERO antes de cualquier cosa
             if ('serviceWorker' in navigator) {
-                // Primero desregistrar SWs viejos/incorrectos
                 navigator.serviceWorker.getRegistrations().then(registrations => {
-                    console.log(`[Mobile] 🔍 Service Workers registrados: ${registrations.length}`);
-                    
-                    registrations.forEach((reg, index) => {
-                        console.log(`[Mobile] SW ${index + 1}: scope="${reg.scope}", active=${!!reg.active}`);
-                        
-                        // Desregistrar si NO es el correcto
-                        // El correcto debe tener 'firebase-messaging-sw.js' en el scope
+                    registrations.forEach((reg) => {
                         if (!reg.scope.includes('firebase-messaging-sw.js')) {
-                            console.log(`[Mobile] 🗑️ Desregistrando SW INCORRECTO: ${reg.scope}`);
-                            reg.unregister().then(() => {
-                                console.log(`[Mobile] ✅ SW desregistrado: ${reg.scope}`);
-                            });
-                        } else {
-                            console.log(`[Mobile] ✅ SW CORRECTO encontrado: ${reg.scope}`);
+                            reg.unregister();
                         }
                     });
                     
-                    // Esperar un poco y luego registrar el correcto
                     setTimeout(() => {
                         navigator.serviceWorker.register('/firebase-messaging-sw.js')
-                            .then(reg => {
-                                console.log('[Mobile] ✅ Service Worker CORRECTO registrado:', reg.scope);
-                            })
                             .catch(err => {
-                                console.error('[Mobile] ❌ Error registrando Service Worker:', err);
+                                console.error('[Mobile] SW registration error:', err);
                             });
                     }, 1000);
                 });
@@ -478,8 +448,7 @@
             
             // Notification status
             const notifIcon = document.getElementById('notificationStatusIcon');
-            const notifText = document.getElementById('notificationStatusText');
-            if (notificationGranted) {
+            const notifText = document.getElementById('notificationStatusText');            if (notificationGranted) {
                 notifIcon.textContent = '✅';
                 notifText.textContent = 'Notificaciones Activas';
                 notifText.style.color = '#059669';
@@ -501,8 +470,6 @@
                 soundText.textContent = 'Sonidos Inactivos';
                 soundText.style.color = '#DC2626';
             }
-            
-            console.log('[Mobile] Estado actualizado - Notif:', notificationGranted, 'Sound:', soundGranted);
         }
         
         // Check notification permission
@@ -659,7 +626,8 @@
                         notifications_enabled: true,
                         created_at: firebase.firestore.FieldValue.serverTimestamp(),
                         last_updated: firebase.firestore.FieldValue.serverTimestamp(),
-                        app_version: 'mobile-alerts-v1.0'
+                        app_version: 'mobile-alerts-v1.0',
+                        clientId: currentUserClientId
                     }, { merge: true });
                     
                     console.log('[Mobile] ✅ Token guardado en alert_subscribers');
@@ -1084,6 +1052,7 @@
                 console.log('[Mobile] 🔍 Cargando alertas activas...');
                 
                 const snapshot = await db.collection('emergency_alerts')
+                    .where('clientId', '==', currentUserClientId)
                     .where('status', '==', 'ACTIVE')
                     .orderBy('issued_at', 'desc')
                     .get();
@@ -1116,6 +1085,7 @@
                     console.log('[Mobile] 🔄 Reintentando sin orderBy...');
                     try {
                         const snapshot = await db.collection('emergency_alerts')
+                            .where('clientId', '==', currentUserClientId)
                             .where('status', '==', 'ACTIVE')
                             .get();
                         
@@ -1460,6 +1430,7 @@
 
         // Listen to real-time updates
         db.collection('emergency_alerts')
+            .where('clientId', '==', currentUserClientId)
             .where('status', '==', 'ACTIVE')
             .onSnapshot(snapshot => {
                 console.log('[Mobile] 🔄 ========== ACTUALIZACIÓN EN TIEMPO REAL ==========');

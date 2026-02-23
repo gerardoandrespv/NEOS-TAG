@@ -1,3 +1,4 @@
+// DEPRECATED – not used anymore. Root firestore.rules is source of truth.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
