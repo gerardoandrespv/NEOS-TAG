@@ -74,12 +74,24 @@
     }
   </style>
 
-  <!-- Firebase SDK 8 — Auth incluido solo porque firebase-config.js lo requiere;
-       NO se llama signInAnonymously, la regla Firestore permite request.auth == null -->
+  <!-- Firebase SDK 8 — SOLO App + Firestore. Sin firebase-auth.js ni firebase-config.js
+       para evitar que firebase.auth() dispare requests de autenticación.
+       La regla Firestore permite request.auth == null (broadcast público). -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-  <script src="/firebase-config.js"></script>
+  <script>
+    // Inicialización directa — no importar firebase-config.js (llama firebase.auth())
+    if (!firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey:            "AIzaSyBZ-XRSRgC2gz9E6zdYpes7yv5nLZtKmSw",
+        authDomain:        "neos-tech.firebaseapp.com",
+        projectId:         "neos-tech",
+        storageBucket:     "neos-tech.firebasestorage.app",
+        messagingSenderId: "738411977369",
+        appId:             "1:738411977369:web:7facc71cea4c271d217608"
+      });
+    }
+  </script>
 </head>
 <body>
 
