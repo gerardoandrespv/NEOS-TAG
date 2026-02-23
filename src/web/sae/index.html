@@ -305,12 +305,26 @@
       if (btnInstall) { btnInstall.textContent = 'Instalada ✓'; btnInstall.disabled = true; btnInstall.classList.add('secondary'); }
     }
 
-    // Detecta Chrome de Google en Android (excluye Firefox, Samsung, Opera, Edge)
+    // ─── Detección de browser compatible ────────────────────────────────────
+    // Chrome de Google en Android
     function _isAndroidChrome() {
       const ua = navigator.userAgent;
-      return /Android/i.test(ua)
-          && /Chrome\/\d/.test(ua)
+      return /Android/i.test(ua) && /Chrome\/\d/.test(ua)
           && !/Firefox|FxiOS|OPR\/|EdgA\/|SamsungBrowser/.test(ua);
+    }
+    // Safari en iPhone/iPad iOS 16.4+ (único browser en iOS con web push)
+    function _isIOSSafari() {
+      const ua = navigator.userAgent;
+      return /iPhone|iPad/i.test(ua) && /Safari\//.test(ua)
+          && !/CriOS|FxiOS|OPR\//.test(ua);
+    }
+    // Chrome en iOS — Apple bloquea Push API a terceros, solo Safari puede
+    function _isIOSChrome() {
+      return /CriOS/.test(navigator.userAgent);
+    }
+    // Plataformas admitidas para push
+    function _isSupportedBrowser() {
+      return _isAndroidChrome() || _isIOSSafari();
     }
 
     async function initSetup() {
@@ -328,13 +342,31 @@
 
       setupCard.style.display = 'block';
 
-      // Solo Chrome de Google en Android puede activar notificaciones
-      if (!_isAndroidChrome()) {
-        browserWarning.textContent = '⚠️ Las alertas solo funcionan en Chrome para Android. Abre esta app en Chrome en tu teléfono Android.';
+      // Chrome en iPhone — Apple bloquea push a terceros navegadores
+      if (_isIOSChrome()) {
+        browserWarning.textContent = '⚠️ Chrome en iPhone no puede recibir notificaciones de emergencia (limitación de Apple). Abre esta página en Safari para activarlas.';
         browserWarning.style.display = 'block';
         if (btnInstall) btnInstall.style.display = 'none';
         if (btnPush)    btnPush.style.display    = 'none';
         return;
+      }
+
+      // Browser no compatible (Firefox, PC, etc.)
+      if (!_isSupportedBrowser()) {
+        browserWarning.textContent = '⚠️ Las alertas push solo funcionan en Chrome para Android o Safari para iPhone (iOS 16.4+).';
+        browserWarning.style.display = 'block';
+        if (btnInstall) btnInstall.style.display = 'none';
+        if (btnPush)    btnPush.style.display    = 'none';
+        return;
+      }
+
+      // iOS Safari: la instalación es manual con Share → Añadir a inicio
+      if (_isIOSSafari() && !(navigator.standalone)) {
+        if (btnInstall) {
+          btnInstall.textContent = 'Toca Compartir → "Añadir a inicio"';
+          btnInstall.disabled = true;
+          btnInstall.classList.add('secondary');
+        }
       }
 
       // Marcar paso de notificaciones si ya están activadas
@@ -345,19 +377,22 @@
     }
 
     async function instalarApp() {
-      if (!_deferredInstall) return;
-      btnInstall.disabled = true;
-      btnInstall.textContent = 'Instalando...';
-      _deferredInstall.prompt();
-      const { outcome } = await _deferredInstall.userChoice;
-      if (outcome === 'accepted') {
-        numInstall.textContent = '✓'; numInstall.classList.add('done');
-        btnInstall.textContent = 'Instalada ✓'; btnInstall.classList.add('secondary');
-      } else {
-        btnInstall.disabled = false;
-        btnInstall.textContent = 'Instalar App';
+      // Android Chrome — usa el evento nativo beforeinstallprompt
+      if (_deferredInstall) {
+        btnInstall.disabled = true;
+        btnInstall.textContent = 'Instalando...';
+        _deferredInstall.prompt();
+        const { outcome } = await _deferredInstall.userChoice;
+        if (outcome === 'accepted') {
+          numInstall.textContent = '✓'; numInstall.classList.add('done');
+          btnInstall.textContent = 'Instalada ✓'; btnInstall.classList.add('secondary');
+        } else {
+          btnInstall.disabled = false;
+          btnInstall.textContent = 'Instalar App';
+        }
+        _deferredInstall = null;
       }
-      _deferredInstall = null;
+      // iOS Safari — botón deshabilitado con instrucción (no hay API de instalación)
     }
 
     async function activarPush() {
@@ -365,12 +400,16 @@
       btn.disabled = true;
       btn.textContent = 'Activando...';
 
-      // Bloqueo duro: solo Chrome de Google en Android
-      if (!_isAndroidChrome()) {
+      // Bloqueo duro: solo plataformas compatibles (Android Chrome + iOS Safari)
+      if (!_isSupportedBrowser()) {
         btn.disabled = false;
-        btn.textContent = 'Requiere Chrome en Android';
+        btn.textContent = _isIOSChrome()
+          ? 'Abre en Safari (iPhone)'
+          : 'Requiere Chrome Android / Safari iPhone';
         if (browserWarning) {
-          browserWarning.textContent = '⚠️ Las alertas solo funcionan en Chrome para Android. Abre esta app en Chrome en tu teléfono Android.';
+          browserWarning.textContent = _isIOSChrome()
+            ? '⚠️ Chrome en iPhone no puede recibir notificaciones (limitación de Apple). Abre en Safari.'
+            : '⚠️ Las alertas push solo funcionan en Chrome para Android o Safari para iPhone (iOS 16.4+).';
           browserWarning.style.display = 'block';
         }
         return;
