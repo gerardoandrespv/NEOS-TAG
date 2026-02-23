@@ -51,7 +51,7 @@ self.addEventListener('notificationclick', function(e) {
 });
 
 // ─── Caché offline ──────────────────────────────────────────────────────────
-const CACHE    = 'neostech-sae-v4';
+const CACHE    = 'neostech-sae-v5';
 const PRECACHE = ['/sae/', '/sae/index.html', '/assets/images/neostechb.png'];
 
 self.addEventListener('install', e => {
@@ -68,12 +68,10 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Network-first: intenta red, cae a caché si sin conexión
-// Solo interceptar requests del mismo origen — NO pasar por el SW las llamadas
-// a Firebase/Firestore/FCM (cross-origin), que usan streaming XHR y fallan si
-// el SW intenta re-fetchearlas.
+// Network-first para navegaciones HTML solamente.
+// mode === 'navigate' filtra requests XHR/fetch de JS (Firestore, FCM, etc.)
+// que NUNCA deben pasar por el SW — causan NS_BINDING_ABORTED en streaming.
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  if (!e.request.url.startsWith(self.location.origin)) return;
+  if (e.request.mode !== 'navigate') return;
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
