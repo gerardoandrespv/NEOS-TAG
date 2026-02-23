@@ -1568,7 +1568,10 @@ function _initInstallQr() {
   const installBtn = document.getElementById('btnInstallPwa');
   if (!container) return;
 
-  const url = window.location.origin + window.location.pathname;
+  // QR apunta al SAE público — los residentes NO necesitan autenticarse
+  const clientId = window.currentUserClientId || '';
+  const url = window.location.origin + '/sae' +
+              (clientId ? '?c=' + encodeURIComponent(clientId) : '');
   if (urlLabel) urlLabel.textContent = url;
 
   // Genera el QR cuando qrcodejs esté disponible (cargado con defer)
@@ -2197,7 +2200,10 @@ function init() {
       _setIndicator('indicatorDB', 'loading');
     },
     () => {
-      _showAuth();
+      // Guard: /sae es ruta pública — no redirigir a login desde esa ruta
+      if (!location.pathname.startsWith('/sae')) {
+        _showAuth();
+      }
     }
   );
 }
