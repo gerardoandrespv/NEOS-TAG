@@ -1,6 +1,6 @@
 {
   "production_since": "2026-01-20",
-  "firebase_project": "neos-tech",
+  "firebase_project": "neostech",
   "environment": "production",
   "cloud_function": "https://us-central1-neos-tech.cloudfunctions.net/rfid-gateway",
   "gateway_port": 60000,

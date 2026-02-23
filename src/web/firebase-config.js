@@ -1,5 +1,7 @@
-// Firebase configuration for Neos Tech RFID System
-// Project: neos-tech
+// Firebase configuration — proyecto: neostech (GCP project ID: neos-tech)
+// ⚠️  Los valores de authDomain, storageBucket y projectId son generados por Firebase
+//     y no pueden cambiarse sin migrar al proyecto neostech.
+//     Para migrar: crear proyecto GCP "neostech", exportar Firestore, actualizar estos valores.
 const firebaseConfig = {
     apiKey: "AIzaSyBZ-XRSRgC2gz9E6zdYpes7yv5nLZtKmSw",
     authDomain: "neos-tech.firebaseapp.com",
