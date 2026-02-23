@@ -1568,15 +1568,15 @@ function _initInstallQr() {
   const installBtn = document.getElementById('btnInstallPwa');
   if (!container) return;
 
-  // QR apunta al SAE público — los residentes NO necesitan autenticarse
-  const clientId = window.currentUserClientId || '';
-  const url = window.location.origin + '/sae' +
-              (clientId ? '?c=' + encodeURIComponent(clientId) : '');
-  if (urlLabel) urlLabel.textContent = url;
-
-  // Genera el QR cuando qrcodejs esté disponible (cargado con defer)
+  // QR apunta al SAE público — los residentes NO necesitan autenticarse.
+  // currentUserClientId puede ser null al momento del init (auth aún no completó),
+  // por eso se lee dentro de generate() con retry hasta que esté disponible.
   const generate = () => {
     if (typeof QRCode === 'undefined') { setTimeout(generate, 300); return; }
+    const clientId = window.currentUserClientId || '';
+    if (!clientId) { setTimeout(generate, 400); return; } // esperar auth
+    const url = window.location.origin + '/sae?c=' + encodeURIComponent(clientId);
+    if (urlLabel) urlLabel.textContent = url;
     container.innerHTML = '';
     new QRCode(container, {
       text:         url,
