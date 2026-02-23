@@ -7,7 +7,13 @@ import functions_framework
 from flask import jsonify
 from firebase_admin import firestore as fs_admin
 
-db = fs_admin.client()
+# Lazy init — no llamar fs_admin.client() a nivel de módulo (falla en análisis local)
+_db = None
+def _get_db():
+    global _db
+    if _db is None:
+        _db = fs_admin.client()
+    return _db
 
 # TODO: Firestore trigger requiere Python <3.14
 # from alert_trigger import on_alert_created
@@ -315,7 +321,7 @@ def subscribeToTopic(request: https_fn.Request) -> https_fn.Response:
         client_id   = request_json.get('clientId', '')
         device_type = request_json.get('device_type', 'web')
         try:
-            db.collection('alert_subscribers').document(token[:128]).set({
+            _get_db().collection('alert_subscribers').document(token[:128]).set({
                 'fcm_token':             token,
                 'notifications_enabled': True,
                 'clientId':              client_id,
