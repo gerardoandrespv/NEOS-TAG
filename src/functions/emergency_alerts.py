@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import os
 from typing import Dict, List, Any
 import logging
+from push_notifications import send_alert_to_all_devices
 
 # Inicializar Firebase Admin
 initialize_app()
@@ -113,8 +114,19 @@ def emit_alert(request):
         alert_id = alert_ref.id
         
         logger.info(f"Alerta creada: {alert_id} - Tipo: {alert_data['type']}")
-        
-        # Push enviado por alert_trigger.py (on_document_created) — no duplicar aquí.
+
+        # Enviar push a todos los suscriptores (topic all-users)
+        if alert_data['send_push']:
+            try:
+                push_result = send_alert_to_all_devices(
+                    alert_type=alert_data['type'],
+                    title=alert_data['title'],
+                    body=alert_data['message'],
+                    severity=alert_data['severity'],
+                )
+                logger.info(f"Push enviado: {push_result}")
+            except Exception as push_err:
+                logger.error(f"Error enviando push: {push_err}")
 
         # Obtener destinatarios (todos los usuarios activos)
         recipients = get_recipients(request_json.get('affected_floors'))
@@ -132,8 +144,6 @@ def emit_alert(request):
         
         for recipient in recipients:
             recipient_id = save_recipient(alert_id, recipient, alert_data)
-            
-            # Push manejado por alert_trigger.py (on_document_created) — no duplicar aquí.
 
             # Enviar SMS
             if alert_data['send_sms'] and recipient.get('phone'):
