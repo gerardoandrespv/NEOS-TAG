@@ -67,17 +67,39 @@
       text-align: center; font-size: 13px; color: #fbbf24;
     }
 
-    #push-prompt {
-      display: none; border-radius: 14px; padding: 16px 18px;
-      background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.4);
-      text-align: center;
+    /* Tarjeta de configuración inicial (instalación + notificaciones) */
+    #setup-card {
+      display: none; border-radius: 14px; padding: 18px;
+      background: rgba(15,23,42,0.8); border: 1px solid rgba(99,102,241,0.4);
     }
-    #push-prompt p { font-size: 13px; color: #c7d2fe; margin-bottom: 10px; line-height: 1.4; }
-    #btn-push {
-      background: #6366f1; color: #fff; border: none; border-radius: 8px;
-      padding: 9px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+    #setup-card h4 { font-size: 14px; font-weight: 700; color: #e2e8f0; margin-bottom: 12px; }
+    .setup-step {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px; border-radius: 10px; margin-bottom: 8px;
+      background: rgba(255,255,255,0.04);
     }
-    #btn-push:active { opacity: 0.8; }
+    .setup-step-num {
+      width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+      background: #6366f1; color: #fff; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .setup-step-num.done { background: #16a34a; }
+    .setup-step-body { flex: 1; }
+    .setup-step-body p { font-size: 12px; color: #94a3b8; margin-top: 2px; line-height: 1.4; }
+    .setup-step-body strong { font-size: 13px; color: #e2e8f0; }
+    .btn-setup {
+      margin-top: 8px; background: #6366f1; color: #fff; border: none;
+      border-radius: 8px; padding: 8px 16px; font-size: 12px; font-weight: 600;
+      cursor: pointer; width: 100%;
+    }
+    .btn-setup:disabled { opacity: 0.5; cursor: default; }
+    .btn-setup.secondary { background: rgba(99,102,241,0.2); color: #a5b4fc; }
+    .browser-warning {
+      font-size: 11px; color: #f59e0b; background: rgba(245,158,11,0.1);
+      border-radius: 8px; padding: 8px 10px; margin-top: 10px; line-height: 1.5;
+    }
+
+    #push-prompt { display: none; } /* reemplazado por #setup-card */
 
     #footer {
       padding: 12px 16px; text-align: center;
@@ -121,11 +143,36 @@
     </div>
 
     <div id="alerts-list"></div>
-    <div id="push-prompt">
-      <p>🔔 Activa las notificaciones para recibir alertas aunque la app esté cerrada</p>
-      <button id="btn-push" onclick="activarPush()">Activar notificaciones</button>
+
+    <!-- Tarjeta de configuración: instalar como app + activar notificaciones -->
+    <div id="setup-card">
+      <h4>📲 Configura tu app de alertas</h4>
+
+      <div class="setup-step" id="step-install">
+        <div class="setup-step-num" id="num-install">1</div>
+        <div class="setup-step-body">
+          <strong>Instalar en pantalla de inicio</strong>
+          <p>Agrega esta app para recibirla como aplicación independiente</p>
+          <button class="btn-setup" id="btn-install" onclick="instalarApp()">Instalar App</button>
+        </div>
+      </div>
+
+      <div class="setup-step" id="step-push">
+        <div class="setup-step-num" id="num-push">2</div>
+        <div class="setup-step-body">
+          <strong>Activar notificaciones</strong>
+          <p>Recibe alertas aunque la app esté en segundo plano</p>
+          <button class="btn-setup" id="btn-push" onclick="activarPush()">Activar notificaciones</button>
+        </div>
+      </div>
+
+      <div class="browser-warning" id="browser-warning" style="display:none">
+        ⚠️ Abre este enlace en <strong>Chrome</strong> (Android) o <strong>Safari</strong> (iPhone iOS 16.4+) para instalar la app y recibir notificaciones.
+      </div>
     </div>
+
     <div id="err-card">No se pudo conectar al sistema SAE.<br>Verifica tu conexión o escanea el QR nuevamente.</div>
+    <div id="push-prompt" style="display:none"></div>
   </div>
 
   <div id="footer">neostech · Sistema de Alertas de Emergencia</div>
@@ -234,18 +281,74 @@
         );
     }
 
-    // ─── Push Notifications ──────────────────────────────────────────────────
-    let _swReg = null;
+    // ─── Push Notifications + App Install ───────────────────────────────────
+    let _swReg           = null;
+    let _deferredInstall = null;
 
-    async function initPush() {
-      if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
-      if (Notification.permission === 'granted' && localStorage.getItem('sae_push_ok')) {
-        pushPrompt.style.display = 'none';
+    const setupCard      = document.getElementById('setup-card');
+    const btnInstall     = document.getElementById('btn-install');
+    const numInstall     = document.getElementById('num-install');
+    const btnPush        = document.getElementById('btn-push');
+    const numPush        = document.getElementById('num-push');
+    const browserWarning = document.getElementById('browser-warning');
+
+    // Capturar evento de instalación PWA (Chrome/Edge/Android)
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      _deferredInstall = e;
+      if (btnInstall) btnInstall.disabled = false;
+    });
+
+    // Si ya está instalada como PWA (standalone), marcar paso 1 como completo
+    if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) {
+      if (numInstall) { numInstall.textContent = '✓'; numInstall.classList.add('done'); }
+      if (btnInstall) { btnInstall.textContent = 'Instalada ✓'; btnInstall.disabled = true; btnInstall.classList.add('secondary'); }
+    }
+
+    async function initSetup() {
+      if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+        // Browser no soporta push — mostrar advertencia
+        setupCard.style.display = 'block';
+        browserWarning.style.display = 'block';
+        if (btnInstall) btnInstall.style.display = 'none';
+        if (btnPush)    btnPush.style.display    = 'none';
         return;
       }
-      if (Notification.permission !== 'denied') {
-        pushPrompt.style.display = 'block';
+
+      const allDone = Notification.permission === 'granted' && localStorage.getItem('sae_push_ok')
+                   && (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone);
+      if (allDone) return; // todo configurado, no mostrar tarjeta
+
+      setupCard.style.display = 'block';
+
+      // Si no es Chrome/Edge/Samsung (no soporta beforeinstallprompt), mostrar aviso
+      const isChromish = /Chrome|Chromium|CriOS|EdgA|SamsungBrowser/i.test(navigator.userAgent);
+      if (!isChromish) {
+        browserWarning.style.display = 'block';
+        if (btnInstall) btnInstall.style.display = 'none';
       }
+
+      // Marcar paso de notificaciones si ya están activadas
+      if (Notification.permission === 'granted' && localStorage.getItem('sae_push_ok')) {
+        if (numPush)  { numPush.textContent = '✓'; numPush.classList.add('done'); }
+        if (btnPush)  { btnPush.textContent = 'Notificaciones activas ✓'; btnPush.disabled = true; btnPush.classList.add('secondary'); }
+      }
+    }
+
+    async function instalarApp() {
+      if (!_deferredInstall) return;
+      btnInstall.disabled = true;
+      btnInstall.textContent = 'Instalando...';
+      _deferredInstall.prompt();
+      const { outcome } = await _deferredInstall.userChoice;
+      if (outcome === 'accepted') {
+        numInstall.textContent = '✓'; numInstall.classList.add('done');
+        btnInstall.textContent = 'Instalada ✓'; btnInstall.classList.add('secondary');
+      } else {
+        btnInstall.disabled = false;
+        btnInstall.textContent = 'Instalar App';
+      }
+      _deferredInstall = null;
     }
 
     async function activarPush() {
@@ -278,7 +381,8 @@
         });
 
         localStorage.setItem('sae_push_ok', '1');
-        pushPrompt.style.display = 'none';
+        numPush.textContent = '✓'; numPush.classList.add('done');
+        btn.textContent = 'Notificaciones activas ✓'; btn.classList.add('secondary');
         console.log('[SAE] Push activado');
       } catch (err) {
         console.error('[SAE] Error activando push:', err);
@@ -290,11 +394,13 @@
     // ─── Sin autenticación: regla Firestore permite request.auth == null ─────
     subscribeAlerts();
 
-    // ─── Service Worker + push init ──────────────────────────────────────────
+    // ─── Service Worker + setup init ─────────────────────────────────────────
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sae/sw.js', { scope: '/sae/' })
-        .then(() => initPush())
-        .catch(() => {});
+        .then(() => initSetup())
+        .catch(() => initSetup());
+    } else {
+      initSetup();
     }
   </script>
 </body>
