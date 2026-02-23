@@ -42,7 +42,7 @@ def check_tag_access(request):
             return jsonify({'error': 'Se requiere tag_id'}), 400, headers
         
         # 4. Conectar a Firestore
-        db = firestore.Client(project='neos-tech')
+        db = firestore.Client()  # project inferido de GOOGLE_CLOUD_PROJECT en runtime GCP
         
         # 5. Buscar tag en la colección del cliente
         client_ref = db.collection('clients').document(client_id)

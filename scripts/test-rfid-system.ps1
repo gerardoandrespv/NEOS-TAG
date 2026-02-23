@@ -12,7 +12,7 @@ Write-Host ""
 $dashboardUrl = "http://localhost:5000"
 $gatewayPort = 60000
 $gatewayHealthUrl = "http://localhost:$gatewayPort/health"
-$firebaseProject = "neos-tech"
+$firebaseProject = "neostech"
 
 # ============================================
 # 1. VERIFICAR SERVIDOR WEB (Dashboard)

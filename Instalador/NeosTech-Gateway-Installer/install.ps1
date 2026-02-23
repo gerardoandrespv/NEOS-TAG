@@ -259,7 +259,7 @@ Write-Host "   Puerto: 60000" -ForegroundColor Gray
 Write-Host ""
 Write-Host "FIREBASE:" -ForegroundColor Cyan
 Write-Host "   Edita: $InstallPath\gateway.config.json" -ForegroundColor White
-Write-Host "   Proyecto: neos-tech" -ForegroundColor Gray
+Write-Host "   Proyecto: neostech" -ForegroundColor Gray
 Write-Host ""
 Write-Host "CLOUDFLARE TUNNEL (si aplica):" -ForegroundColor Cyan
 Write-Host "   cd $InstallPath" -ForegroundColor White

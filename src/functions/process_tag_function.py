@@ -43,7 +43,7 @@ def process_tag(request):
             return jsonify({'error': 'Se requiere tag_id o id'}), 400, headers
         
         # 4. Conectar a Firestore
-        db = firestore.Client(project='neos-tech')
+        db = firestore.Client()  # project inferido de GOOGLE_CLOUD_PROJECT en runtime GCP
         
         # 5. Guardar en estructura legacy (retrocompatibilidad)
         legacy_ref = db.collection('rfid_tags').document()

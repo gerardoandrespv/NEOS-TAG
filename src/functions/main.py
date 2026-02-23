@@ -107,7 +107,7 @@ def sendEmergencyPush(request: https_fn.Request) -> https_fn.Response:
             return jsonify({'error': 'Se requiere tag_id'}), 400, headers
         
         # 4. Conectar a Firestore
-        db = firestore.Client(project='neos-tech')
+        db = firestore.Client()  # project inferido de GOOGLE_CLOUD_PROJECT en runtime GCP
         
         # 5. Buscar tag en la colección del cliente
         client_ref = db.collection('clients').document(client_id)
@@ -208,7 +208,7 @@ def process_tag(request):
             return jsonify({'error': 'Se requiere tag_id'}), 400, headers
         
         # 4. Conectar a Firestore
-        db = firestore.Client(project='neos-tech')
+        db = firestore.Client()  # project inferido de GOOGLE_CLOUD_PROJECT en runtime GCP
         
         # 5. PARA RETROCOMPATIBILIDAD: Guardar en estructura antigua
         #    Esto asegura que el dashboard actual siga funcionando
