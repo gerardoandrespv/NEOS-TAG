@@ -51,7 +51,7 @@ self.addEventListener('notificationclick', function(e) {
 });
 
 // ─── Caché offline ──────────────────────────────────────────────────────────
-const CACHE    = 'neostech-sae-v3';
+const CACHE    = 'neostech-sae-v4';
 const PRECACHE = ['/sae/', '/sae/index.html', '/assets/images/neostechb.png'];
 
 self.addEventListener('install', e => {
@@ -69,7 +69,11 @@ self.addEventListener('activate', e => {
 });
 
 // Network-first: intenta red, cae a caché si sin conexión
+// Solo interceptar requests del mismo origen — NO pasar por el SW las llamadas
+// a Firebase/Firestore/FCM (cross-origin), que usan streaming XHR y fallan si
+// el SW intenta re-fetchearlas.
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  if (!e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
