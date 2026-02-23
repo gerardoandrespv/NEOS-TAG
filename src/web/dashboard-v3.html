@@ -4,9 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="NeosTech RFID System Pro – Panel de control de accesos" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>NeosTech Pro</title>
   <link rel="icon" type="image/png" href="assets/images/neostechb.png" />
+  <link rel="apple-touch-icon" href="assets/images/neostechb.png" />
+  <link rel="manifest" href="manifest-dashboard.json" />
   <link rel="stylesheet" href="css/dashboard-v3.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 </head>
 
 <body>
@@ -814,6 +820,28 @@
               <p class="config-status" id="pushStatusText">–</p>
               <button class="btn btn--primary btn--sm" id="btnActivatePush" type="button">
                 Activar notificaciones
+              </button>
+            </div>
+          </div>
+
+          <!-- Instalar App (PWA) -->
+          <div class="panel">
+            <div class="panel-header">
+              <h3 class="panel-title">Instalar App</h3>
+            </div>
+            <div class="panel-body">
+              <p class="config-desc">Escanea para abrir el dashboard en tu celular o instálalo como app.</p>
+              <div id="installQrCode" style="
+                display:flex; justify-content:center; padding: 12px 0;
+                background: #fff; border-radius: var(--radius-md);
+                margin-bottom: 10px; min-height: 144px; align-items:center;
+              "></div>
+              <p class="config-status" id="installQrUrl" style="
+                font-family: var(--font-mono); font-size: var(--text-xs);
+                color: var(--color-text-3); text-align:center; word-break:break-all;
+              ">–</p>
+              <button class="btn btn--primary btn--sm" id="btnInstallPwa" type="button" hidden>
+                Instalar en este dispositivo
               </button>
             </div>
           </div>

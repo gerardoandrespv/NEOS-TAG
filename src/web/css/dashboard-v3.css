@@ -22,7 +22,40 @@
 
 
 /* ============================================================
-   0. PROPIEDADES PERSONALIZADAS
+   0. PROPIEDADES PERSONALIZADAS (DESIGN TOKENS)
+   ----------------------------------------------------------------
+   REGLA OBLIGATORIA — cómo usar tokens en nuevos componentes:
+
+   COLOR
+     Fondo de página        → background: var(--color-bg)
+     Tarjeta / panel        → background: var(--color-surface)
+     Sub-panel dentro       → background: var(--color-surface-2)
+     Borde sutil            → border: 1px solid var(--color-border)
+     Borde enfatizado       → border: 1px solid var(--color-border-strong)
+     Acción principal       → background: var(--color-primary)
+     Éxito / Permitido      → color: var(--color-success)
+     Advertencia            → color: var(--color-warning)
+     Error / Denegado       → color: var(--color-error)
+     Fondo semitransparente → var(--color-{semantic}-dim)
+
+   TEXTO
+     Títulos / labels       → color: var(--color-text-1)
+     Texto secundario       → color: var(--color-text-2)
+     Placeholders / muted   → color: var(--color-text-3)
+     Código / IDs / tags    → font-family: var(--font-mono)
+
+   ESPACIADO & FORMA
+     Borde redondeado sm    → border-radius: var(--radius-sm)   (badges)
+     Borde redondeado md    → border-radius: var(--radius-md)   (panels, inputs)
+     Borde redondeado lg    → border-radius: var(--radius-lg)   (modales)
+     Sombra dentro de panel → box-shadow: var(--shadow-sm)
+     Sombra modal / overlay → box-shadow: var(--shadow-lg)
+     Transición estándar    → transition: var(--transition)
+
+   PROHIBIDO
+     ✗ Hardcodear colores hex o rgba directamente en componentes.
+     ✗ Crear nuevas variables fuera de :root sin agregarlas aquí.
+     ✗ Usar font-size en px; usar --text-{xs|sm|base|lg|xl|2xl}.
 ============================================================ */
 :root {
   /* Paleta de color */

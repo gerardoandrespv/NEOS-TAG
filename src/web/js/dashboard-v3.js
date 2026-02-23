@@ -43,6 +43,9 @@ const STATE = {
   livePaused:  false,
   liveUnsub:   null,
 
+  // Alertas en vivo
+  alertsUnsub: null,
+
   // Datos de vistas
   logs:           [],
   users:          [],
@@ -489,8 +492,10 @@ function _showAuth() {
 function _cleanupListeners() {
   STATE._unsubs.forEach(fn => { try { fn(); } catch (_) {} });
   STATE._unsubs = [];
-  if (STATE.liveUnsub) { try { STATE.liveUnsub(); } catch (_) {} }
+  if (STATE.liveUnsub)   { try { STATE.liveUnsub();   } catch (_) {} }
   STATE.liveUnsub = null;
+  if (STATE.alertsUnsub) { try { STATE.alertsUnsub(); } catch (_) {} }
+  STATE.alertsUnsub = null;
 }
 
 function _initAuth() {
@@ -550,7 +555,7 @@ function _loadViewData(view) {
     case 'resumen':      _loadResumen();      break;
     case 'tags':         _startLiveTags();    break;
     case 'bitacora':     _loadBitacora();     break;
-    case 'alertas':      _loadAlertas();      break;
+    case 'alertas':      _startAlertas();     break;
     case 'usuarios':     _loadUsuarios();     break;
     case 'dispositivos': _loadDispositivos(); break;
     case 'listas':       _loadListas();       break;
@@ -870,6 +875,15 @@ function _initBitacora() {
 /* ============================================================
    VIEW: ALERTAS
 ============================================================ */
+
+// Sonido de alerta según severidad (usa los .wav del SW)
+function _playAlertSound(severity) {
+  const src = severity === 'low' ? null : '/sounds/emergency_alarm_general.wav';
+  if (!src) return;
+  try { new Audio(src).play().catch(() => {}); } catch (_) {}
+}
+
+// Botón "Actualizar" → recarga manual una vez
 async function _loadAlertas() {
   _log('loadAlertas');
   const activeList = document.getElementById('alertasActiveList');
@@ -885,6 +899,55 @@ async function _loadAlertas() {
     _warn('loadAlertas error:', err);
     _toast('Error al cargar alertas.', 'danger');
   }
+}
+
+// Suscripción en tiempo real — se llama al entrar a la vista
+function _startAlertas() {
+  if (STATE.alertsUnsub) return; // ya activa
+  _log('startAlertas');
+
+  if (typeof db !== 'undefined') {
+    try {
+      const clientId = STATE.clientId;
+      const today    = _todayStart();
+      let   firstSnap = true;
+
+      // Alertas activas (onSnapshot, ordenadas desc)
+      const unsubActive = db.collection('alerts')
+        .where('clientId', '==', clientId)
+        .where('resolved', '==', false)
+        .orderBy('createdAt', 'desc').limit(50)
+        .onSnapshot({ includeMetadataChanges: false }, snap => {
+          STATE.alerts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          _renderAlertas(STATE.alerts, STATE.alertsResolved);
+          _updateAlertBadge(STATE.alerts.length);
+          // Tocar sonido solo en alertas nuevas (no en la carga inicial)
+          if (!firstSnap) {
+            snap.docChanges().forEach(c => {
+              if (c.type === 'added') _playAlertSound(c.doc.data().severity ?? 'medium');
+            });
+          }
+          firstSnap = false;
+        }, err => _warn('alerts onSnapshot error:', err));
+
+      // Alertas resueltas hoy
+      const unsubResolved = db.collection('alerts')
+        .where('clientId', '==', clientId)
+        .where('resolved', '==', true)
+        .where('resolvedAt', '>=', firebase.firestore.Timestamp.fromDate(today))
+        .limit(20)
+        .onSnapshot({ includeMetadataChanges: false }, snap => {
+          STATE.alertsResolved = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          _renderAlertas(STATE.alerts, STATE.alertsResolved);
+        }, err => _warn('alerts resolved onSnapshot error:', err));
+
+      STATE.alertsUnsub = () => { unsubActive(); unsubResolved(); };
+      return;
+    } catch (e) { _warn('startAlertas error:', e); }
+  }
+
+  // Sin Firebase: carga demo
+  _loadAlertas();
 }
 
 function _renderAlertas(active = [], resolved = []) {
@@ -956,7 +1019,7 @@ async function _acknowledgeAlert(id) {
       });
     }
     _toast('Alerta reconocida.', 'success');
-    _loadAlertas();
+    // onSnapshot actualiza la vista automáticamente
   } catch (e) { _warn('acknowledgeAlert error:', e); }
 }
 
@@ -971,7 +1034,7 @@ async function _resolveAlert(id) {
         });
       }
       _toast('Alerta resuelta.', 'success');
-      _loadAlertas();
+      // onSnapshot actualiza la vista automáticamente
     } catch (e) { _warn('resolveAlert error:', e); }
   });
 }
@@ -1008,8 +1071,8 @@ function _initAlertas() {
       await FirebaseStubs.createAlert({ severity, title, description, zone,
         clientId: STATE.clientId, createdBy: STATE.user?.uid ?? null });
       _closeModal('modalNuevaAlerta');
-      _toast('Alerta creada correctamente.', 'success');
-      _loadAlertas();
+      _toast('Alerta creada y notificación enviada.', 'success');
+      // onSnapshot actualiza la vista automáticamente
     } catch (err) {
       _toast('Error al crear la alerta.', 'danger');
     } finally {
@@ -1459,6 +1522,47 @@ function _initConfigView() {
   } catch (_) {}
 }
 
+/* Genera el QR de instalación PWA en la vista Config */
+function _initInstallQr() {
+  const container  = document.getElementById('installQrCode');
+  const urlLabel   = document.getElementById('installQrUrl');
+  const installBtn = document.getElementById('btnInstallPwa');
+  if (!container) return;
+
+  const url = window.location.origin + window.location.pathname;
+  if (urlLabel) urlLabel.textContent = url;
+
+  // Genera el QR cuando qrcodejs esté disponible (cargado con defer)
+  const generate = () => {
+    if (typeof QRCode === 'undefined') { setTimeout(generate, 300); return; }
+    container.innerHTML = '';
+    new QRCode(container, {
+      text:         url,
+      width:        120,
+      height:       120,
+      colorDark:    '#0f172a',
+      colorLight:   '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  };
+  generate();
+
+  // Botón "Instalar en este dispositivo" (solo aparece si el browser lo soporta)
+  let _deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstall = e;
+    if (installBtn) installBtn.hidden = false;
+  });
+  installBtn?.addEventListener('click', async () => {
+    if (!_deferredInstall) return;
+    _deferredInstall.prompt();
+    const { outcome } = await _deferredInstall.userChoice;
+    if (outcome === 'accepted') { installBtn.hidden = true; _toast('App instalada.', 'success'); }
+    _deferredInstall = null;
+  });
+}
+
 function _initConfig() {
   document.getElementById('btnSaveReader')?.addEventListener('click', () => {
     const ip   = (document.getElementById('readerIp')?.value ?? '').trim();
@@ -1845,10 +1949,25 @@ const FirebaseStubs = {
 
   async createAlert(data) {
     if (typeof db !== 'undefined') {
-      return db.collection('alerts').add({
+      const docRef = await db.collection('alerts').add({
         ...data, resolved: false, acknowledged: false,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
+      // Enviar push notification a todos los dispositivos suscritos
+      try {
+        await fetch('https://sendemergencypush-6psjv5t2ka-uc.a.run.app', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type:     data.alertType || 'GENERAL',
+            message:  data.description || data.title,
+            severity: data.severity,
+            alert_id: docRef.id,
+            title:    data.title,
+          }),
+        });
+      } catch (e) { _warn('push notification error:', e); }
+      return docRef;
     }
     _log('[stub] createAlert', data); await _delay(300);
   },
@@ -2025,6 +2144,7 @@ function init() {
   _initDispositivos();
   _initListas();
   _initConfig();
+  _initInstallQr();
 
   document.getElementById('btnRefreshResumen')?.addEventListener('click', _loadResumen);
 
@@ -2046,4 +2166,13 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
+}
+
+// Registro del Service Worker para PWA + push notifications
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/firebase-messaging-sw.js')
+      .then(reg => _log('SW registrado:', reg.scope))
+      .catch(err => _warn('SW no registrado:', err));
+  });
 }
