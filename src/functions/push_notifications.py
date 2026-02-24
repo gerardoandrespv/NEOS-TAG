@@ -96,7 +96,6 @@ def send_alert_to_all_devices(alert_type: str, title: str, body: str, severity: 
                 android=messaging.AndroidConfig(
                     priority='high',
                     notification=messaging.AndroidNotification(
-                        channel_id='sae_alerts',
                         color='#DC2626',
                     )
                 ),
