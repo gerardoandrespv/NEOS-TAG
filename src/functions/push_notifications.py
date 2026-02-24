@@ -89,6 +89,17 @@ def send_alert_to_all_devices(alert_type: str, title: str, body: str, severity: 
         for i in range(0, len(tokens), 500):
             batch = tokens[i:i + 500]
             message = messaging.MulticastMessage(
+                notification=messaging.Notification(  # nativo Android + iOS
+                    title=title,
+                    body=body,
+                ),
+                android=messaging.AndroidConfig(
+                    priority='high',
+                    notification=messaging.AndroidNotification(
+                        channel_id='sae_alerts',
+                        color='#DC2626',
+                    )
+                ),
                 webpush=messaging.WebpushConfig(
                     headers={'Urgency': 'high'},
                     notification=messaging.WebpushNotification(
