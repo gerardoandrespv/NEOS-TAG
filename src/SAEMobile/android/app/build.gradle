@@ -3,106 +3,48 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
-// Lee de ~/.gradle/gradle.properties primero, luego de variables de entorno.
-// Si falta una propiedad en release, falla con mensaje claro (no NPE silencioso).
+// Accede a ~/.gradle/gradle.properties primero, luego a variables de entorno.
 def getProp(String name) {
     return project.findProperty(name) ?: System.getenv(name)
 }
+
+// Lanza IllegalStateException con mensaje claro si falta la propiedad.
+// Usado en gradle.taskGraph.whenReady (no en fase de configuracion).
 def requireProp(String name) {
     def val = getProp(name)
     if (val == null || val.toString().trim().isEmpty()) {
         throw new IllegalStateException(
-            "[SAEMobile] Propiedad de firma ausente: '${name}'.\n" +
-            "Agrega en ~/.gradle/gradle.properties o como variable de entorno."
+            "[SAEMobile] Propiedad de firma requerida ausente: '${name}'.\n" +
+            "Define en ~/.gradle/gradle.properties o como variable de entorno."
         )
     }
     return val.toString()
 }
 
-def isReleaseBuild = gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
-/**
- * This is the configuration block to customize your React Native Android app.
- * By default you don't need to apply any configuration, just uncomment the lines you need.
- */
-react {
-    /* Folders */
-    //   The root of your project, i.e. where "package.json" lives. Default is '../..'
-    // root = file("../../")
-    //   The folder where the react-native NPM package is. Default is ../../node_modules/react-native
-    // reactNativeDir = file("../../node_modules/react-native")
-    //   The folder where the react-native Codegen package is. Default is ../../node_modules/@react-native/codegen
-    // codegenDir = file("../../node_modules/@react-native/codegen")
-    //   The cli.js file which is the React Native CLI entrypoint. Default is ../../node_modules/react-native/cli.js
-    // cliFile = file("../../node_modules/react-native/cli.js")
-
-    /* Variants */
-    //   The list of variants to that are debuggable. For those we're going to
-    //   skip the bundling of the JS bundle and the assets. Default is "debug", "debugOptimized".
-    //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    // debuggableVariants = ["liteDebug", "liteDebugOptimized", "prodDebug", "prodDebugOptimized"]
-
-    /* Bundling */
-    //   A list containing the node command and its flags. Default is just 'node'.
-    // nodeExecutableAndArgs = ["node"]
-    //
-    //   The command to run when bundling. By default is 'bundle'
-    // bundleCommand = "ram-bundle"
-    //
-    //   The path to the CLI configuration file. Default is empty.
-    // bundleConfig = file(../rn-cli.config.js)
-    //
-    //   The name of the generated asset file containing your JS bundle
-    // bundleAssetName = "MyApplication.android.bundle"
-    //
-    //   The entry file for bundle generation. Default is 'index.android.js' or 'index.js'
-    // entryFile = file("../js/MyApplication.android.js")
-    //
-    //   A list of extra flags to pass to the 'bundle' commands.
-    //   See https://github.com/react-native-community/cli/blob/main/docs/commands.md#bundle
-    // extraPackagerArgs = []
-
-    /* Hermes Commands */
-    // fake-hermesc.js: copia el bundle sin compilar a HBC.
-    // Hermes en Android detecta la ausencia de magic bytes y corre el JS en JIT.
-    // Solución para Windows donde hermes-compiler no incluye win64-bin.
-    hermesCommand = "node $rootDir/fake-hermesc.js"
-    hermesFlags = []
-
-    /* Autolinking */
-    autolinkLibrariesWithApp()
-}
-
-/**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
- */
 def enableProguardInReleaseBuilds = false
-
-/**
- * The preferred build flavor of JavaScriptCore (JSC)
- *
- * For example, to use the international variant, you can use:
- * `def jscFlavor = io.github.react-native-community:jsc-android-intl:2026004.+`
- *
- * The international variant includes ICU i18n library and necessary data
- * allowing to use e.g. `Date.toLocaleString` and `String.localeCompare` that
- * give correct results when using with locales other than en-US. Note that
- * this variant is about 6MiB larger per architecture than default.
- */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+// Validacion de propiedades SAE_* para signing de release.
+// Se ejecuta DESPUES de resolver el task graph, ANTES de la ejecucion.
+// assembleDebug no incluye tareas de release en el grafo -> no valida SAE_*.
+// assembleRelease incluye tareas release -> valida y lanza si faltan props.
+// Esto evita usar startParameter.taskNames (poco fiable con tareas calificadas).
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { t -> t.name.toLowerCase().contains('release') }) {
+        requireProp("SAE_STORE_FILE")
+        requireProp("SAE_STORE_PASSWORD")
+        requireProp("SAE_KEY_ALIAS")
+        requireProp("SAE_KEY_PASSWORD")
+    }
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    // Redirigir .cxx a ruta corta para evitar Windows MAX_PATH (260 chars)
-    externalNativeBuild {
-        cmake {
-            buildStagingDirectory "C:/b"
-        }
-    }
-
     namespace "com.saemobile"
+
     defaultConfig {
         applicationId "com.saemobile"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -111,40 +53,75 @@ android {
         versionName "1.0"
         externalNativeBuild {
             cmake {
-                // Override broken prefab header (std::format → std::to_string) without touching immutable Gradle cache
+                // Override broken prefab header (std::format -> std::to_string)
+                // sin tocar el Gradle cache inmutable.
                 cppFlags "-I${projectDir.absolutePath}/src/main/cpp/overrides"
             }
         }
     }
-    signingConfigs {
-        debug {
-            // Usa debug.keystore por defecto (React Native/Android).
-        }
 
-        release {
-            if (isReleaseBuild) {
-                storeFile     file(requireProp("SAE_STORE_FILE"))
-                storePassword requireProp("SAE_STORE_PASSWORD")
-                keyAlias      requireProp("SAE_KEY_ALIAS")
-                keyPassword   requireProp("SAE_KEY_PASSWORD")
+    // Windows-only: ruta corta para evitar MAX_PATH (260 chars).
+    // En Linux/CI se omite; Gradle usa el staging por defecto.
+    if (System.properties['os.name'].toLowerCase().contains('windows')) {
+        externalNativeBuild {
+            cmake {
+                buildStagingDirectory "C:/b"
             }
         }
     }
+
+    signingConfigs {
+        debug {
+            // debug.keystore por defecto (React Native/Android).
+        }
+        release {
+            // Se asignan solo si las variables existen.
+            // Si faltan, la validacion en gradle.taskGraph.whenReady (arriba)
+            // ya habra lanzado IllegalStateException antes de llegar a este punto.
+            // Sin props: storeFile queda null -> release sin firma (no debug signing).
+            def sf = getProp("SAE_STORE_FILE")
+            def sp = getProp("SAE_STORE_PASSWORD")
+            def ka = getProp("SAE_KEY_ALIAS")
+            def kp = getProp("SAE_KEY_PASSWORD")
+            if (sf) storeFile     file(sf)
+            if (sp) storePassword sp
+            if (ka) keyAlias      ka
+            if (kp) keyPassword   kp
+        }
+    }
+
     buildTypes {
         debug {
-            // signingConfig debug (o dejarlo por defecto)
             signingConfig signingConfigs.debug
         }
-
         release {
+            // Sin fallback a debug signing.
+            // Si faltan SAE_*, taskGraph.whenReady falla antes de que Gradle
+            // intente firmar con un signingConfig incompleto.
             signingConfig signingConfigs.release
-            // minifyEnabled / proguard etc según tu estrategia
+            minifyEnabled enableProguardInReleaseBuilds
         }
     }
 }
 
+/**
+ * Configuracion React Native.
+ *
+ * hermesCommand: fake-hermesc.js copia el bundle sin compilar a HBC.
+ * Hermes detecta ausencia de magic bytes y corre el JS en JIT.
+ * Workaround para Windows donde hermes-compiler no incluye win64-bin.
+ * En debug, el bundle no se genera (Metro lo sirve en vivo), asi que
+ * este comando no se invoca durante assembleDebug.
+ */
+react {
+    hermesCommand = "node $rootDir/fake-hermesc.js"
+    hermesFlags = []
+
+    autolinkLibrariesWithApp()
+}
+
 dependencies {
-    // The version of react-native is set by the React Native Gradle Plugin
+    // La version de react-native la fija el React Native Gradle Plugin.
     implementation("com.facebook.react:react-android")
 
     if (hermesEnabled.toBoolean()) {

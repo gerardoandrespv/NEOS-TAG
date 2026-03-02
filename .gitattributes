@@ -1,0 +1,4 @@
+# Normalize Gradle build files to LF in index and working tree (all platforms).
+# Prevents ^M artifacts in diffs on Windows (git core.autocrlf).
+*.gradle     text eol=lf
+*.gradle.kts text eol=lf
