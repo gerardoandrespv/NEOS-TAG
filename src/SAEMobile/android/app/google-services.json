@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "738411977369",
+    "project_id": "neos-tech",
+    "storage_bucket": "neos-tech.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:738411977369:android:7bc15475dc28978e217608",
+        "android_client_info": {
+          "package_name": "com.saemobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmRtRIwyCMcygjP-M4YTZq5BEvkrA1QCY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

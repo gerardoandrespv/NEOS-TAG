@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import os
 from typing import Dict, List, Any
 import logging
+from push_notifications import send_alert_to_all_devices
 
 # Inicializar Firebase Admin
 initialize_app()
@@ -113,21 +114,20 @@ def emit_alert(request):
         alert_id = alert_ref.id
         
         logger.info(f"Alerta creada: {alert_id} - Tipo: {alert_data['type']}")
-        
-        # 🔥 ENVIAR PUSH NOTIFICATION A TODOS LOS DISPOSITIVOS MÓVILES
-        push_result = None
-        try:
-            push_result = send_emergency_push(
-                alert_type=alert_data['type'],
-                severity=alert_data['severity'],
-                message=alert_data['message'],
-                tower=alert_data.get('affected_tower'),
-                floor=alert_data.get('affected_floor')
-            )
-            logger.info(f"✅ Push notifications enviadas: {push_result}")
-        except Exception as e:
-            logger.error(f"❌ Error enviando push: {str(e)}")
-        
+
+        # Enviar push a todos los suscriptores (topic all-users)
+        if alert_data['send_push']:
+            try:
+                push_result = send_alert_to_all_devices(
+                    alert_type=alert_data['type'],
+                    title=alert_data['title'],
+                    body=alert_data['message'],
+                    severity=alert_data['severity'],
+                )
+                logger.info(f"Push enviado: {push_result}")
+            except Exception as push_err:
+                logger.error(f"Error enviando push: {push_err}")
+
         # Obtener destinatarios (todos los usuarios activos)
         recipients = get_recipients(request_json.get('affected_floors'))
         
@@ -144,21 +144,7 @@ def emit_alert(request):
         
         for recipient in recipients:
             recipient_id = save_recipient(alert_id, recipient, alert_data)
-            
-            # Enviar notificación push
-            if alert_data['send_push'] and recipient.get('device_tokens'):
-                try:
-                    send_push_notification(recipient, alert_data)
-                    results['push_sent'] += 1
-                    update_recipient_delivery(recipient_id, 'push')
-                except Exception as e:
-                    logger.error(f"Error enviando push a {recipient['user_id']}: {str(e)}")
-                    results['errors'].append({
-                        'user_id': recipient['user_id'],
-                        'channel': 'push',
-                        'error': str(e)
-                    })
-            
+
             # Enviar SMS
             if alert_data['send_sms'] and recipient.get('phone'):
                 try:

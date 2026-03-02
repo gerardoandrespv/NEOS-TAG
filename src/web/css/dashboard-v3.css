@@ -709,7 +709,8 @@ th { font-weight: 600; text-align: left; }
   align-items: center;
   gap: 12px;
   padding: 0 20px;
-  height: var(--topbar-h);
+  padding-top: env(safe-area-inset-top);
+  height: calc(var(--topbar-h) + env(safe-area-inset-top));
   position: sticky;
   top: 0;
   z-index: 100;
@@ -1271,6 +1272,8 @@ th { font-weight: 600; text-align: left; }
   font-size: var(--text-sm);
   color: var(--color-text-1);
   line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .alert-meta {
@@ -1353,6 +1356,9 @@ th { font-weight: 600; text-align: left; }
 .modal {
   width: 100%;
   max-width: 440px;
+  max-height: min(85dvh, calc(100dvh - 48px));
+  display: flex;
+  flex-direction: column;
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
@@ -1399,6 +1405,8 @@ th { font-weight: 600; text-align: left; }
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow-y: auto;
+  flex: 1 1 auto;
 }
 
 .modal-footer {
@@ -1790,8 +1798,8 @@ th { font-weight: 600; text-align: left; }
 }
 
 /* ── Modal tamaños */
-.modal--lg { max-width: 640px; }
-.modal--sm { max-width: 360px; }
+.modal--lg { max-width: min(640px, calc(100vw - 32px)); }
+.modal--sm { max-width: min(360px, calc(100vw - 32px)); }
 
 /* ── Form grid (2 columnas en modales) */
 .form-grid {
@@ -2254,4 +2262,33 @@ th { font-weight: 600; text-align: left; }
 /* Small phone */
 @media (max-width: 480px) {
   .kpi-grid { grid-template-columns: 1fr; }
+
+  /* Auth card — reducir padding lateral en pantallas pequeñas */
+  .auth-card { padding: 28px 20px; }
+
+  /* Toast — estirar a todo el ancho para no desbordarse */
+  .toast-container {
+    right: 12px;
+    left: 12px;
+    bottom: 16px;
+    max-width: none;
+  }
+
+  /* Modal — quitar padding lateral del backdrop */
+  .modal-backdrop { padding: 12px; }
+
+  /* Tablas — permitir scroll horizontal sin romper layout */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* ── 360px — teléfonos muy pequeños */
+@media (max-width: 380px) {
+  :root { --content-pad: 12px; }
+
+  .topbar-title { font-size: var(--text-sm); }
+
+  .btn { padding: 7px 12px; font-size: var(--text-xs); }
+
+  /* Alertas — icono más pequeño */
+  .alert-icon { width: 32px; height: 32px; font-size: 14px; }
 }

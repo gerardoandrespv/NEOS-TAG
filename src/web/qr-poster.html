@@ -1,239 +1,317 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Póster QR - NeosTech Alertas</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <style>
-        @page {
-            size: A4;
-            margin: 0;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .poster {
-            width: 210mm;
-            height: 297mm;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            color: white;
-            page-break-after: always;
-        }
-        
-        .logo {
-            width: 150px;
-            height: 150px;
-            background: white;
-            border-radius: 30px;
-            padding: 20px;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        }
-        
-        .logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        
-        h1 {
-            font-size: 64px;
-            margin-bottom: 20px;
-            font-weight: 900;
-            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-        
-        .subtitle {
-            font-size: 32px;
-            margin-bottom: 50px;
-            opacity: 0.95;
-            font-weight: 600;
-        }
-        
-        .qr-wrapper {
-            background: white;
-            padding: 50px;
-            border-radius: 40px;
-            box-shadow: 0 30px 80px rgba(0,0,0,0.4);
-            margin-bottom: 50px;
-            position: relative;
-        }
-        
-        .qr-wrapper::before {
-            content: '';
-            position: absolute;
-            top: -10px;
-            left: -10px;
-            right: -10px;
-            bottom: -10px;
-            background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
-            border-radius: 45px;
-            z-index: -1;
-        }
-        
-        #qrcode {
-            display: inline-block;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-        }
-        
-        #qrcode img {
-            display: block;
-        }
-        
-        .instructions {
-            background: rgba(255,255,255,0.15);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px 40px;
-            margin-top: 40px;
-        }
-        
-        .instruction-step {
-            font-size: 24px;
-            margin: 15px 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-        }
-        
-        .step-number {
-            width: 40px;
-            height: 40px;
-            background: white;
-            color: #667eea;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 20px;
-        }
-        
-        .url {
-            font-size: 20px;
-            margin-top: 30px;
-            background: rgba(255,255,255,0.2);
-            padding: 15px 30px;
-            border-radius: 15px;
-            font-family: monospace;
-            word-break: break-all;
-        }
-        
-        .footer {
-            margin-top: 40px;
-            font-size: 18px;
-            opacity: 0.8;
-        }
-        
-        .print-button {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-        
-        @media print {
-            .print-button {
-                display: none;
-            }
-            
-            .poster {
-                width: 100%;
-                height: 100vh;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Póster SAE — NeosTech</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    @page { size: A4; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #f1f5f9;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .print-btn {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      background: #1e40af;
+      color: #fff;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    @media print { .print-btn { display: none; } }
+
+    .poster {
+      width: 210mm;
+      min-height: 297mm;
+      background: #0f172a;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #f1f5f9;
+    }
+
+    /* ── Header ── */
+    .header {
+      width: 100%;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      padding: 36px 40px 28px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .header img { width: 64px; height: 64px; object-fit: contain; margin-bottom: 14px; }
+    .header h1 { font-size: 32px; font-weight: 900; letter-spacing: -0.5px; }
+    .header p  { font-size: 16px; opacity: 0.75; margin-top: 6px; }
+
+    /* ── QR section ── */
+    .qr-section {
+      padding: 36px 40px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      width: 100%;
+    }
+    .qr-label {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #60a5fa;
+    }
+    .qr-box {
+      background: #fff;
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+    }
+    #qrcode canvas, #qrcode img { display: block; border-radius: 8px; }
+    .qr-url {
+      font-size: 11px;
+      color: #475569;
+      font-family: monospace;
+      text-align: center;
+      word-break: break-all;
+      max-width: 260px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      width: calc(100% - 80px);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #1e293b;
+    }
+
+    /* ── ClientId card ── */
+    .clientid-section {
+      padding: 0 40px 32px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .clientid-label {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #60a5fa;
+    }
+    .clientid-card {
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 14px;
+      padding: 18px 32px;
+      text-align: center;
+      width: 100%;
+    }
+    .clientid-card .cid-hint {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+    .clientid-card .cid-value {
+      font-size: 28px;
+      font-weight: 900;
+      color: #f1f5f9;
+      letter-spacing: 1px;
+      word-break: break-all;
+    }
+    .clientid-card .cid-hint-below {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 8px;
+    }
+
+    /* ── Steps ── */
+    .steps {
+      padding: 0 40px 32px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .steps-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #60a5fa;
+      margin-bottom: 4px;
+    }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 12px 16px;
+    }
+    .step-num {
+      width: 28px; height: 28px;
+      background: #1e40af;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .step-text { font-size: 14px; color: #cbd5e1; line-height: 1.4; }
+    .step-text strong { color: #f1f5f9; }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: auto;
+      width: 100%;
+      padding: 16px 40px;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-brand { font-size: 13px; font-weight: 700; color: #475569; }
+    .footer-sub   { font-size: 11px; color: #334155; }
+
+    /* ── Error state ── */
+    .error-box {
+      background: rgba(220,38,38,0.1);
+      border: 1px solid rgba(220,38,38,0.3);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      color: #fca5a5;
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 32px 40px;
+    }
+  </style>
 </head>
 <body>
-    <button class="print-button" onclick="window.print()">🖨️ Imprimir Póster</button>
-    
-    <div class="poster">
-        <div class="logo">
-            <img src="assets/images/neostechc.png" alt="NeosTech Logo">
-        </div>
-        
-        <h1>🚨 ALERTAS DE EMERGENCIA</h1>
-        <p class="subtitle">Instala la App de NeosTech</p>
-        
-        <div class="qr-wrapper">
-            <div id="qrcode"></div>
-            <div style="margin-top: 30px; padding: 20px; background: rgba(255,255,255,0.9); border-radius: 15px;">
-                <p style="margin: 0; font-size: 20px; color: #1F2937; font-weight: 700;">
-                    ✅ Se abre automáticamente en tu navegador
-                </p>
-            </div>
-        </div>
-        
-        <div class="instructions">
-            <div class="instruction-step">
-                <div class="step-number">1</div>
-                <span>Escanea el QR con tu celular</span>
-            </div>
-            <div class="instruction-step">
-                <div class="step-number">2</div>
-                <span>Instala la aplicación</span>
-            </div>
-            <div class="instruction-step">
-                <div class="step-number">3</div>
-                <span>Activa las notificaciones</span>
-            </div>
-        </div>
-        
-        <div class="url" id="appUrl"></div>
-        
-        <div class="footer">
-            📱 Recibe alertas de emergencia en tiempo real<br>
-            ⚡ Sistema de Control de Acceso NeosTech RFID
-        </div>
+  <button class="print-btn" onclick="window.print()">🖨️ Imprimir</button>
+
+  <div class="poster">
+
+    <!-- Header -->
+    <div class="header">
+      <img src="assets/images/neostechb.png" alt="NeosTech" onerror="this.style.display='none'">
+      <h1>🚨 Alertas de Emergencia</h1>
+      <p>Sistema de Alertas — SAE · NeosTech RFID</p>
     </div>
 
-    <script>
-        // URL ABSOLUTA COMPLETA - abre directo en navegador
-        const appUrl = 'https://neos-tech.web.app/install.html';
-        
-        // Generate QR Code simple (sin logo)
+    <div id="main-content"></div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="footer-brand">neostech · SAE</span>
+      <span class="footer-sub">Sistema de Alertas de Emergencia</span>
+    </div>
+
+  </div>
+
+  <script>
+    const params   = new URLSearchParams(location.search);
+    const clientId = params.get('c') || params.get('clientId') || '';
+    const container = document.getElementById('main-content');
+
+    if (!clientId) {
+      container.innerHTML = `
+        <div class="error-box">
+          <strong>⚠️ Número de edificio no especificado</strong><br>
+          Abre este poster con el parámetro <code>?c=TU_EDIFICIO</code><br><br>
+          Ejemplo: <code>/qr-poster.html?c=EDIFICIO_001</code>
+        </div>`;
+    } else {
+      const saeUrl = location.origin + '/sae?c=' + encodeURIComponent(clientId);
+
+      container.innerHTML = `
+        <!-- QR para web / escáner de cámara -->
+        <div class="qr-section">
+          <span class="qr-label">Escanea con la cámara de tu celular</span>
+          <div class="qr-box">
+            <div id="qrcode"></div>
+          </div>
+          <div class="qr-url" id="qr-url-text"></div>
+        </div>
+
+        <div class="divider">o si ya tienes la app instalada</div>
+
+        <!-- ClientId para app nativa -->
+        <div class="clientid-section">
+          <span class="clientid-label">Número de edificio — App SAE</span>
+          <div class="clientid-card">
+            <div class="cid-hint">Ingresa este número en la pantalla de inicio de la app:</div>
+            <div class="cid-value" id="cid-display"></div>
+            <div class="cid-hint-below">Número de edificio / block / torre</div>
+          </div>
+        </div>
+
+        <!-- Instrucciones -->
+        <div class="steps">
+          <div class="steps-title">Cómo activar las alertas</div>
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text"><strong>Instala la app SAE</strong> — pide el APK al administrador del edificio</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text"><strong>Abre la app</strong> e ingresa el número de edificio que aparece arriba</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text"><strong>Activa las notificaciones</strong> cuando la app lo solicite — son necesarias para recibir alertas</div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-text"><strong>Listo.</strong> Recibirás alertas de emergencia aunque el celular esté en silencio</div>
+          </div>
+        </div>`;
+
+      document.getElementById('cid-display').textContent = clientId;
+      document.getElementById('qr-url-text').textContent = saeUrl;
+
+      // Generar QR una vez la librería esté lista
+      function generateQR() {
+        if (typeof QRCode === 'undefined') { setTimeout(generateQR, 200); return; }
         new QRCode(document.getElementById('qrcode'), {
-            text: appUrl,
-            width: 400,
-            height: 400,
-            colorDark: '#1F2937',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M
+          text:         saeUrl,
+          width:        220,
+          height:       220,
+          colorDark:    '#0f172a',
+          colorLight:   '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M,
         });
-        
-        document.getElementById('appUrl').textContent = appUrl;
-    </script>
+      }
+      generateQR();
+    }
+  </script>
 </body>
 </html>
