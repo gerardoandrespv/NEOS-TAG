@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat\\(dashboard\\): complete redesign proposal with clean HTML/CSS base\n\n- Add dashboard-pro-v2.html: semantic SPA shell with 3-area CSS Grid\n  layout \\(sidebar + topbar + content\\), 7 views \\(overview, live RFID,\n  logs, alerts, QR, users, devices, settings\\), accessible markup\n  \\(aria-live, aria-current, role landmarks\\), HTML entities for all\n  Latin characters to fix encoding issues, modals and toast container\n- Add css/dashboard-pro-v2.css: modern dark SaaS admin CSS \\(~900 lines\\)\n  built on tokens.css palette; includes sidebar collapse animation,\n  mobile off-canvas sidebar, KPI grid, virtual scroller, skeleton\n  loaders, status dots, alert cards, device cards, modals, toasts,\n  full responsive breakpoints \\(1100px / 768px / 480px\\)\n- Add REFACTOR-CHECKLIST.md: 10-phase refactor plan covering legacy\n  file cleanup, console.log removal, encoding fixes, CSS consolidation,\n  JS modular architecture, Firestore Security Rules + index guidance,\n  accessibility audit, responsive QA, and Firebase Auth integration\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(firebase:*)",
+      "Bash(dir /B \"C:\\\\NeosTech-RFID-System-Pro\\\\.claude\\\\worktrees\\\\heuristic-rosalind\\\\src\\\\web\")"
+    ]
+  }
+}

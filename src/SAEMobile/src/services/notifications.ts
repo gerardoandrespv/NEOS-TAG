@@ -17,6 +17,24 @@ async function getOrCreateDeviceId(): Promise<string> {
   return id;
 }
 
+async function sendTokenToServer(
+  token: string,
+  clientId: string,
+  deviceId: string,
+): Promise<void> {
+  await fetch(SUBSCRIBE_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      token,
+      topic: 'all-users',
+      clientId,
+      device_type: 'sae_resident',
+      device_id: deviceId,
+    }),
+  });
+}
+
 export async function registerPushNotifications(
   clientId: string,
 ): Promise<void> {
@@ -33,17 +51,12 @@ export async function registerPushNotifications(
   const token = await messaging().getToken();
   const deviceId = await getOrCreateDeviceId();
 
-  await fetch(SUBSCRIBE_URL, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      token,
-      topic: 'all-users',
-      clientId,
-      device_type: 'sae_resident',
-      device_id: deviceId,
-    }),
-  });
-
+  await sendTokenToServer(token, clientId, deviceId);
   console.log('[SAE] Push registrado, token:', token.slice(0, 20) + '...');
+
+  // Renovar token cuando Firebase lo invalida (reinstalación, limpieza de datos, etc.)
+  messaging().onTokenRefresh(async newToken => {
+    console.log('[SAE] Token renovado, re-registrando...');
+    await sendTokenToServer(newToken, clientId, deviceId);
+  });
 }

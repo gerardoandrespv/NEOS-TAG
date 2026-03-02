@@ -770,6 +770,8 @@
                 'FIRE': 'alertSoundFire',
                 'FLOOD': 'alertSoundFlood',
                 'EVACUATION': 'alertSoundEvacuation',
+                'TSUNAMI': 'alertSoundFlood',
+                'EARTHQUAKE': 'alertSoundGeneral',
                 'ROBBERY': 'alertSoundGeneral',
                 'FIGHT': 'alertSoundGeneral',
                 'POWER_OUTAGE': 'alertSoundGeneral',
@@ -1207,13 +1209,15 @@
         // Get alert type display
         function getAlertTypeDisplay(type) {
             const displays = {
-                'FIRE': 'INCENDIO',
-                'FIGHT': 'PELEA',
-                'ROBBERY': 'ROBO',
-                'EVACUATION': 'EVACUACIÓN',
-                'FLOOD': 'FUGA DE AGUA',
-                'POWER_OUTAGE': 'CORTE ENERGÍA',
-                'GENERAL': 'GENERAL'
+                'FIRE':        'INCENDIO',
+                'FIGHT':       'AGRESIÓN',
+                'ROBBERY':     'ROBO',
+                'EVACUATION':  'EVACUACIÓN',
+                'FLOOD':       'INUNDACIÓN',
+                'TSUNAMI':     'TSUNAMI',
+                'EARTHQUAKE':  'TERREMOTO',
+                'POWER_OUTAGE':'CORTE ENERGÍA',
+                'GENERAL':     'GENERAL'
             };
             return displays[type] || type || 'ALERTA';
         }

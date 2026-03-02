@@ -5,6 +5,8 @@ export type AlertType =
   | 'ROBBERY'
   | 'FIGHT'
   | 'POWER_OUTAGE'
+  | 'TSUNAMI'
+  | 'EARTHQUAKE'
   | 'GENERAL';
 
 export type AlertSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
@@ -18,6 +20,7 @@ export interface EmergencyAlert {
   status: AlertStatus;
   clientId: string;
   title?: string;
+  zone?: string;
   created_at?: {toDate: () => Date} | null;
 }
 

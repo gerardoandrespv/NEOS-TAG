@@ -2,17 +2,17 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="NeosTech RFID System Pro – Panel de control de accesos" />
   <meta name="theme-color" content="#2563eb" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="neostech" />
-  <title>neostech – Control RFID</title>
+  <meta name="apple-mobile-web-app-title" content="NeosTech Dashboard" />
+  <title>NeosTech Dashboard</title>
   <link rel="icon" type="image/png" href="assets/images/neostechb.png" />
   <link rel="apple-touch-icon" href="assets/images/neostechb.png" />
   <link rel="manifest" href="manifest-dashboard.json" />
-  <link rel="stylesheet" href="css/dashboard-v3.css" />
+  <link rel="stylesheet" href="css/dashboard-v3.css?v=20260225" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 </head>
 
@@ -844,6 +844,9 @@
               <button class="btn btn--primary btn--sm" id="btnInstallPwa" type="button" hidden>
                 Instalar en este dispositivo
               </button>
+              <button class="btn btn--secondary btn--sm" id="btnPrintPoster" type="button" style="margin-top:8px; width:100%;">
+                🖨️ Imprimir Póster QR
+              </button>
             </div>
           </div>
 
@@ -937,26 +940,31 @@
     <div class="modal-body">
       <form id="formNuevaAlerta" novalidate>
         <div class="field">
+          <label class="field-label" for="alertType">Tipo de alerta</label>
+          <select class="field-select" id="alertType" name="alertType" required>
+            <option value="">Seleccione un tipo…</option>
+            <option value="FIRE">🔥 Incendio</option>
+            <option value="EVACUATION">🚨 Evacuación</option>
+            <option value="FLOOD">💧 Inundación/Fuga</option>
+            <option value="TSUNAMI">🌊 Tsunami</option>
+            <option value="EARTHQUAKE">🏚️ Terremoto</option>
+            <option value="ROBBERY">🔴 Robo</option>
+            <option value="FIGHT">🥊 Agresión</option>
+            <option value="POWER_OUTAGE">⚡ Corte de Energía</option>
+            <option value="SYSTEM_FAILURE">⚙️ Falla de Sistemas</option>
+            <option value="GENERAL">📢 Anuncio General</option>
+          </select>
+        </div>
+        <div class="field">
           <label class="field-label" for="alertSeverity">Severidad</label>
           <select class="field-select" id="alertSeverity" name="severity">
-            <option value="critical">🔴 Crítica</option>
-            <option value="high">🟠 Alta</option>
+            <option value="critical">🔴 Alta</option>
             <option value="medium" selected>🟡 Media</option>
             <option value="low">🟢 Baja</option>
           </select>
         </div>
         <div class="field">
-          <label class="field-label" for="alertTitle">Título</label>
-          <input class="field-input" type="text" id="alertTitle" name="title"
-                 placeholder="Título de la alerta…" required />
-        </div>
-        <div class="field">
-          <label class="field-label" for="alertDesc">Descripción</label>
-          <textarea class="field-input field-textarea" id="alertDesc" name="description"
-                    rows="3" placeholder="Descripción detallada…"></textarea>
-        </div>
-        <div class="field">
-          <label class="field-label" for="alertZona">Zona / Punto</label>
+          <label class="field-label" for="alertZona">Zona / Punto <span style="font-weight:400;opacity:.55">(opcional)</span></label>
           <input class="field-input" type="text" id="alertZona" name="zone"
                  placeholder="Ej. Portón principal, Bloque A…" />
         </div>
@@ -1129,7 +1137,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="firebase-config.js"></script>
-<script src="js/dashboard-v3.js"></script>
+<script src="js/dashboard-v3.js?v=20260225e"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});

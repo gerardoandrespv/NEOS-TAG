@@ -52,6 +52,21 @@ def subscribe_to_topic(token: str, topic: str = 'all-users') -> Dict:
         }
 
 
+_ALERT_TYPE_TO_CHANNEL = {
+    'FIRE':          'sae_fire_v2',
+    'EVACUATION':    'sae_evacuation_v2',
+    'FLOOD':         'sae_flood_v2',
+    'TSUNAMI':       'sae_tsunami_v2',
+    'EARTHQUAKE':    'sae_earthquake_v2',
+    'ROBBERY':       'sae_robbery_v2',
+    'FIGHT':         'sae_fight_v2',
+    'POWER_OUTAGE':  'sae_power_outage_v2',
+    'GENERAL':       'sae_general_v2',
+    'CANCEL':        'sae_cancel_v2',
+    'CANCELLED':     'sae_cancel_v2',
+}
+
+
 def send_alert_to_all_devices(alert_type: str, title: str, body: str, severity: str = 'MEDIUM') -> Dict:
     """
     Envía notificación push SOLO a residentes SAE en Android Chrome
@@ -97,8 +112,13 @@ def send_alert_to_all_devices(alert_type: str, title: str, body: str, severity: 
                     priority='high',
                     notification=messaging.AndroidNotification(
                         color='#DC2626',
+                        channel_id=_ALERT_TYPE_TO_CHANNEL.get(alert_type, 'sae_general'),
                     )
                 ),
+                data={
+                    'alert_type': alert_type,
+                    'severity': severity,
+                },
                 webpush=messaging.WebpushConfig(
                     headers={'Urgency': 'high'},
                     notification=messaging.WebpushNotification(
@@ -196,13 +216,18 @@ def send_alert_to_topic(topic: str, alert_type: str, title: str, body: str, seve
 
 # Mapeo de tipos de alerta a emojis y títulos
 ALERT_TITLES = {
-    "FIRE": "🔥 ALERTA DE INCENDIO",
-    "EVACUATION": "🚨 EVACUACIÓN INMEDIATA",
-    "FLOOD": "🌊 ALERTA DE INUNDACIÓN",
-    "POWER_OUTAGE": "⚡ CORTE DE ENERGÍA",
+    "FIRE":           "🔥 ALERTA DE INCENDIO",
+    "EVACUATION":     "🚨 EVACUACIÓN INMEDIATA",
+    "FLOOD":          "💧 ALERTA DE INUNDACIÓN",
+    "TSUNAMI":        "🌊 ALERTA DE TSUNAMI",
+    "EARTHQUAKE":     "🏚️ ALERTA DE TERREMOTO",
+    "ROBBERY":        "🔴 ALERTA DE ROBO",
+    "FIGHT":          "🥊 ALERTA DE AGRESIÓN",
+    "POWER_OUTAGE":   "⚡ CORTE DE ENERGÍA",
     "SYSTEM_FAILURE": "⚙️ FALLA DE SISTEMAS",
-    "GENERAL": "🟠 ALERTA GENERAL",
-    "CANCELLED": "✅ ALERTA CANCELADA"
+    "GENERAL":        "🟠 ALERTA GENERAL",
+    "CANCEL":         "✅ ALERTA CANCELADA",
+    "CANCELLED":      "✅ ALERTA CANCELADA",
 }
 
 

@@ -3,32 +3,41 @@ import {
   View,
   Text,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Animated,
   ActivityIndicator,
+  TouchableOpacity,
+  NativeModules,
 } from 'react-native';
 import {subscribeToAlerts} from '../services/firestore';
 import {registerPushNotifications} from '../services/notifications';
 import {EmergencyAlert, AlertType} from '../types';
 
+const {SoundPlayer} = NativeModules;
+
 const ALERT_ICONS: Record<AlertType, string> = {
-  FIRE: '🔥',
-  FLOOD: '🌊',
-  EVACUATION: '🚨',
-  ROBBERY: '🔴',
-  FIGHT: '⚠️',
-  POWER_OUTAGE: '⚡',
-  GENERAL: '❗',
+  FIRE:        '🔥',
+  FLOOD:       '💧',
+  EVACUATION:  '🚨',
+  TSUNAMI:     '🌊',
+  EARTHQUAKE:  '🏚️',
+  ROBBERY:     '🔴',
+  FIGHT:       '🥊',
+  POWER_OUTAGE:'⚡',
+  GENERAL:     '❗',
 };
 
 const ALERT_LABELS: Record<AlertType, string> = {
-  FIRE: 'Incendio',
-  FLOOD: 'Inundación',
-  EVACUATION: 'Evacuación',
-  ROBBERY: 'Robo',
-  FIGHT: 'Pelea',
-  POWER_OUTAGE: 'Corte de luz',
-  GENERAL: 'Emergencia',
+  FIRE:        'Incendio',
+  FLOOD:       'Inundación',
+  EVACUATION:  'Evacuación',
+  TSUNAMI:     'Tsunami',
+  EARTHQUAKE:  'Terremoto',
+  ROBBERY:     'Robo',
+  FIGHT:       'Agresión',
+  POWER_OUTAGE:'Corte de luz',
+  GENERAL:     'Emergencia',
 };
 
 function formatTime(ts: EmergencyAlert['created_at']): string {
@@ -39,29 +48,23 @@ function formatTime(ts: EmergencyAlert['created_at']): string {
 
 interface Props {
   clientId: string;
+  onSilence?: () => void;
+  onAlertsCleared?: () => void;
 }
 
-export default function AlertScreen({clientId}: Props) {
+export default function AlertScreen({clientId, onSilence, onAlertsCleared}: Props) {
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const prevCountRef = useRef(0);
 
-  // Pulsating animation for ALERT badge
   useEffect(() => {
     if (alerts.length > 0) {
       const pulse = Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 0.5,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
+          Animated.timing(pulseAnim, {toValue: 0.5, duration: 800, useNativeDriver: true}),
+          Animated.timing(pulseAnim, {toValue: 1,   duration: 800, useNativeDriver: true}),
         ]),
       );
       pulse.start();
@@ -71,7 +74,6 @@ export default function AlertScreen({clientId}: Props) {
     }
   }, [alerts.length, pulseAnim]);
 
-  // Firestore listener
   useEffect(() => {
     const unsub = subscribeToAlerts(
       clientId,
@@ -88,14 +90,29 @@ export default function AlertScreen({clientId}: Props) {
     return unsub;
   }, [clientId]);
 
-  // FCM registration
   useEffect(() => {
     registerPushNotifications(clientId).catch(e =>
       console.warn('[SAE] push registration failed:', e),
     );
   }, [clientId]);
 
+  // Detectar cuando las alertas activas se limpian → detener alarma localmente
+  useEffect(() => {
+    if (!loading && prevCountRef.current > 0 && alerts.length === 0) {
+      SoundPlayer?.stop();
+      SoundPlayer?.playOnce?.('emergency_alarm_cancel');
+      onAlertsCleared?.();
+    }
+    prevCountRef.current = alerts.length;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alerts.length, loading]);
+
   const hasAlerts = alerts.length > 0;
+
+  function handleSilence() {
+    SoundPlayer?.stop();
+    onSilence?.();
+  }
 
   return (
     <View style={styles.container}>
@@ -130,44 +147,35 @@ export default function AlertScreen({clientId}: Props) {
           <View style={[styles.statusCard, styles.statusAlert]}>
             <Text style={styles.statusIcon}>🚨</Text>
             <Text style={styles.statusTitle}>
-              {alerts.length === 1
-                ? '1 alerta activa'
-                : `${alerts.length} alertas activas`}
+              {alerts.length === 1 ? '1 alerta activa' : `${alerts.length} alertas activas`}
             </Text>
-            <Text style={styles.statusSub}>
-              Sigue las instrucciones del personal
-            </Text>
+            <Text style={styles.statusSub}>Sigue las instrucciones del personal</Text>
           </View>
         ) : (
           <View style={[styles.statusCard, styles.statusOk]}>
             <Text style={styles.statusIcon}>✅</Text>
             <Text style={styles.statusTitle}>Sistema operando normal</Text>
-            <Text style={styles.statusSub}>
-              No hay alertas activas en este momento
-            </Text>
+            <Text style={styles.statusSub}>No hay alertas activas en este momento</Text>
           </View>
         )}
 
         {/* Alert items */}
         {alerts.map(alert => {
-          const isLow =
-            alert.severity === 'LOW' || alert.severity === 'MEDIUM';
+          const isLow = alert.severity === 'LOW' || alert.severity === 'MEDIUM';
           return (
-            <View
-              key={alert.id}
-              style={[styles.alertItem, isLow && styles.alertItemLow]}>
+            <View key={alert.id} style={[styles.alertItem, isLow && styles.alertItemLow]}>
               <Text style={styles.alertItemIcon}>
                 {ALERT_ICONS[alert.type] ?? '❗'}
               </Text>
               <View style={styles.alertItemBody}>
-                <Text
-                  style={[styles.alertType, isLow && styles.alertTypeLow]}>
+                <Text style={[styles.alertType, isLow && styles.alertTypeLow]}>
                   {ALERT_LABELS[alert.type] ?? alert.type}
                 </Text>
                 <Text style={styles.alertMsg}>{alert.message}</Text>
-                <Text style={styles.alertTime}>
-                  {formatTime(alert.created_at)}
-                </Text>
+                {alert.zone ? (
+                  <Text style={styles.alertZone}>📍 {alert.zone}</Text>
+                ) : null}
+                <Text style={styles.alertTime}>{formatTime(alert.created_at)}</Text>
               </View>
             </View>
           );
@@ -182,6 +190,15 @@ export default function AlertScreen({clientId}: Props) {
         )}
       </ScrollView>
 
+      {/* Botón silenciar — visible cuando hay alertas activas */}
+      {hasAlerts && (
+        <View style={styles.silenceBar}>
+          <TouchableOpacity style={styles.silenceBtn} onPress={handleSilence} activeOpacity={0.8}>
+            <Text style={styles.silenceBtnText}>🔕  Silenciar alarma — Estoy bien</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.footer}>
         <Text style={styles.footerText}>neostech · Sistema de Alertas de Emergencia</Text>
       </View>
@@ -190,7 +207,7 @@ export default function AlertScreen({clientId}: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#0f172a'},
+  container: {flex: 1, backgroundColor: '#0f172a', paddingTop: StatusBar.currentHeight ?? 0},
 
   header: {
     flexDirection: 'row',
@@ -208,13 +225,9 @@ const styles = StyleSheet.create({
     color: '#f1f5f9',
     letterSpacing: -0.3,
   },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 20,
-  },
+  badge: {paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20},
   badgeLive: {backgroundColor: '#dc2626'},
-  badgeOk: {backgroundColor: '#16a34a'},
+  badgeOk:   {backgroundColor: '#16a34a'},
   badgeText: {
     color: '#fff',
     fontSize: 11,
@@ -226,12 +239,7 @@ const styles = StyleSheet.create({
   main: {flex: 1},
   mainContent: {padding: 16, gap: 12},
 
-  statusCard: {
-    borderRadius: 14,
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
+  statusCard: {borderRadius: 14, padding: 28, alignItems: 'center', borderWidth: 1},
   statusOk: {
     backgroundColor: 'rgba(22,163,74,0.15)',
     borderColor: 'rgba(22,163,74,0.4)',
@@ -244,20 +252,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderColor: 'rgba(255,255,255,0.1)',
   },
-  statusIcon: {fontSize: 48, lineHeight: 56, marginBottom: 8},
-  statusTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#f1f5f9',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  statusSub: {
-    fontSize: 13,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 4,
-  },
+  statusIcon:  {fontSize: 48, lineHeight: 56, marginBottom: 8},
+  statusTitle: {fontSize: 18, fontWeight: '700', color: '#f1f5f9', textAlign: 'center', marginTop: 4},
+  statusSub:   {fontSize: 13, color: '#94a3b8', textAlign: 'center', marginTop: 4},
 
   alertItem: {
     borderRadius: 12,
@@ -284,7 +281,8 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   alertTypeLow: {color: '#fbbf24'},
-  alertMsg: {fontSize: 14, lineHeight: 21, color: '#e2e8f0'},
+  alertMsg:  {fontSize: 14, lineHeight: 21, color: '#e2e8f0'},
+  alertZone: {fontSize: 12, color: '#93c5fd', marginTop: 3, fontWeight: '500'},
   alertTime: {fontSize: 11, color: '#64748b', marginTop: 4},
 
   errCard: {
@@ -295,15 +293,25 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(234,179,8,0.3)',
     alignItems: 'center',
   },
-  errText: {
-    fontSize: 13,
-    color: '#fbbf24',
-    textAlign: 'center',
-    lineHeight: 20,
+  errText: {fontSize: 13, color: '#fbbf24', textAlign: 'center', lineHeight: 20},
+
+  silenceBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(220,38,38,0.3)',
+    backgroundColor: 'rgba(220,38,38,0.06)',
   },
+  silenceBtn: {
+    backgroundColor: '#dc2626',
+    borderRadius: 50,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  silenceBtnText: {fontSize: 15, fontWeight: '700', color: '#fff'},
 
   footer: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.05)',
