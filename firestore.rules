@@ -306,8 +306,11 @@ service cloud.firestore {
     // ============================================
     match /emergency_alerts/{alertId} {
 
-      // Lectura: cualquier usuario autenticado del mismo tenant.
-      allow read: if isAuthenticated() && isSameTenantDoc();
+      // Lectura: staff/admin del tenant (autenticación completa),
+      //          O sin autenticación para el SAE público (/sae).
+      //          Las alertas de emergencia son broadcasts públicos — sin PII.
+      allow read: if isAuthenticated() && isSameTenantDoc()
+                  || request.auth == null;
 
       // Creación: staff o admin del tenant.
       // Las alertas nacen siempre en estado ACTIVE.

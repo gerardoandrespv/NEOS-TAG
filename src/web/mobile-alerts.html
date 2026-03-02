@@ -372,10 +372,16 @@
 
         // Bootstrap multi-tenant: leer clientId desde JWT claims
         let currentUserClientId = null;
+        let _authReady = false;
         firebase.auth().onAuthStateChanged(function(user) {
             if (user) {
                 user.getIdTokenResult().then(function(result) {
                     currentUserClientId = result.claims.clientId || null;
+                    if (!_authReady) {
+                        _authReady = true;
+                        loadActiveAlerts();
+                        checkURLParams();
+                    }
                 });
             }
         });
@@ -421,8 +427,9 @@
         window.addEventListener('load', async () => {
             await preloadAudioFiles();
             checkNotificationPermission();
-            loadActiveAlerts();
-            
+            // loadActiveAlerts() y checkURLParams() se llaman desde onAuthStateChanged
+            // para garantizar que currentUserClientId esté disponible.
+
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.getRegistrations().then(registrations => {
                     registrations.forEach((reg) => {
@@ -763,6 +770,8 @@
                 'FIRE': 'alertSoundFire',
                 'FLOOD': 'alertSoundFlood',
                 'EVACUATION': 'alertSoundEvacuation',
+                'TSUNAMI': 'alertSoundFlood',
+                'EARTHQUAKE': 'alertSoundGeneral',
                 'ROBBERY': 'alertSoundGeneral',
                 'FIGHT': 'alertSoundGeneral',
                 'POWER_OUTAGE': 'alertSoundGeneral',
@@ -1200,13 +1209,15 @@
         // Get alert type display
         function getAlertTypeDisplay(type) {
             const displays = {
-                'FIRE': 'INCENDIO',
-                'FIGHT': 'PELEA',
-                'ROBBERY': 'ROBO',
-                'EVACUATION': 'EVACUACIÓN',
-                'FLOOD': 'FUGA DE AGUA',
-                'POWER_OUTAGE': 'CORTE ENERGÍA',
-                'GENERAL': 'GENERAL'
+                'FIRE':        'INCENDIO',
+                'FIGHT':       'AGRESIÓN',
+                'ROBBERY':     'ROBO',
+                'EVACUATION':  'EVACUACIÓN',
+                'FLOOD':       'INUNDACIÓN',
+                'TSUNAMI':     'TSUNAMI',
+                'EARTHQUAKE':  'TERREMOTO',
+                'POWER_OUTAGE':'CORTE ENERGÍA',
+                'GENERAL':     'GENERAL'
             };
             return displays[type] || type || 'ALERTA';
         }
@@ -1415,18 +1426,7 @@
             }
         }
         
-        // Check on load - EJECUTAR CUANDO TODO ESTÉ LISTO
-        // NO necesitamos desregistrar SWs aquí porque ya se hace en window.load
-        // Usar setTimeout para asegurar que los elementos de audio estén cargados
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                console.log('[Mobile] DOMContentLoaded - ejecutando checkURLParams en 800ms');
-                setTimeout(checkURLParams, 800);
-            });
-        } else {
-            console.log('[Mobile] DOM ya listo - ejecutando checkURLParams en 300ms');
-            setTimeout(checkURLParams, 300);
-        }
+        // checkURLParams() se llama desde onAuthStateChanged — ver arriba.
 
         // Listen to real-time updates
         db.collection('emergency_alerts')

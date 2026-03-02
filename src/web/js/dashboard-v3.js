@@ -895,10 +895,24 @@ function _initBitacora() {
    VIEW: ALERTAS
 ============================================================ */
 
-// Sonido de alerta según severidad (usa los .wav del SW)
-function _playAlertSound(severity) {
-  const src = severity === 'low' ? null : '/sounds/emergency_alarm_general.wav';
-  if (!src) return;
+// Sonido de alerta según tipo (usa los .wav disponibles en /sounds/)
+const SOUND_BY_TYPE = {
+  FIRE:        '/sounds/emergency_alarm_fire.wav',
+  EVACUATION:  '/sounds/emergency_alarm_evacuation.wav',
+  FLOOD:       '/sounds/emergency_alarm_flood.wav',
+  TSUNAMI:     '/sounds/emergency_alarm_flood.wav',
+  EARTHQUAKE:  '/sounds/emergency_alarm_general.wav',
+  ROBBERY:     '/sounds/emergency_alarm_general.wav',
+  FIGHT:       '/sounds/emergency_alarm_general.wav',
+  POWER_OUTAGE:'/sounds/emergency_alarm_general.wav',
+  CANCEL:      '/sounds/emergency_alarm_cancel.wav',
+  GENERAL:     '/sounds/emergency_alarm_general.wav',
+};
+
+function _playAlertSound(alertType, severity) {
+  if (severity === 'low') return;
+  const src = SOUND_BY_TYPE[String(alertType || '').toUpperCase()]
+    ?? '/sounds/emergency_alarm_general.wav';
   try { new Audio(src).play().catch(() => {}); } catch (_) {}
 }
 
@@ -944,7 +958,7 @@ function _startAlertas() {
           // Tocar sonido solo en alertas nuevas (no en la carga inicial)
           if (!firstSnap) {
             snap.docChanges().forEach(c => {
-              if (c.type === 'added') _playAlertSound(c.doc.data().severity ?? 'medium');
+              if (c.type === 'added') _playAlertSound(c.doc.data().alertType, c.doc.data().severity ?? 'medium');
             });
           }
           firstSnap = false;
@@ -1065,6 +1079,30 @@ async function _resolveAlert(id) {
           resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
           resolvedBy: STATE.user?.uid ?? null,
         });
+        // Cancelar en emergency_alerts (para la app móvil)
+        try {
+          const clientId = window.currentUserClientId;
+          const emSnap = await db.collection('emergency_alerts')
+            .where('clientId', '==', clientId)
+            .where('status', '==', 'ACTIVE').get();
+          if (!emSnap.empty) {
+            const batch = db.batch();
+            emSnap.docs.forEach(d => batch.update(d.ref, {status: 'CANCELLED'}));
+            await batch.commit();
+          }
+        } catch (emErr) { _warn('emergency_alerts cancel error:', emErr); }
+        // Enviar CANCEL push para silenciar alarma en celulares
+        try {
+          await fetch('https://sendemergencypush-6psjv5t2ka-uc.a.run.app', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type:     'CANCEL',
+              message:  'Alerta resuelta. Situación bajo control.',
+              severity: 'low',
+            }),
+          });
+        } catch (pushErr) { _warn('cancel push error:', pushErr); }
       }
       _toast('Alerta resuelta.', 'success');
       // onSnapshot actualiza la vista automáticamente
@@ -1092,16 +1130,18 @@ function _initAlertas() {
     const btn = document.getElementById('btnSubmitAlerta');
     if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
     const severity    = document.getElementById('alertSeverity')?.value ?? 'medium';
-    const title       = document.getElementById('alertTitle')?.value.trim() ?? '';
-    const description = document.getElementById('alertDesc')?.value.trim() ?? '';
+    const alertType   = document.getElementById('alertType')?.value || 'GENERAL';
     const zone        = document.getElementById('alertZona')?.value.trim() ?? '';
-    if (!title) {
-      _toast('El título es obligatorio.', 'warning');
-      if (btn) { btn.disabled = false; btn.textContent = 'Crear alerta'; }
-      return;
-    }
+    const AUTO_TITLES = {
+      FIRE:'🔥 Alerta de Incendio', EVACUATION:'🚨 Evacuación Inmediata',
+      FLOOD:'💧 Alerta de Inundación', TSUNAMI:'🌊 Alerta de Tsunami',
+      EARTHQUAKE:'🏚️ Alerta de Terremoto', ROBBERY:'🔴 Alerta de Robo',
+      FIGHT:'🥊 Alerta de Agresión', POWER_OUTAGE:'⚡ Corte de Energía',
+      SYSTEM_FAILURE:'⚙️ Falla de Sistemas', GENERAL:'📢 Emergencia General',
+    };
+    const title = AUTO_TITLES[alertType] ?? '📢 Emergencia General';
     try {
-      await FirebaseStubs.createAlert({ severity, title, description, zone,
+      await FirebaseStubs.createAlert({ severity, alertType, title, zone,
         clientId: window.currentUserClientId, createdBy: STATE.user?.uid ?? null });
       _closeModal('modalNuevaAlerta');
       _toast('Alerta creada y notificación enviada.', 'success');
@@ -1568,12 +1608,15 @@ function _initInstallQr() {
   const installBtn = document.getElementById('btnInstallPwa');
   if (!container) return;
 
-  const url = window.location.origin + window.location.pathname;
-  if (urlLabel) urlLabel.textContent = url;
-
-  // Genera el QR cuando qrcodejs esté disponible (cargado con defer)
+  // QR apunta al SAE público — los residentes NO necesitan autenticarse.
+  // currentUserClientId puede ser null al momento del init (auth aún no completó),
+  // por eso se lee dentro de generate() con retry hasta que esté disponible.
   const generate = () => {
     if (typeof QRCode === 'undefined') { setTimeout(generate, 300); return; }
+    const clientId = window.currentUserClientId || '';
+    if (!clientId) { setTimeout(generate, 400); return; } // esperar auth
+    const url = window.location.origin + '/sae?c=' + encodeURIComponent(clientId);
+    if (urlLabel) urlLabel.textContent = url;
     container.innerHTML = '';
     new QRCode(container, {
       text:         url,
@@ -1586,6 +1629,13 @@ function _initInstallQr() {
   };
   generate();
 
+  // Botón "Imprimir Póster QR"
+  document.getElementById('btnPrintPoster')?.addEventListener('click', () => {
+    const clientId = window.currentUserClientId || '';
+    if (!clientId) { _toast('ID de edificio no disponible aún.', 'warning'); return; }
+    window.open('/qr-poster.html?c=' + encodeURIComponent(clientId), '_blank');
+  });
+
   // Botón "Instalar en este dispositivo" (solo aparece si el browser lo soporta)
   let _deferredInstall = null;
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -1595,10 +1645,15 @@ function _initInstallQr() {
   });
   installBtn?.addEventListener('click', async () => {
     if (!_deferredInstall) return;
-    _deferredInstall.prompt();
-    const { outcome } = await _deferredInstall.userChoice;
-    if (outcome === 'accepted') { installBtn.hidden = true; _toast('App instalada.', 'success'); }
-    _deferredInstall = null;
+    try {
+      _deferredInstall.prompt();
+      const { outcome } = await _deferredInstall.userChoice;
+      if (outcome === 'accepted') { installBtn.hidden = true; _toast('App instalada.', 'success'); }
+    } catch (err) {
+      _warn('PWA install prompt error:', err);
+    } finally {
+      _deferredInstall = null;
+    }
   });
 }
 
@@ -1993,6 +2048,32 @@ const FirebaseStubs = {
         ...data, resolved: false, acknowledged: false,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
+      // Sincronizar a emergency_alerts para la app móvil
+      try {
+        const alertType = (data.alertType || 'GENERAL').toUpperCase();
+        // Cancelar duplicados activos del mismo tipo antes de insertar
+        const dupSnap = await db.collection('emergency_alerts')
+          .where('clientId', '==', data.clientId)
+          .where('type',     '==', alertType)
+          .where('status',   '==', 'ACTIVE')
+          .get();
+        if (!dupSnap.empty) {
+          const batch = db.batch();
+          dupSnap.docs.forEach(d => batch.update(d.ref, {status: 'CANCELLED'}));
+          await batch.commit();
+        }
+        await db.collection('emergency_alerts').add({
+          type:       alertType,
+          message:    data.description || data.title || '',
+          severity:   (data.severity  || 'MEDIUM').toUpperCase(),
+          status:     'ACTIVE',
+          clientId:   data.clientId,
+          zone:       data.zone || null,
+          title:      data.title,
+          created_at: firebase.firestore.FieldValue.serverTimestamp(),
+          alertsRef:  docRef.id,
+        });
+      } catch (e) { _warn('emergency_alerts write error:', e); }
       // Enviar push notification a todos los dispositivos suscritos
       try {
         await fetch('https://sendemergencypush-6psjv5t2ka-uc.a.run.app', {
@@ -2197,7 +2278,10 @@ function init() {
       _setIndicator('indicatorDB', 'loading');
     },
     () => {
-      _showAuth();
+      // Guard: /sae es ruta pública — no redirigir a login desde esa ruta
+      if (!location.pathname.startsWith('/sae')) {
+        _showAuth();
+      }
     }
   );
 }

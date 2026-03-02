@@ -1,0 +1,25 @@
+{
+  "name": "neostech SAE – Alertas",
+  "short_name": "SAE",
+  "description": "Sistema de Alertas de Emergencia — neostech",
+  "start_url": "/sae",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/assets/images/neostechb.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/images/neostechb.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

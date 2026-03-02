@@ -5,6 +5,15 @@ from push_notifications import emit_emergency_alert, subscribe_to_topic
 from firebase_functions import https_fn
 import functions_framework
 from flask import jsonify
+from firebase_admin import firestore as fs_admin
+
+# Lazy init — no llamar fs_admin.client() a nivel de módulo (falla en análisis local)
+_db = None
+def _get_db():
+    global _db
+    if _db is None:
+        _db = fs_admin.client()
+    return _db
 
 # TODO: Firestore trigger requiere Python <3.14
 # from alert_trigger import on_alert_created
@@ -307,6 +316,23 @@ def subscribeToTopic(request: https_fn.Request) -> https_fn.Response:
             )
         
         result = subscribe_to_topic(token, topic)
+
+        # Guardar token en alert_subscribers — usar device_id como clave estable
+        # para que re-activaciones del mismo dispositivo sobreescriban el mismo doc.
+        client_id   = request_json.get('clientId', '')
+        device_type = request_json.get('device_type', 'web')
+        device_id   = request_json.get('device_id') or token[:128]
+        try:
+            _get_db().collection('alert_subscribers').document(device_id).set({
+                'fcm_token':             token,
+                'notifications_enabled': True,
+                'clientId':              client_id,
+                'device_type':           device_type,
+                'device_id':             device_id,
+                'last_updated':          fs_admin.SERVER_TIMESTAMP,
+            }, merge=True)
+        except Exception as db_err:
+            logger.warning(f"subscribeToTopic: no se pudo guardar en Firestore: {db_err}")
         
         return https_fn.Response(
             json.dumps(result),
@@ -320,4 +346,64 @@ def subscribeToTopic(request: https_fn.Request) -> https_fn.Response:
             json.dumps({'success': False, 'error': str(e)}),
             status=500,
             headers={"Access-Control-Allow-Origin": "*", "Content-Type": "application/json"}
+        )
+
+
+@https_fn.on_request()
+def testPush(request: https_fn.Request) -> https_fn.Response:
+    """Endpoint de diagnóstico: envía un push de prueba a todos los tokens sae_resident
+    y devuelve el resultado detallado. Llamar con GET desde el navegador."""
+    cors_headers = {"Access-Control-Allow-Origin": "*", "Content-Type": "application/json"}
+
+    if request.method == "OPTIONS":
+        return https_fn.Response("", status=204, headers=cors_headers)
+
+    try:
+        db = _get_db()
+
+        # 1. Listar tokens sae_resident
+        q = db.collection('alert_subscribers').where(
+            filter=fs_admin.FieldFilter('device_type', '==', 'sae_resident')
+        ).stream()
+
+        subscribers = []
+        for doc in q:
+            d = doc.to_dict()
+            subscribers.append({
+                'device_id': doc.id,
+                'has_token': bool(d.get('fcm_token')),
+                'notifications_enabled': d.get('notifications_enabled'),
+                'clientId': d.get('clientId', ''),
+            })
+
+        tokens_count = sum(1 for s in subscribers if s['has_token'])
+
+        # 2. Enviar push de prueba
+        push_result = None
+        if tokens_count > 0:
+            from push_notifications import send_alert_to_all_devices
+            push_result = send_alert_to_all_devices(
+                alert_type='GENERAL',
+                title='🔔 Prueba de notificación',
+                body='Si ves esto, las notificaciones push funcionan correctamente.',
+                severity='LOW'
+            )
+
+        return https_fn.Response(
+            json.dumps({
+                'subscribers_found': len(subscribers),
+                'tokens_found': tokens_count,
+                'subscribers': subscribers,
+                'push_result': push_result,
+            }),
+            status=200,
+            headers=cors_headers
+        )
+
+    except Exception as e:
+        logger.error(f"Error en testPush: {str(e)}", exc_info=True)
+        return https_fn.Response(
+            json.dumps({'success': False, 'error': str(e)}),
+            status=500,
+            headers=cors_headers
         )

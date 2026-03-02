@@ -1,6 +1,6 @@
 {
-  "name": "neostech – Control RFID",
-  "short_name": "neostech",
+  "name": "NeosTech Dashboard",
+  "short_name": "Dashboard",
   "description": "Panel de control de accesos RFID en tiempo real",
   "start_url": "/dashboard-v3.html",
   "display": "standalone",
