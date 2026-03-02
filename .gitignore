@@ -47,3 +47,4 @@ Instalador/*.msi
 *.pdb
 temp/
 src/Gateway/Binaries/
+.claude/
