@@ -19,6 +19,7 @@ def requireProp(String name) {
     return val.toString()
 }
 
+def isReleaseBuild = gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -117,26 +118,27 @@ android {
     }
     signingConfigs {
         debug {
-            storeFile file('debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
+            // Usa debug.keystore por defecto (React Native/Android).
         }
+
         release {
-            storeFile     file(requireProp("SAE_STORE_FILE"))
-            storePassword requireProp("SAE_STORE_PASSWORD")
-            keyAlias      requireProp("SAE_KEY_ALIAS")
-            keyPassword   requireProp("SAE_KEY_PASSWORD")
+            if (isReleaseBuild) {
+                storeFile     file(requireProp("SAE_STORE_FILE"))
+                storePassword requireProp("SAE_STORE_PASSWORD")
+                keyAlias      requireProp("SAE_KEY_ALIAS")
+                keyPassword   requireProp("SAE_KEY_PASSWORD")
+            }
         }
     }
     buildTypes {
         debug {
+            // signingConfig debug (o dejarlo por defecto)
             signingConfig signingConfigs.debug
         }
+
         release {
             signingConfig signingConfigs.release
-            minifyEnabled enableProguardInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            // minifyEnabled / proguard etc según tu estrategia
         }
     }
 }
