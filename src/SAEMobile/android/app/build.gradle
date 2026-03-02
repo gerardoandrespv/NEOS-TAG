@@ -3,6 +3,22 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
+// Lee de ~/.gradle/gradle.properties primero, luego de variables de entorno.
+// Si falta una propiedad en release, falla con mensaje claro (no NPE silencioso).
+def getProp(String name) {
+    return project.findProperty(name) ?: System.getenv(name)
+}
+def requireProp(String name) {
+    def val = getProp(name)
+    if (val == null || val.toString().trim().isEmpty()) {
+        throw new IllegalStateException(
+            "[SAEMobile] Propiedad de firma ausente: '${name}'.\n" +
+            "Agrega en ~/.gradle/gradle.properties o como variable de entorno."
+        )
+    }
+    return val.toString()
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -45,11 +61,11 @@ react {
     // extraPackagerArgs = []
 
     /* Hermes Commands */
-    //   The hermes compiler command to run. By default it is 'hermesc'
-    // hermesCommand = "$rootDir/my-custom-hermesc/bin/hermesc"
-    //
-    //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
-    // hermesFlags = ["-O", "-output-source-map"]
+    // fake-hermesc.js: copia el bundle sin compilar a HBC.
+    // Hermes en Android detecta la ausencia de magic bytes y corre el JS en JIT.
+    // Solución para Windows donde hermes-compiler no incluye win64-bin.
+    hermesCommand = "node $rootDir/fake-hermesc.js"
+    hermesFlags = []
 
     /* Autolinking */
     autolinkLibrariesWithApp()
@@ -78,6 +94,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    // Redirigir .cxx a ruta corta para evitar Windows MAX_PATH (260 chars)
+    externalNativeBuild {
+        cmake {
+            buildStagingDirectory "C:/b"
+        }
+    }
+
     namespace "com.saemobile"
     defaultConfig {
         applicationId "com.saemobile"
@@ -85,6 +108,12 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        externalNativeBuild {
+            cmake {
+                // Override broken prefab header (std::format → std::to_string) without touching immutable Gradle cache
+                cppFlags "-I${projectDir.absolutePath}/src/main/cpp/overrides"
+            }
+        }
     }
     signingConfigs {
         debug {
@@ -93,15 +122,19 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile     file(requireProp("SAE_STORE_FILE"))
+            storePassword requireProp("SAE_STORE_PASSWORD")
+            keyAlias      requireProp("SAE_KEY_ALIAS")
+            keyPassword   requireProp("SAE_KEY_PASSWORD")
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

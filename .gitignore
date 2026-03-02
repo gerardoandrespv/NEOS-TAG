@@ -12,6 +12,20 @@ firebase-debug.log
 *.log
 node_modules
 
+# Android signing — NUNCA commitear keystores de release
+*.keystore
+*.jks
+# Excepción: debug.keystore es público (password = 'android'), seguros de commitear
+!src/SAEMobile/android/app/debug.keystore
+
+# Artefactos temporales de sesiones Claude Code
+tmpclaude-*
+**/tmpclaude-*
+
+# Archivos nulos residuales de Windows
+[Nn]ul
+src/web/[Nn]ul
+
 # Archivos de sonido (MP3) - Se suben a Firebase Storage
 assets/sounds/*.mp3
 assets/sounds/*.wav
