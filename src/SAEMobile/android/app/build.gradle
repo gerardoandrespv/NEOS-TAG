@@ -123,10 +123,10 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile     file(requireProp("SAE_STORE_FILE"))
-            storePassword requireProp("SAE_STORE_PASSWORD")
-            keyAlias      requireProp("SAE_KEY_ALIAS")
-            keyPassword   requireProp("SAE_KEY_PASSWORD")
+            storeFile     getProp("SAE_STORE_FILE") ? file(getProp("SAE_STORE_FILE")) : null
+            storePassword getProp("SAE_STORE_PASSWORD")
+            keyAlias      getProp("SAE_KEY_ALIAS")
+            keyPassword   getProp("SAE_KEY_PASSWORD")
         }
     }
     buildTypes {
@@ -141,6 +141,20 @@ android {
     }
 }
 
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { t -> t.name.toLowerCase().contains('release') }) {
+        ["SAE_STORE_FILE",
+         "SAE_STORE_PASSWORD",
+         "SAE_KEY_ALIAS",
+         "SAE_KEY_PASSWORD"].each { key ->
+            if (!getProp(key)) {
+                throw new IllegalStateException(
+                    "[SAEMobile] Missing required signing property: ${key}"
+                )
+            }
+        }
+    }
+}
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
